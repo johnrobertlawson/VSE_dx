@@ -1,0 +1,19 @@
+/home/john.lawson/gits/objectID/to_refactor/news_e_verif_dot.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/to_refactor/object_match_wrapper.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/to_refactor/wrapper_dot.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/to_refactor/feature_wrapper.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/to_refactor/news_e_paint_verif.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/to_refactor/wrapper_verif_obj_retro.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/to_refactor/wrapper_verif_paint_retro.py:#mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/src/news_e_paint_timelag.py:    #mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/src/news_e_paintball.py:    #mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/src/news_e_member.py:    #mapname = '/scratch2/patrick.skinner/images/map.pickle'
+/home/john.lawson/gits/objectID/objectid.py:                    map_pickle_fpath='auto'):
+/home/john.lawson/gits/objectID/objectid.py:        self.map_pickle_fpath = dict()
+/home/john.lawson/gits/objectID/objectid.py:            if map_pickle_fpath == 'auto':
+/home/john.lawson/gits/objectID/objectid.py:                self.map_pickle_fpath[domn] = os.path.join(plotdir,
+/home/john.lawson/gits/objectID/objectid.py:                self.map_pickle_fpath[domn] = map_pickle_fpath[n]
+/home/john.lawson/gits/objectID/objectid.py:                    self.map_pickle_fpath[dom],vrbl,t
+/home/john.lawson/gits/objectID/objectid.py:                    self.map_pickle_fpath[dom],vrbl,t
+/home/john.lawson/gits/objectID/objectid.py:                    self.map_pickle_fpath[dom], self.fcst_nt
+/home/john.lawson/gits/objectID/objectid.py:                    self.map_pickle_fpath[dom],t
