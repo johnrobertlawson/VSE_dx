@@ -101,14 +101,15 @@ member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 # doms = (1,2)
 
 class CaseGrid:
-    def __init__(self,d02_fpath):
+    def __init__(self,Wnc):
         """ Create new grid for 5 km data.
 
         wrfout_fpath should be the d02 domain.
         """
         self.bmap = create_bmap()
 
-        Wnc = Dataset(d02_fpath)
+        if isinstance(Wnc,str):
+            Wnc = Dataset(Wnc)
         Wlats = Wnc.variables['XLAT'][:]
         Wlons = Wnc.variables['XLON'][:]
 
@@ -140,7 +141,44 @@ class CaseGrid:
 
         return nx, ny
 
+    def return_latlons(self):
+        return self.lats, self.lons
+
     return
+
+def get_extraction_fpaths(vrbl,fmt,validutc,caseutc=None,initutc=None,mem=None):
+    """ Return the file path for the .npy of an interpolated field.
+
+    Vrbl could be the forecast or observed field.
+    utc is the valid time of forecast or observation.
+    fmt is the extracted-grid name
+
+    inistr is only required for forecasts
+    mem too
+
+    Args:
+        initstr: String for 
+
+    Something like:
+
+    FORECASTS:
+    uh02_d02_3km_20160331_0100_0335_m01.npy
+
+    OBS:
+    aws02_mrms_rot_3km_20160331_0335.npy
+
+    """
+    if vrbl in ("Wmax","UH02","UH25","RAINNC"):
+        # TODO: are we not just doing 5-min or 1-hr accum_precip?
+        caseYYYYMMDD = caseutc
+        initHHMM = initutc
+        validHHMM = validutc
+        fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,initHHMM,validHHMM,mem)
+    elif vrbl in ("AWS02","AWS25","DZ","ST4"):
+        utcYYYYMMDD = validutc
+        utcHHMM = validutc
+        fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,utcYYYYMMDD,utcHHMM)
+    return os.path.join(pp_root,fname)
 
 def create_bmap():
     bmap = self.create_basemap(width=12000000,height=9000000,
@@ -152,13 +190,21 @@ def create_bmap():
 def closest(arr,val):
     return N.argmin(N.abs(arr-val))
 
-def interpolate(dataA,latsA,lonsA,latsB,lonsB,
-                cut_first=True,remove_negative=False):
+#def cut(data,latsA,lonsA,latsB,lonsB):
+#    return utils.return_subdomain(data,latsA,lonsA,cut_to_lats=d02_lats,
+#                        cut_to_lons=d02_lons)
+
+def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,cut_first=True,
+                # remove_negative=False,
+                save_to_fpath=None):
     """ Interpolate data on gridA to gridB.
 
     If cut_first, if gridA is a lot bigger (e.g., StageIV data), cut it to 
     a smaller size to improve interpolation efficiency.
     """
+    if cut_only:
+        return utils.return_subdomain(data,latsA,lonsA,cut_to_lats=latsB,
+                                cut_to_lons=lonsB)
     if cut_first:
         Nlim = N.max(latsA)+0.5
         Elim = N.max(lonsA)+0.5
@@ -184,6 +230,9 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,
     ydB = len(yyB[0,:])
     dataB = scipy.interpolate.griddata([xxA.flat,yyA.flat],dataA.flat,
                 [xxB.flat,yyB.flat],method='linear').reshape(xdB,ydB)
+    if save_to_fpath:
+        N.save(arr=dataB,file=save_to_fpath)
+        return
     return dataB
     
 def generate_all_runs():
@@ -295,13 +344,16 @@ def unsparsify(nc,vrbl):
                         pixel_y = np.append(pixel_y, temp_y_index)
                         pixel_value = np.append(pixel_value, pixel_value_temp[i])
 
-            pixel_x = abs(pixel_x - (xlat_full.shape[0] - min_lat)) #... tortured way of flipping lat values, but it works
+            #... tortured way of flipping lat values, but it works
+            pixel_x = abs(pixel_x - (xlat_full.shape[0] - min_lat)) 
             pixel_y = pixel_y - min_lon
 
             mrms_low_pixel_x_val = x[pixel_x, pixel_y]  
             mrms_low_pixel_y_val = y[pixel_x, pixel_y]
             mrms_low_pixel_value = pixel_value
-            mrms_low_x_y = np.dstack([mrms_low_pixel_y_val, mrms_low_pixel_x_val])[0] #KD Tree searchable index of mrms observations
+            #KD Tree searchable index of mrms observations
+            mrms_low_x_y = np.dstack([mrms_low_pixel_y_val, mrms_low_pixel_x_val])[0] 
+
     elif (grid_type[0:2] == 'La'): #if LatLonGrid
         pixel_value_full = low_fin.variables[mrms_low_var][:]
         pixel_value_full = pixel_value_full.ravel()
@@ -328,11 +380,13 @@ def unsparsify(nc,vrbl):
                                 (pixel_y_full > min_lon) & 
                                 (pixel_y_full < max_lon) & 
                                 (pixel_value_full > aws_thresh_1)]
-        pixel_x = abs(pixel_x - (xlat_full.shape[0] - min_lat)) #... tortured way of flipping lat values, but it works
+        #... tortured way of flipping lat values, but it works
+        pixel_x = abs(pixel_x - (xlat_full.shape[0] - min_lat)) 
         pixel_y = pixel_y - min_lon
         mrms_low_pixel_x_val = x[pixel_x, pixel_y]
         mrms_low_pixel_y_val = y[pixel_x, pixel_y]
-        mrms_low_x_y = np.dstack([mrms_low_pixel_y_val, mrms_low_pixel_x_val])[0] #KD Tree searchable index of mrms observations
+        #KD Tree searchable index of mrms observations
+        mrms_low_x_y = np.dstack([mrms_low_pixel_y_val, mrms_low_pixel_x_val])[0] 
     else: 
        print 'aws low unknown grid type!!!!'
 
@@ -346,7 +400,7 @@ def get_mrms_rotdz_grid(caseutc,vrbl):
 
     Listed Latitude/Longitude attributes are top left
     """
-    assert vrbl in ("DZ","AzShear")
+    assert vrbl in ("dz","aws")
 
     nc = open_random_rotdz(caseutc,vrbl)
 
@@ -499,40 +553,50 @@ def open_random_rotdz(caseutc,vrbl):
 ######### PROCEDURE #########
 """ Numpy array extraction for Lawson et al, 2019.
 
-Logic:
-    * First, create d02_1km arrays of lat, lon, cref, Wmax, etc
-    * Next, create d01_3km by trimming the raw d01 to region of d02 
-    * Now also create d01_5km by interpolating to neutral grid
-    * ALL OUTER DOMS DONE HERE
-    * Load MRMS and cut/interpolate to d02 for mrms_1km
-    * Cut/interpolate to cut d01 domain for mrms_3km
-    * Now also create stageiv_5km by interpolating to the neutral grid
-    * ALL OBS DONE HERE
-    * Interpolate inner domain to d02 grid for d02_3km
-    * Interpolate inner domain to neutral grid for d02_5km
-    * ALL INNER DOMS DONE HERE
-
 The following are native grids, computed for each case:
     * d01_raw (3 km)
     * d02_raw (1 km)
     * stageiv_raw (4.7 km)
-    * mrms_rot_raw (2016: 1 km; 2017: 0.5 km)
+    * mrms_aws_raw (2016: 1 km; 2017: 0.5 km)
     * mrms_dz_raw (1 km)
     * neutral (5 km)
 
-The following are copied or interpolated grids, again, for each case:
-    * d01_3km (d01 cut to d02_raw bounds)
-    * d01_5km (d01 interpolated to neutral_5km)
-    * d02_1km (d02 on native, d02_raw)
-    * d02_3km (d02 interpolated to d01_3km)
-    * d02_5km (d02 interpolated to neutral)
-    * mrms_rot_1km (AWS data interpolated to d02_1km)
-    * mrms_rot_3km (AWS data interpolated to d01_3km)
-    * mrms_rot_5km (AWS data interpolated to neutral)
+The following are extra grids computed from above, requiring cut data:
+    * d01_3km (d01_raw cut to d02_raw bounds)
+    
+The following are cut or interpolated grids, from above, requiring interpolation:
+    * d01_5km (d01 data interpolated to neutral_5km)
+    * d02_1km (d02 data on native, d02_raw)
+    * d02_3km (d02 data interpolated to d01_3km)
+    * d02_5km (d02 data interpolated to neutral)
+    * mrms_aws_1km (AWS data interpolated to d02_1km)
+    * mrms_aws_3km (AWS data interpolated to d01_3km)
+    * mrms_aws_5km (AWS data interpolated to neutral)
     * mrms_dz_1km (cref data interpolated to d02_1km)
     * mrms_dz_3km (cref data interpolated to d01_3km)
     * mrms_dz_5km (cref data interpolated to neutral)
     * stageiv_5km (Stage IV data interpolated to neutral)
+
+This script will compute all lat/lon grids first (see above).
+
+Then, interpolation of fields is performed for:
+
+    1. FORECAST FIELDS (d01, d02):
+    * Wmax (column max of W; not verified)
+    * UH02 (TODO: write)
+    * UH25 (TODO: write)
+    * cref (column max of REFL_10CM)
+    * RAINNC (check! rain rate - needs to be done hourly)
+
+    2. OBSERVED FIELDS:
+    * AWS02 (MRMS LL-AWS)
+    * AWS25 (MRMS ML-AWS)
+    * DZ (MRMS)
+    * Stage IV
+
+When the script is finished, the sliced/interpolated data is then
+available to move to another location with all lat/lon requirements
+present. TODO: make sure everything's in the same folder.
 
 """
 # Variables for plotting
@@ -541,9 +605,6 @@ all_folders = list(generate_all_folders())
 
 ### Get Stage IV catalogue
 ST4 = ObsGroup(st4dir,'stageiv')
-
-
-commands = []
 
 # for i in all_folders:
 for caseutc, initutc in CASES.items():
@@ -558,6 +619,9 @@ for caseutc, initutc in CASES.items():
     # d02
     d02_latf, d02_lonf = get_llf_fpath(casestr,"d02_raw")
 
+    # TODO: we just need to loop to check the lat/lon
+    # files have been created, or create them. We can
+    # delete the lat/lon array files, and not load them.
     if os.path.exists(d02_latf):
         d02_lats = N.load(do2_latf)
         d02_lons = N.load(d02_lonf)
@@ -610,25 +674,104 @@ for caseutc, initutc in CASES.items():
         N.save(arr=st4_lats,file=st4_latf)
         N.save(arr=st4_lons,file=st4_lonf)
 
-    # MRMS rot/dz
-    mrms_rotdz_latf, mrms_rotdz_lonf = get_llf_fpath(casestr,"mrms_rotdz_raw")
-    if os.path.exists(mrms_rotdz_latf):
-        mrms_rotdz_lats = N.load(mrms_rotdz_latf)
-        mrms_rotdz_lons = N.load(mrms_rotdz_lonf)
+    # MRMS LLAWS/MLAWS (rot)
+    mrms_aws_latf, mrms_aws_lonf = get_llf_fpath(casestr,"mrms_aws_raw")
+    if os.path.exists(mrms_aws_latf):
+        mrms_aws_lats = N.load(mrms_aws_latf)
+        mrms_aws_lons = N.load(mrms_aws_lonf)
     else:
-        mrms_fpath = get_mrms_rotdz_fpath(caseutc)
-        mrms_rotdz_nc = Dataset(mrms_fpath)
+        # mrms_fpath = get_mrms_rotdz_fpath(caseutc)
+        # mrms_rotdz_nc = Dataset(mrms_fpath)
+        mrms_aws_lats,mrms_aws_lons = get_mrms_rotdz_grid(caseutc,"aws")
+        N.save(arr=mrms_aws_lats,file=mrms_aws_latf)
+        N.save(arr=mrms_aws_lons,file=mrms_aws_lonf)
 
-        ### AT LONS
+    # MRMS DZ (cref)
+    mrms_dz_latf, mrms_dz_lonf = get_llf_fpath(casestr,"mrms_dz_raw")
+    if os.path.exists(mrms_dz_latf):
+        mrms_dz_lats = N.load(mrms_dz_latf)
+        mrms_dz_lons = N.load(mrms_dz_lonf)
+    else:
+        # mrms_fpath = get_mrms_rotdz_fpath(caseutc)
+        # mrms_rotdz_nc = Dataset(mrms_fpath)
+        mrms_dz_lats,mrms_dz_lons = get_mrms_rotdz_grid(caseutc,"dz")
+        N.save(arr=mrms_dz_lats,file=mrms_dz_latf)
+        N.save(arr=mrms_dz_lons,file=mrms_dz_lonf)
 
+    # Neutral grid
+    neutral_latf, neutral_lonf = get_llf_fpath(casestr,"neutral")
+    if os.path.exists(neutral_latf):
+        neutral_lats = N.load(neutral_latf)
+        neutral_lons = N.load(neutral_lonf)
+    else:
+        d02_GRID = CaseGrid(d02_nc)
+        neutral_lats, neutral_lons = d02_GRID.return_latlons()
+        N.save(arr=neutral_lats,file=neutral_latf)
+        N.save(arr=neutral_lons,file=neutral_lonf)
 
+    # One last to compute:
+    ### d01_3km (d01 cut to d02_raw bounds) 
+    
+    d01_3km_latf, d01_3km_lonf = get_llf_fpath(casestr,"d01_3km")
+    if os.path.exists():
+    #    neutral_lats = N.load(neutral_latf)
+    #    neutral_lons = N.load(neutral_lonf)
+        pass
+    else:
+        new_lats,new_lons = cut(None,d01_lats,d01_lons,d02_lats,d02_lons)
+        #new_lats,new_lons = utils.return_subdomain(data=None,lats=d01_lats,
+        #                            lons=d01_lons,cut_to_lats=d02_lats,
+        #                            cut_to_lons=d02_lons)
+        N.save(arr=new_lats,file=d01_3km_latf)
+        N.save(arr=new_lons,file=d01_3km_lonf)
 
-    GRIDS = {}
-    GRIDS[5] = {} # The neutral 5 km domain
-    GRIDS[3] = {} # Just the d02 raw domain
-    GRIDS[1] = {} # Just the d01 raw domain
+# Now the grids are there!
+
+# Time to interpolate!
+
+# This is a list of lists of arguments to send to interpolate().
+commands = []
+# for case, mem, vrbl, utc?
+for case in cases:
+    # Do verification separately, and loop over all verification times
+    # HERE
+
+    # Forecast products
     for mem in member_names:
         memdir = os.path.join(ensroot,initstr,mem)
+
+        ### d01_3km (d01 cut to d02)
+        for utc in valid_utcs:
+            save_to_fpath = get_extraction_fpaths(vrbl,"d01_3km",utc,
+            if not os.path.exists(save_to_fpath):
+                data, latsA, lonsB = get_data(case, vrbl, utc, "d01_raw")
+                #lats, lons =  get_latlons(case, vrbl, utc, "d01_3km")
+                latsB, lonsB =  get_latlons(case, vrbl, utc, "d02_raw")
+
+                # Need fpath for interpolated grids to be saved.
+                commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
+
+        ### d01_5km (d01 interpolated to neutral_5km)
+
+        
+        # Create .npy file name
+        # If not there, append the function to the command list
+        commands.append(interpolate, )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         # d02_1km
