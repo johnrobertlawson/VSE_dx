@@ -170,13 +170,15 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc=None,initutc=None,mem=None):
     """
     if vrbl in ("Wmax","UH02","UH25","RAINNC"):
         # TODO: are we not just doing 5-min or 1-hr accum_precip?
-        caseYYYYMMDD = caseutc
-        initHHMM = initutc
-        validHHMM = validutc
-        fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,initHHMM,validHHMM,mem)
+        caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
+                                                caseutc.day)
+        initHHMM = "{:02d}{:02d}".format(initutc.hour, initutc.minute)
+        validHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
+        fname = "{}_{}_{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,initHHMM,
+                                        validHHMM,mem)
     elif vrbl in ("AWS02","AWS25","DZ","ST4"):
         utcYYYYMMDD = validutc
-        utcHHMM = validutc
+        utcHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
         fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,utcYYYYMMDD,utcHHMM)
     return os.path.join(pp_root,fname)
 
@@ -731,127 +733,111 @@ for caseutc, initutc in CASES.items():
 
 # This is a list of lists of arguments to send to interpolate().
 commands = []
-# for case, mem, vrbl, utc?
-for case in cases:
-    # Do verification separately, and loop over all verification times
-    # HERE
 
-    # Forecast products
-    for mem in member_names:
-        memdir = os.path.join(ensroot,initstr,mem)
+#### FIRST: forecast
+for initutc, mem, vrbl in loop_interp:
+    initstr = utils.string_from_time('dir',initutc,strlen='hour')
+    caseutc = get_caseutc(initutc)
+    casestr = utils.string_from_time('dir',caseutc,strlen='day')
+    memdir = os.path.join(ensroot,initstr,mem)
 
+    for validutc in valid_utcs(vrbl,initutc):
         ### d01_3km (d01 cut to d02)
-        for utc in valid_utcs:
-            save_to_fpath = get_extraction_fpaths(vrbl,"d01_3km",utc,
-            if not os.path.exists(save_to_fpath):
-                data, latsA, lonsB = get_data(case, vrbl, utc, "d01_raw")
-                #lats, lons =  get_latlons(case, vrbl, utc, "d01_3km")
-                latsB, lonsB =  get_latlons(case, vrbl, utc, "d02_raw")
-
-                # Need fpath for interpolated grids to be saved.
-                commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
+        save_to_fpath = get_extraction_fpaths(vrbl,"d01_3km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(case,vrbl,utc,"d01_raw")
+            latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_raw")
+            commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
         ### d01_5km (d01 interpolated to neutral_5km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"d01_5km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data, latsA, lonsB = get_data(case,vrbl,utc,"d01_raw")
+            latsB, lonsB = get_latlons(case,vrbl,utc,"neutral")
+            commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
-        
-        # Create .npy file name
-        # If not there, append the function to the command list
-        commands.append(interpolate, )
+        ### d02_1km - should be a simple one...
+        ### todo: compare interp to raw data! They should be very similar
+        save_to_fpath = get_extraction_fpaths(vrbl,"d02_1km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(case,vrbl,utc,"d02_raw")
+            latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_1km")
+            commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
+            
+        ### d02_3km (d02 interpolated to 3 km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"d02_3km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(case,vrbl,utc,"d02_raw")
+            latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_3km")
+            commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+        ### d02_5km (d02 interpolated to 5km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"d02_5km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(case,vrbl,utc,"d02_raw")
+            latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_5km")
+            commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+# That's that.
 
+# Do verification separately, and loop over all verification times
+for vrbl, validutc in obs_vrbls_times:
+    
+    ### mrms_aws_1km (AWS data interpolated to d02_1km)
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"mrms_aws_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_1km")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+    # mrms_aws_3km (AWS data interpolated to d01_3km)
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"mrms_aws_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_3km")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+    # mrms_aws_5km (AWS data interpolated to d01_5km)
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"mrms_aws_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"neutral")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+    # mrms_dz_1km (cref data interpolated to d02_1km) 
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"mrms_dz_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_1km")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+    # mrms_dz_3km (cref data interpolated to d02_3km) 
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"mrms_dz_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"d02_3km")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
+    # mrms_dz_5km (cref data interpolated to d02_5km) 
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"mrms_dz_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"neutral")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
-
-
-
-
-
-
-
-
-        # d02_1km
-
-        # Get filepath for d02
-        fname = utils.string_from_time('wrfout',initutc,dom="d02")
-        d02_nc_fpath = os.path.join(memdir,fname)
-
-        # d02 native 1km grid
-        for vrbl in vrbls:
-            npyfs = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                            vrbl=vrbl,fmt='d02_1km')
-            commands.append([d02_nc_fpath, vrbl, npyfs])
-
-        # Save d02 native 1km lat/lon grid
-        if mem == 'm01':
-            for vrbl in ("XLAT","XLONG"):
-                npyf = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                            vrbl=vrbl,fmt="d02_1km",nt=1)
-                commands.append((d02_nc_fpath, vrbl, npyf))
+    # stageiv_5km (Stage IV data interpolated to neutral)
+    save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(case,vrbl,utc,"stageiv_raw")
+        latsB,lonsB =  get_latlons(case,vrbl,utc,"neutral")
+        commands.append(data,latsA,lonsA,latsB,lonsB,True,save_to_fpath)
 
 # Now to submit them
 with multiprocessing.pool(ncpus) as Pool:
     pool.map(load_data,commands)
-
-# d01_3km and d01_5km
-commands = []
-for i in all_folders:
-    # This time, load lat/lon within functions for interp
-    do2latf = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                vrbl="XLAT",fmt="d02_1km",nt=1)
-    d02lonf = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                vrbl="XLON",fmt="d02_1km",nt=1)
-
-    # Get filepath for d01
-    fname = utils.string_from_time('wrfout',initutc,dom="d01")
-    d01_nc_fpath = os.path.join(memdir,fname)
-
-    # Cut d01 to d02 and save native 3km array
-    # Save new lat/lon too
-    for vrbl in vrbls:
-        npyfs = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                     vrbl=vrbl,fmt="d01_3km")
-        commands.append(d01_nc_fpath, vrbl, npyfs, d02latf, d02lonf)
-
-    # Interpolate to 5 km for stageiv
-    
-
-# Now to submit them
-with multiprocessing.pool(ncpus) as Pool:
-    pool.map(do_fcst_interp,commands)
- 
-
-    # Now we can interp d02 to 3 km:
-    for vrbl in vrbls:
-        npyfs = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                     vrbl=vrbl,fmt="d02_3km")
-        yield do_fcst_interp, d02_nc_fpath, vrbl, npyfs, d01_cutlats, d01_cutlons
-
-    # Interp to 5km and save
-    for vrbl in vrbls:
-        npyfs = get_extraction_fpaths(initstr=initstr,mem=mem,
-                                     vrbl=vrbl,fmt="d01_5km")
-        yield do_fcst_interp, d01_nc_fpath, vrbl, npyfs, st4lats, st4lons
-
-
-    # Load mrms for this timerange
-    for utc in fcst_utcs:
-        fname = utils.string_from_time('mrms',initutc,dom="d01")
-        FOLDER = "NEED FOLDERS HERE"
-        nc_fpath = os.path.join(memdir,FOLDER,fname)
-
-        # Save 1km npy (domain of d02)
-        for vrbl in ("DZ","AWS02","AWS25"):
-            # npyfs = get_extraction_fpaths(initstr,2,mem,vrbl,fmt,nt=1)
-            npyf = get_mrms_extraction_fpath(initstr,utc,vrbl,fmt)
-            yield do_mrms_to_1km, nc_fpath, npy_fpath, d02lats, d02lons, vrbl
-
-
-        # Save 3km npy (domain of d01)
-
-return
 
