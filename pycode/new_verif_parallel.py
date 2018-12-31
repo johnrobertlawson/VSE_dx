@@ -24,15 +24,17 @@ from evac.plot.domains import Domains
 from evac.stats.detscores import DetScores
 from evac.plot.performance import Performance
 from evac.stats.fi import FI
+from evac.object.objectid import ObjectID
 
 
 ### SWITCHES ###
 do_domains = False
 do_performance = False
-do_efss = True
+do_efss = False # Also includes FISS, which is broken?
 
 do_object_performance = True
-object_switch = max(do_object_performance,)
+do_object_distr = False
+object_switch = max(do_object_performance,do_object_distr)
 
 ### SETTINGS ###
 #mp_log = multiprocessing.log_to_stderr()
@@ -83,15 +85,15 @@ member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 # doms = (1,2)
 fcst_vrbls = ("Wmax","UH02","UH25","RAINNC","REFL_comp")
 obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")
-fcstmins = N.arange(0,185,5)
+all_fcstmins = N.arange(0,185,5)
 fcst_fmts = ("d01_3km","d02_1km","d02_3km")
 
 #### FOR DEBUGGING ####
-# CASES = {
-        # datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),],
-        # }
+CASES = {
+        datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,21,0,0),],
+        }
 
-# member_names = ['m{:02d}'.format(n) for n in range(1,19)]
+member_names = ['m{:02d}'.format(n) for n in range(2,3)]
 # fcst_vrbls = ("REFL_comp",)
 # fcst_vrbls = ("Wmax",)
 fcst_vrbls = ("REFL_comp","Wmax")
@@ -165,23 +167,69 @@ def get_wrfout_fname(t,dom):
                 t.year,t.month,t.day,t.hour,t.minute,t.second)
     return fname
 
-def fc2ob(fcv,fcfmt):
+def fc2ob(fcst_vrbl,fcst_fmt):
     """ Look up the corresponding variable/format name for obs, from vrbls.
     """
     # This is the observational variable
     VRBLS = {"REFL_comp":"NEXRAD",}
-    obv = VRBLS[fcv]
+    obs_vrbl = VRBLS[fcst_vrbl]
 
     # This is the dx for the grid (e.g. 1km)
-    *_, dx = fcfmt.split("_")
+    *_, dx = fcst_fmt.split("_")
 
     # These are the field codes
     OO = {'NEXRAD':'nexrad'}
-    obfmt = "_".join((OO[obv],dx))
+    obs_fmt = "_".join((OO[obs_vrbl],dx))
 
     # pdb.set_trace()
-    return obv,obfmt
+    return obs_vrbl,obs_fmt
 
+def ob2fc(obs_vrbl,obs_fmt):
+    VRBLS = {"NEXRAD":"REFL_comp",}
+    fcst_vrbl = VRBLS[obs_vrbl]
+
+    # This is the dx for the grid (e.g. 1km)
+    *_, dx = obs_fmt.split("_")
+
+    if dx == "3km":
+        fcst_fmt = "d01_3km"
+    elif dx == "1km":
+        fcst_fmt = "d02_1km"
+
+    return fcst_vrbl, fcst_fmt
+    # fcst_vrbl, fcst_fmt = ob2fc(obs_vrbl,obs_fmt)
+
+def loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,members):
+    for mem in members:
+        for fcstmin in fcstmins:
+            for caseutc, initutcs in CASES.items():
+                for initutc in initutcs:
+                    validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
+                    yield fcst_vrbl, fcst_fmt, validutc, caseutc, initutc, mem
+
+def loop_obj_obs(obs_vrbl,all_times=True):
+    if all_times is True:
+        ts = N.arange(0,185,5)
+    else:
+        ts = all_times
+    obtimes = set()
+    casetimes = {}
+    for caseutc, initutcs in CASES.items():
+        casetimes[caseutc] = set()
+        for initutc in initutcs:
+            for t in ts:
+                validutc = initutc+datetime.timedelta(seconds=60*int(t))
+                obtimes.add(validutc)
+                casetimes[caseutc].add(validutc)
+
+    for t in obtimes:
+        case = None
+        for caseutc in CASES.keys():
+            if t in casetimes[caseutc]:
+                case = caseutc
+                break
+        assert case is not None
+        yield obs_vrbl, obs_fmt, validutc, case
 
 def loop_efss(vrbl,fcstmin,fmt):
     for caseutc, initutcs in CASES.items():
@@ -230,6 +278,43 @@ def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
 
         return fcst_data, obs_data
 
+def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
+    if mem == "all":
+        for midx, mem in enumerate(member_names):
+            fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
+                    validutc=validutc,caseutc=caseutc,initutc=initutc,
+                    mem=mem)
+            temp_data = N.load(fcst_fpath)
+            if midx == 0:
+                fcst_data = N.zeros([len(member_names),*temp_data.shape])
+            fcst_data[midx,:,:] = temp_data
+    else:
+        fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
+                validutc=validutc,caseutc=caseutc,initutc=initutc,
+                mem=mem)
+        fcst_data = N.load(fcst_fpath)
+
+    fcst_lats, fcst_lons = load_latlons(fcst_fmt,caseutc)
+    return fcst_data, fcst_lats, fcst_lons
+
+def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
+                    fcst_fmt=None,):
+    if (obs_vrbl is None) and (obs_fmt is None):
+        obs_vrbl, obs_fmt = fc2ob(fcst_vrbl,fcst_fmt)
+    elif (fcst_vrbl is None) and (fcst_fmt is None):
+        fcst_vrbl, fcst_fmt = ob2fc(obs_vrbl,obs_fmt)
+    else:
+        print("Check args:",obs_vrbl,obs_fmt,fcst_vrbl,fcst_fmt)
+        raise Exception
+
+    obs_fpath = get_extraction_fpaths(vrbl=obs_vrbl,fmt=obs_fmt,
+                    validutc=validutc,caseutc=caseutc)
+    obs_data = N.load(obs_fpath)
+
+    obs_lats, obs_lons = load_latlons(fcst_fmt,caseutc)
+    return obs_data, obs_lats, obs_lons
+
+
 def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='all'):
     nt = window
     ws = int((nt-1)/2)
@@ -256,6 +341,15 @@ def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='al
         obs_data[tidx,:,:] = obs_i
 
     return fcst_data, obs_data
+
+def load_latlons(fmt,caseutc):
+    casestr = utils.string_from_time('dir',caseutc,strlen='day')
+    ret = []
+    for f in ("lats.npy","lons.npy"):
+        fpath = os.path.join(extractroot,fmt,casestr,f)
+        ret.append(N.load(fpath))
+    return ret
+
 
 ### COLOUR SETTINGS ###
 # https://davidmathlogic.com/colorblind/#%23D81B60-%231E88E5-%23FFC107-%23004D40
@@ -519,7 +613,67 @@ if object_switch:
     # Check if object files have been created
 
     # if not... Do object identification here
-    pass
+
+    def compute_obj_fcst(i):
+        #fcst_vrbl, caseutc, initutc, mem, fcst_fmt, validutc,thresh = i
+        fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem = i
+
+        if validutc == initutc:
+            # Forecast is just zeros.
+            return None
+
+        # Check for object save file for obs/fcst
+
+        # if exists, return
+
+        print("DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
+        fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
+                                validutc,caseutc,initutc,mem)
+        # pdb.set_trace()
+        dx = 3 if fcst_fmt.startswith("d01") else 1
+        print("dx set to",dx)
+
+        obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx)
+        fname = "obj_{}.png".format(fcst_fmt)
+        obj.plot_quicklook(outdir=outroot,fname=fname)
+        # pdb.set_trace()
+        return obj
+
+    def compute_obj_obs(i):
+        obs_vrbl, obs_fmt, validutc, caseutc = i
+        dx = 3 if obs_fmt.endswith("3km") else 1
+
+        print("dx set to",dx)
+        print("DEBUG:",obs_fmt,caseutc,validutc)
+
+        obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
+                            obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
+        obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx)
+        fname = "obj_{}.png".format(obs_fmt)
+        obj.plot_quicklook(outdir=outroot,fname=fname)
+
+        return obj
+
+    fcst_vrbl = "REFL_comp"
+    obs_vrbl = "NEXRAD"
+    # fcstmins = all_fcstmins
+    fcstmins = (35,)
+    fcst_fmts = ("d01_3km","d02_1km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    # obs_fmts = fcst_fmts
+    for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
+        itr_obs = loop_obj_obs(obs_vrbl,all_times=fcstmins)
+            # with multiprocessing.Pool(ncpus) as pool:
+            #     results = pool.map(compute_obj_obs,itr)
+        for i in itr_obs:
+            compute_obj_obs(i)
+
+        itr_fcst = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names)
+
+        # with multiprocessing.Pool(ncpus) as pool:
+        #     results = pool.map(compute_obj_fcst,itr)
+        for i in itr_fcst:
+            compute_obj_fcst(i)
 
 if object_performance:
     # Do 2x2 table from objects matched
