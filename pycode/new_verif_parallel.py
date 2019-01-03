@@ -25,16 +25,32 @@ from evac.stats.detscores import DetScores
 from evac.plot.performance import Performance
 from evac.stats.fi import FI
 from evac.object.objectid import ObjectID
+from evac.object.catalogue import Catalogue
 
+### ARG PARSE ####
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-N','--ncpus',dest='ncpus',default=1,type=int)
+parser.add_argument('-oo','--overwrite_output',dest='overwrite_output',
+                            action='store_true',default=False)
+parser.add_argument('-op','--overwrite_pp',dest='overwrite_pp',
+                            action='store_true',default=False)
+
+PA = parser.parse_args()
+ncpus = PA.ncpus
+overwrite_output = PA.overwrite_output
+overwrite_pp = PA.overwrite_pp
 
 ### SWITCHES ###
 do_domains = False
 do_performance = False
 do_efss = False # Also includes FISS, which is broken?
 
-do_object_performance = True
+do_object_performance = False
 do_object_distr = False
-object_switch = max(do_object_performance,do_object_distr)
+do_object_pca = True
+object_switch = max(do_object_performance,do_object_distr,
+                    do_object_pca)
 
 ### SETTINGS ###
 #mp_log = multiprocessing.log_to_stderr()
@@ -75,13 +91,10 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 ### DIRECTORIES ###
 extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
 objectroot = os.path.join(extractroot,'object_instances')
-outroot = "/home/nothijngrad/Xmas_Shutdown/pyoutput"
+#outroot = "/home/nothijngrad/Xmas_Shutdown/pyoutput"
+outroot = "/mnt/d/pyoutput"
 
-### ARG PARSE ####
-parser = argparse.ArgumentParser()
 
-parser.add_argument('-N','--ncpus',dest='ncpus',default=1,type=int)
-ncpus = parser.parse_args().ncpus
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -95,10 +108,11 @@ obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 all_fcstmins = N.arange(0,185,5)
 fcst_fmts = ("d01_3km","d02_1km","d02_3km")
 
+
+
 #### FOR DEBUGGING ####
 # CASES = {datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,21,0,0),]}
 
-member_names = ['m{:02d}'.format(n) for n in range(2,3)]
 # fcst_vrbls = ("REFL_comp",)
 # fcst_vrbls = ("Wmax",)
 fcst_vrbls = ("REFL_comp","Wmax")
@@ -652,6 +666,16 @@ if do_efss:
 
 
 if object_switch:
+    # To discriminate between line/cell
+    eccentricity = 0.5
+
+    # Plot type
+    #plot_what = 'ratio'; plot_dir = 'check_ratio'
+    # plot_what = 'qlcs'; plot_dir = 'qlcs_v_cell'
+    # plot_what = 'ecc'; plot_dir = "compare_ecc_ratio"
+    # plot_what = 'extent'; plot_dir ='check_extent'
+    plot_what = "4-panel"; plot_dir = "four-panel"
+
     def compute_obj_fcst(i):
         fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem = i
 
@@ -664,8 +688,7 @@ if object_switch:
                                         initutc=initutc,mem=mem)
         print(stars,"FCST DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
 
-        already_loaded = False
-        if not os.path.exists(pk_fpath):
+        if (not os.path.exists(pk_fpath)) or overwrite_pp:
         #if True:
             dx = 3 if fcst_fmt.startswith("d01") else 1
             print("dx set to",dx)
@@ -674,24 +697,24 @@ if object_switch:
                                     validutc,caseutc,initutc,mem)
             obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx)
             save_pickle(obj=obj,fpath=pk_fpath)
-            already_loaded = True
             print("Object instance newly created.")
         else:
             print("Object instance already created.")
+            obj = load_pickle(pk_fpath)
 
         # QUICK LOOKS
         fcstmin = int(((validutc-initutc).seconds)/60)
         if fcstmin in range(30,210,30):
+        #if ((fcstmin % 30) == 0): # and (mem == "m01"):
             ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(fcst_fmt,initutc,fcstmin)
-            outdir = os.path.join(outroot,"object_quicklooks","qlcs_v_cell")
+            outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
             ql_fpath = os.path.join(outdir,ql_fname)
-            if not os.path.exists(ql_fpath):
-                if not already_loaded:
-                    obj = load_pickle(pk_fpath)
-                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what='qlcs')
+            if (not os.path.exists(ql_fpath)) or overwrite_output:
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what,ecc=eccentricity)
             else:
                 print("Figure already created")
-        return
+
+        return obj.objects
 
     def compute_obj_obs(i):
         obs_vrbl, obs_fmt, validutc, caseutc = i
@@ -700,8 +723,7 @@ if object_switch:
         fpath = get_object_picklepaths(obs_vrbl,obs_fmt,validutc,caseutc)
         print(stars,"OBS DEBUG:",obs_fmt,caseutc,validutc)
 
-        already_loaded = False
-        if not os.path.exists(fpath):
+        if (not os.path.exists(fpath)) or overwrite_pp:
         #if True:
             print("DEBUG:",obs_fmt,caseutc,validutc)
             dx = 3 if obs_fmt.endswith("3km") else 1
@@ -710,49 +732,65 @@ if object_switch:
             obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
                                 obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
             obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx)
-            already_loaded = True
             save_pickle(obj=obj,fpath=fpath)
             print("Object instance newly created.")
         else:
             print("Object instance already created.")
+            obj = load_pickle(fpath)
 
         if validutc.minute == 30:
             ql_fname = "obj_{}_{:%Y%m%d%H%M}.png".format(obs_fmt,validutc)
-            outdir = os.path.join(outroot,"object_quicklooks","qlcs_v_cell")
+            outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
             ql_fpath = os.path.join(outdir,ql_fname)
-            if not os.path.exists(ql_fpath):
-                if not already_loaded:
-                    obj = load_pickle(fpath)
-                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what='qlcs')
-                return
-        print("Skipping figures")
-        return
+            if (not os.path.exists(ql_fpath)) or overwrite_output:
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what,ecc=eccentricity)
+            else:
+                print("Figure already created")
+
+        return obj.objects
 
 
     fcst_vrbl = "REFL_comp"
     obs_vrbl = "NEXRAD"
-    # fcstmins = all_fcstmins
+
     fcstmins = N.arange(30,210,30)
+    # fcstmins = N.arange(5,185,5)
+
     fcst_fmts = ("d01_3km","d02_1km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
 
-    for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
-        itr_fcst = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names)
+    member_names = ['m{:02d}'.format(n) for n in range(2,3)]
 
-        if ncpus > 1:
-            with multiprocessing.Pool(ncpus) as pool:
-                results_fcst = pool.map(compute_obj_fcst,itr_fcst)
-        else:
-            for i in itr_fcst:
-                compute_obj_fcst(i)
+    fname = "all_obj_dataframes.pickle"
+    df_pickf = os.path.join(objectroot,fname)
 
-        itr_obs = loop_obj_obs(obs_vrbl,all_times=fcstmins)
-        if ncpus > 1:
-            with multiprocessing.Pool(ncpus) as pool:
-                results_obs = pool.map(compute_obj_obs,itr_obs)
-        else:
-            for i in itr_obs:
-                compute_obj_obs(i)
+    if (not os.path.exists(df_pickf)) or overwrite_pp:
+        for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
+            itr_fcst = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names)
+
+            if ncpus > 1:
+                with multiprocessing.Pool(ncpus) as pool:
+                    results_fcst = pool.map(compute_obj_fcst,itr_fcst)
+            else:
+                for i in itr_fcst:
+                    compute_obj_fcst(i)
+
+            itr_obs = loop_obj_obs(obs_vrbl,all_times=fcstmins)
+            if ncpus > 1:
+                with multiprocessing.Pool(ncpus) as pool:
+                    results_obs = pool.map(compute_obj_obs,itr_obs)
+            else:
+                for i in itr_obs:
+                    compute_obj_obs(i)
+
+        results = results_fcst+results_obs
+        save_pickle(obj=results,fpath=df_pickf)
+    else:
+        results = load_pickle(df_pickf)
+
+    if do_object_pca:
+        CAT = Catalogue(results)
+        CAT.do_pca()
 
 
 if do_object_performance:
