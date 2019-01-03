@@ -74,11 +74,18 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 
 ### DIRECTORIES ###
 extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
+objectroot = os.path.join(extractroot,'object_instances')
 outroot = "/home/nothijngrad/Xmas_Shutdown/pyoutput"
+
+### ARG PARSE ####
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-N','--ncpus',dest='ncpus',default=1,type=int)
+ncpus = parser.parse_args().ncpus
 
 ##### OTHER STUFF #####
 stars = "*"*10
-ncpus = 8
+# ncpus = 8
 dom_names = ("d01","d02")
 domnos = (1,2)
 member_names = ['m{:02d}'.format(n) for n in range(1,37)]
@@ -89,9 +96,7 @@ all_fcstmins = N.arange(0,185,5)
 fcst_fmts = ("d01_3km","d02_1km","d02_3km")
 
 #### FOR DEBUGGING ####
-CASES = {
-        datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,21,0,0),],
-        }
+# CASES = {datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,21,0,0),]}
 
 member_names = ['m{:02d}'.format(n) for n in range(2,3)]
 # fcst_vrbls = ("REFL_comp",)
@@ -140,6 +145,23 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
         utcHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
         fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,utcHHMM)
     return os.path.join(extractroot,caseYYYYMMDD,fname)
+
+def get_object_picklepaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
+    if vrbl in fcst_vrbls: # ("Wmax","UH02","UH25","RAINNC"):
+        # TODO: are we not just doing 5-min or 1-hr accum_precip?
+        caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
+                                                caseutc.day)
+        initHHMM = "{:02d}{:02d}".format(initutc.hour, initutc.minute)
+        validHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
+        fname = "objects_{}_{}_{}_{}_{}_{}.pickle".format(vrbl,fmt,caseYYYYMMDD,initHHMM,
+                                        validHHMM,mem)
+    elif vrbl in obs_vrbls: # ("AWS02","AWS25","DZ","ST4"):
+        caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
+                                                caseutc.day)
+        # utcYYYYMMDD = validutc
+        utcHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
+        fname = "objects_{}_{}_{}_{}.pickle".format(vrbl,fmt,caseYYYYMMDD,utcHHMM)
+    return os.path.join(objectroot,caseYYYYMMDD,fname)
 
 def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None):
     bmap = Basemap(
@@ -222,6 +244,7 @@ def loop_obj_obs(obs_vrbl,all_times=True):
                 obtimes.add(validutc)
                 casetimes[caseutc].add(validutc)
 
+    # pdb.set_trace()
     for t in obtimes:
         case = None
         for caseutc in CASES.keys():
@@ -229,7 +252,7 @@ def loop_obj_obs(obs_vrbl,all_times=True):
                 case = caseutc
                 break
         assert case is not None
-        yield obs_vrbl, obs_fmt, validutc, case
+        yield obs_vrbl, obs_fmt, t, case
 
 def loop_efss(vrbl,fcstmin,fmt):
     for caseutc, initutcs in CASES.items():
@@ -350,6 +373,23 @@ def load_latlons(fmt,caseutc):
         ret.append(N.load(fpath))
     return ret
 
+def save_pickle(obj,fpath):
+    utils.trycreate(fpath)
+    with open(fpath,'wb') as f:
+        pickle.dump(obj=obj,file=f)
+    return
+
+def load_pickle(fpath):
+    with open(fpath,'rb') as f:
+        pp = pickle.load(f)
+    return pp
+
+def load_obj():
+    """ Pass in time, vrbl etc. Return the obj instance.
+    """
+    pass
+
+# /home/nothijngrad/Xmas_Shutdown/Xmas/20170501/NEXRAD_nexrad_3km_20170501_0300.npy
 
 ### COLOUR SETTINGS ###
 # https://davidmathlogic.com/colorblind/#%23D81B60-%231E88E5-%23FFC107-%23004D40
@@ -609,13 +649,10 @@ if do_efss:
         fig.savefig(fpath)
         plt.close(fig)
 
+
+
 if object_switch:
-    # Check if object files have been created
-
-    # if not... Do object identification here
-
     def compute_obj_fcst(i):
-        #fcst_vrbl, caseutc, initutc, mem, fcst_fmt, validutc,thresh = i
         fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem = i
 
         if validutc == initutc:
@@ -623,63 +660,106 @@ if object_switch:
             return None
 
         # Check for object save file for obs/fcst
+        pk_fpath = get_object_picklepaths(fcst_vrbl,fcst_fmt,validutc,caseutc,
+                                        initutc=initutc,mem=mem)
+        print(stars,"FCST DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
 
-        # if exists, return
+        already_loaded = False
+        if not os.path.exists(pk_fpath):
+        #if True:
+            dx = 3 if fcst_fmt.startswith("d01") else 1
+            print("dx set to",dx)
 
-        print("DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
-        fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
-                                validutc,caseutc,initutc,mem)
-        # pdb.set_trace()
-        dx = 3 if fcst_fmt.startswith("d01") else 1
-        print("dx set to",dx)
+            fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
+                                    validutc,caseutc,initutc,mem)
+            obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx)
+            save_pickle(obj=obj,fpath=pk_fpath)
+            already_loaded = True
+            print("Object instance newly created.")
+        else:
+            print("Object instance already created.")
 
-        obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx)
-        fname = "obj_{}.png".format(fcst_fmt)
-        obj.plot_quicklook(outdir=outroot,fname=fname)
-        # pdb.set_trace()
-        return obj
+        # QUICK LOOKS
+        fcstmin = int(((validutc-initutc).seconds)/60)
+        if fcstmin in range(30,210,30):
+            ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(fcst_fmt,initutc,fcstmin)
+            outdir = os.path.join(outroot,"object_quicklooks","qlcs_v_cell")
+            ql_fpath = os.path.join(outdir,ql_fname)
+            if not os.path.exists(ql_fpath):
+                if not already_loaded:
+                    obj = load_pickle(pk_fpath)
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what='qlcs')
+            else:
+                print("Figure already created")
+        return
 
     def compute_obj_obs(i):
         obs_vrbl, obs_fmt, validutc, caseutc = i
-        dx = 3 if obs_fmt.endswith("3km") else 1
 
-        print("dx set to",dx)
-        print("DEBUG:",obs_fmt,caseutc,validutc)
+        # Check for object save file for obs/fcst
+        fpath = get_object_picklepaths(obs_vrbl,obs_fmt,validutc,caseutc)
+        print(stars,"OBS DEBUG:",obs_fmt,caseutc,validutc)
 
-        obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
-                            obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
-        obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx)
-        fname = "obj_{}.png".format(obs_fmt)
-        obj.plot_quicklook(outdir=outroot,fname=fname)
+        already_loaded = False
+        if not os.path.exists(fpath):
+        #if True:
+            print("DEBUG:",obs_fmt,caseutc,validutc)
+            dx = 3 if obs_fmt.endswith("3km") else 1
+            print("dx set to",dx)
 
-        return obj
+            obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
+                                obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
+            obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx)
+            already_loaded = True
+            save_pickle(obj=obj,fpath=fpath)
+            print("Object instance newly created.")
+        else:
+            print("Object instance already created.")
+
+        if validutc.minute == 30:
+            ql_fname = "obj_{}_{:%Y%m%d%H%M}.png".format(obs_fmt,validutc)
+            outdir = os.path.join(outroot,"object_quicklooks","qlcs_v_cell")
+            ql_fpath = os.path.join(outdir,ql_fname)
+            if not os.path.exists(ql_fpath):
+                if not already_loaded:
+                    obj = load_pickle(fpath)
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what='qlcs')
+                return
+        print("Skipping figures")
+        return
+
 
     fcst_vrbl = "REFL_comp"
     obs_vrbl = "NEXRAD"
     # fcstmins = all_fcstmins
-    fcstmins = (35,)
+    fcstmins = N.arange(30,210,30)
     fcst_fmts = ("d01_3km","d02_1km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
-    # obs_fmts = fcst_fmts
-    for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
-        itr_obs = loop_obj_obs(obs_vrbl,all_times=fcstmins)
-            # with multiprocessing.Pool(ncpus) as pool:
-            #     results = pool.map(compute_obj_obs,itr)
-        for i in itr_obs:
-            compute_obj_obs(i)
 
+    for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
         itr_fcst = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names)
 
-        # with multiprocessing.Pool(ncpus) as pool:
-        #     results = pool.map(compute_obj_fcst,itr)
-        for i in itr_fcst:
-            compute_obj_fcst(i)
+        if ncpus > 1:
+            with multiprocessing.Pool(ncpus) as pool:
+                results_fcst = pool.map(compute_obj_fcst,itr_fcst)
+        else:
+            for i in itr_fcst:
+                compute_obj_fcst(i)
 
-if object_performance:
+        itr_obs = loop_obj_obs(obs_vrbl,all_times=fcstmins)
+        if ncpus > 1:
+            with multiprocessing.Pool(ncpus) as pool:
+                results_obs = pool.map(compute_obj_obs,itr_obs)
+        else:
+            for i in itr_obs:
+                compute_obj_obs(i)
+
+
+if do_object_performance:
     # Do 2x2 table from objects matched
     pass
 
-if object_w_distr:
+if do_object_distr:
     # Plot distributions of objects in each domain and obs
 
     # Then match them
