@@ -15,6 +15,7 @@ import numpy as N
 import matplotlib as M
 import matplotlib.pyplot as plt
 import scipy
+import pandas
 from mpl_toolkits.basemap import Basemap
 from netCDF4 import Dataset
 
@@ -49,8 +50,9 @@ do_efss = False # Also includes FISS, which is broken?
 do_object_performance = False
 do_object_distr = False
 do_object_pca = True
+do_object_lda = False
 object_switch = max(do_object_performance,do_object_distr,
-                    do_object_pca)
+                    do_object_pca,do_object_lda)
 
 ### SETTINGS ###
 #mp_log = multiprocessing.log_to_stderr()
@@ -403,6 +405,92 @@ def load_obj():
     """
     pass
 
+def do_pca_plots(pca,PC_df,features,data,fmt):
+    ### TEST PLOT 1 ###
+    fname = "pca_test_scatter_{}.png".format(fmt)
+    fpath = os.path.join(outroot,"pca",fname)
+
+    fig,ax = plt.subplots(1,figsize=(8,8))
+    ax.set_xlabel('Principal Component 1')
+    ax.set_ylabel('Principal Component 2')
+    cm = M.cm.plasma
+    sca = ax.scatter(PC_df.loc[:,'PC1'],PC_df.loc[:,'PC2'],
+                    c=PC_df.loc[:,'PC3'],
+                    alpha=0.7,edgecolor='k',linewidth=0.15,cmap=cm)
+    plt.colorbar(sca,ax=ax)
+    utils.trycreate(fpath)
+    fig.savefig(fpath)
+
+    ### PCs in feature space ###
+    fname = "pca_test_bar_{}.png".format(fmt)
+    fpath = os.path.join(outroot,"pca",fname)
+    fig,ax = plt.subplots(1,figsize=(8,8))
+    names = []
+    scores = []
+    for n,pc in enumerate(pca.components_):
+        label = "PC #{}".format(n)
+        names.append(label)
+        scores.append(pc*100)
+
+    bw = 0.2
+    pos = N.arange(len(features))
+    poss = [pos+(n*bw) for n in (1,0,-1)]
+
+    for n, (pos,label, scorearray) in enumerate(zip(poss,names,scores)):
+        ax.barh(pos, scorearray, bw, alpha=0.6, align='center',
+                color=RANCOL[n],label=label,
+                tick_label=features,)
+    ax.set_xlabel("Variance explained (%)")
+    ax.set_ylabel("Storm-object characteristic")
+    ax.legend()
+    utils.trycreate(fpath)
+    fig.subplots_adjust(left=0.3)
+    fig.savefig(fpath)
+
+    ### Show distribution of PC scores.
+    fname = "pca_test_distr_{}.png".format(fmt)
+    fpath = os.path.join(outroot,"pca",fname)
+    fig,ax = plt.subplots(1,figsize=(8,8))
+
+    ax.hist(data['PC1'],bins=50)
+    ax.set_xlabel("PC score")
+    ax.set_ylabel("Frequency")
+    # ax.legend()
+    utils.trycreate(fpath)
+    fig.subplots_adjust(left=0.3)
+    fig.savefig(fpath)
+
+    ### Show examples of objects
+    fname = "pca_test_examples_{}.png".format(fmt)
+    fig,ax = plt.subplots(1,figsize=(8,8))
+    exarr = N.zeros([40,20])
+
+    # utils.trycreate(fpath)
+    #fig.subplots_adjust(left=0.3)
+    #W fig.savefig(fpath)
+
+    print("Test plots saved to",os.path.dirname(fpath))
+    return
+
+def get_kw(prodfmt,utc,mem=None):
+    pca_fname = "pca_model_{}.pickle".format(prodfmt)
+    pca_fpath = os.path.join(objectroot,pca_fname)
+    if os.path.exists(pca_fpath):
+        P = load_pickle(fpath=pca_fpath)
+        kw = dict(classify=True,pca=P['pca'],features=P['features'],
+                        scaler=P['scaler'])
+    else:
+        kw = dict()
+
+    if mem is None:
+        prod = '_'.join((prodfmt,"obs"))
+    else:
+        prod = '_'.join((prodfmt,mem))
+
+    kw['prod_code'] = prod
+    kw['time_code'] = utc
+    return kw
+
 # /home/nothijngrad/Xmas_Shutdown/Xmas/20170501/NEXRAD_nexrad_3km_20170501_0300.npy
 
 ### COLOUR SETTINGS ###
@@ -414,6 +502,13 @@ COLORS = {
         "d02_1km":"#D41159", # See v v v v v v
         "d02_3km":"#D41159", # Same - differentiated by shape
         }
+
+RANCOL = {
+        0:"#DDAA33",
+        1:"#BB5566",
+        2:"#004488",
+        }
+
 MARKERS = {
         "d01_3km":'s',
         "d02_1km":'s',
@@ -433,6 +528,13 @@ size = 25
 for fmt in fcst_fmts:
     SIZES[fmt] = size
     ALPHAS[fmt] = alpha
+
+PROD = {
+        "d01_3km":1,
+        "d02_1km":2,
+        "nexrad_3km":3,
+        "nexrad_1km":4,
+        }
 
 ### PROCEDURE ###
 
@@ -489,7 +591,7 @@ if do_performance:
         return DS
 
     # Create a "master" figure for the paper
-    fname = "perfdiag_REFL_comp_30_multi"
+    fname = "perfdiag_REFL_comp_30_multi.png"
     fpath = os.path.join(outroot,fname)
     PD0 = Performance(fpath=fpath,legendkwargs=None,legend=True)
     #_ths = (15,30,40,50)
@@ -674,7 +776,8 @@ if object_switch:
     # plot_what = 'qlcs'; plot_dir = 'qlcs_v_cell'
     # plot_what = 'ecc'; plot_dir = "compare_ecc_ratio"
     # plot_what = 'extent'; plot_dir ='check_extent'
-    plot_what = "4-panel"; plot_dir = "four-panel"
+    # plot_what = "4-panel"; plot_dir = "four-panel"
+    plot_what = "pca"; plot_dir = "pca_check"
 
     def compute_obj_fcst(i):
         fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem = i
@@ -695,7 +798,9 @@ if object_switch:
 
             fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
                                     validutc,caseutc,initutc,mem)
-            obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx)
+
+            kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem)
+            obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
             save_pickle(obj=obj,fpath=pk_fpath)
             print("Object instance newly created.")
         else:
@@ -731,7 +836,8 @@ if object_switch:
 
             obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
                                 obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
-            obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx)
+            kw = get_kw(prodfmt=fcst_fmt,utc=validutc)
+            obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx,**kw)
             save_pickle(obj=obj,fpath=fpath)
             print("Object instance newly created.")
         else:
@@ -753,28 +859,33 @@ if object_switch:
     fcst_vrbl = "REFL_comp"
     obs_vrbl = "NEXRAD"
 
-    fcstmins = N.arange(30,210,30)
-    # fcstmins = N.arange(5,185,5)
+    # fcstmins = N.arange(30,210,30)
+    fcstmins = N.arange(5,185,5)
 
     fcst_fmts = ("d01_3km","d02_1km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
 
-    member_names = ['m{:02d}'.format(n) for n in range(2,3)]
+    # member_names = ['m{:02d}'.format(n) for n in range(2,3)]
 
-    fname = "all_obj_dataframes.pickle"
-    df_pickf = os.path.join(objectroot,fname)
-
-    if (not os.path.exists(df_pickf)) or overwrite_pp:
-        for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
+    for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
+        fcst_fname = "all_obj_dataframes_{}.pickle".format(fcst_fmt)
+        fcst_fpath = os.path.join(objectroot,fcst_fname)
+        if (not os.path.exists(fcst_fpath)) or overwrite_pp or overwrite_output:
             itr_fcst = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names)
-
             if ncpus > 1:
                 with multiprocessing.Pool(ncpus) as pool:
                     results_fcst = pool.map(compute_obj_fcst,itr_fcst)
             else:
                 for i in itr_fcst:
                     compute_obj_fcst(i)
+            save_pickle(obj=results_fcst,fpath=fcst_fpath)
+        else:
+            results_fcst = load_pickle(fcst_fpath)
 
+        obs_fname = "all_obj_dataframes_{}.pickle".format(obs_fmt)
+        obs_fpath = os.path.join(objectroot,obs_fname)
+        if (not os.path.exists(obs_fpath)) or overwrite_pp or overwrite_output:
             itr_obs = loop_obj_obs(obs_vrbl,all_times=fcstmins)
             if ncpus > 1:
                 with multiprocessing.Pool(ncpus) as pool:
@@ -782,15 +893,44 @@ if object_switch:
             else:
                 for i in itr_obs:
                     compute_obj_obs(i)
+            save_pickle(obj=results_obs,fpath=obs_fpath)
+        else:
+            results_fcst = load_pickle(obs_fpath)
 
-        results = results_fcst+results_obs
-        save_pickle(obj=results,fpath=df_pickf)
-    else:
-        results = load_pickle(df_pickf)
+if do_object_pca:
+    # results = []
+    for fmt in all_fmts:
+        fname = "all_obj_dataframes_{}.pickle".format(fmt)
+        fpath = os.path.join(objectroot,fname)
+        results = load_pickle(fpath)
+        all_df = pandas.concat(results,ignore_index=True)
 
-    if do_object_pca:
-        CAT = Catalogue(results)
-        CAT.do_pca()
+        fname = "pca_model_{}.pickle".format(fmt)
+        fpath = os.path.join(objectroot,fname)
+
+        if (not os.path.exists(fpath)) or overwrite_pp:
+            CAT = Catalogue(all_df)
+            pca, PC_df, features, scaler = CAT.do_pca()
+            save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+        else:
+            P = load_pickle(fpath=fpath)
+            pca = P['pca']
+            features = P['features']
+            scaler = P['scaler']
+            PC_df = P['data']
+
+        do_pca_plots(pca,PC_df,features,PC_df,fmt=fmt)
+        # TODO: do for objects in d01, d02, obs
+
+
+
+    # assert 1==0
+
+if do_object_lda:
+    CAT = Catalogue(results)
+    lda = CAT.do_lda()
+    pdb.set_trace()
+
 
 
 if do_object_performance:
