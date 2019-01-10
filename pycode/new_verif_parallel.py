@@ -10,6 +10,7 @@ import itertools
 import multiprocessing
 import argparse
 import time
+import itertools
 
 import numpy as N
 import matplotlib as M
@@ -36,24 +37,30 @@ parser.add_argument('-oo','--overwrite_output',dest='overwrite_output',
                             action='store_true',default=False)
 parser.add_argument('-op','--overwrite_pp',dest='overwrite_pp',
                             action='store_true',default=False)
+parser.add_argument('-nq','--no_quick',dest="no_quick",
+                            action='store_true',default=False)
 
 PA = parser.parse_args()
 ncpus = PA.ncpus
 overwrite_output = PA.overwrite_output
 overwrite_pp = PA.overwrite_pp
+do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
 do_domains = False
 do_performance = False
 do_efss = False # Also includes FISS, which is broken?
 
-do_object_performance = False
-do_object_distr = True
+object_switch = False
 do_object_pca = False
-do_object_lda = False
-do_object_matching = False
-object_switch = max(do_object_performance,do_object_distr,
-                    do_object_pca,do_object_lda,do_object_matching,)
+do_object_performance = False
+do_object_distr = False
+do_object_matching = True
+do_object_examples = True
+do_object_waffle = True
+do_object_cluster = True
+                #max(do_object_performance,do_object_distr,
+                #    do_object_pca,do_object_lda,do_object_matching,)
 
 ### SETTINGS ###
 #mp_log = multiprocessing.log_to_stderr()
@@ -176,6 +183,17 @@ def get_object_picklepaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
         fname = "objects_{}_{}_{}_{}.pickle".format(vrbl,fmt,caseYYYYMMDD,utcHHMM)
     return os.path.join(objectroot,caseYYYYMMDD,fname)
 
+def round_nearest(x,a,method='floor'):
+    """
+    Args:
+        x: original value
+        a: multiple to round x to
+    """
+    FUNCS = {'floor':N.floor,
+                'ceil':N.ceil,
+                'round':N.round,}
+    return FUNCS[method](x/a) * a
+
 def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None):
     bmap = Basemap(
                 # width=12000000,height=9000000,
@@ -198,6 +216,7 @@ def get_random_domain(caseutc,dom):
     return dom_nc
 
 def get_wrfout_fname(t,dom):
+    assert dom in (1,2)
     fname = 'wrfout_d{:02d}_{:04d}-{:02d}-{:02d}_{:02d}:{:02d}:{:02d}'.format(dom,
                 t.year,t.month,t.day,t.hour,t.minute,t.second)
     return fname
@@ -230,6 +249,8 @@ def ob2fc(obs_vrbl,obs_fmt):
         fcst_fmt = "d01_3km"
     elif dx == "1km":
         fcst_fmt = "d02_1km"
+    else:
+        raise Exception
 
     return fcst_vrbl, fcst_fmt
     # fcst_vrbl, fcst_fmt = ob2fc(obs_vrbl,obs_fmt)
@@ -386,23 +407,12 @@ def load_latlons(fmt,caseutc):
         ret.append(N.load(fpath))
     return ret
 
-def save_pickle(obj,fpath):
-    utils.trycreate(fpath)
-    with open(fpath,'wb') as f:
-        pickle.dump(obj=obj,file=f)
-    return
-
-def load_pickle(fpath):
-    with open(fpath,'rb') as f:
-        pp = pickle.load(f)
-    return pp
-
 def load_obj():
     """ Pass in time, vrbl etc. Return the obj instance.
     """
     pass
 
-def do_pca_plots(pca,PC_df,features,data,fmt):
+def do_pca_plots(pca,PC_df,features,fmt):
     ### TEST PLOT 1 ###
     fname = "pca_test_scatter_{}.png".format(fmt)
     fpath = os.path.join(outroot,"pca",fname)
@@ -449,7 +459,8 @@ def do_pca_plots(pca,PC_df,features,data,fmt):
     fpath = os.path.join(outroot,"pca",fname)
     fig,ax = plt.subplots(1,figsize=(8,8))
 
-    ax.hist(data['PC1'],bins=50)
+    #ax.hist(data['PC1'],bins=50)
+    ax.hist(PC_df['PC1'],bins=50)
     ax.set_xlabel("PC score")
     ax.set_ylabel("Frequency")
     # ax.legend()
@@ -469,11 +480,20 @@ def do_pca_plots(pca,PC_df,features,data,fmt):
     print("Test plots saved to",os.path.dirname(fpath))
     return
 
-def get_kw(prodfmt,utc,mem=None,initutc=None):
+def get_all_initutcs():
+    """ Find all unique initialisation times.
+    """
+    SET = set()
+    for caseutc,initutcs in CASES.items():
+        for i in initutcs:
+            SET.add(i)
+    return list(SET)
+
+def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     pca_fname = "pca_model_{}.pickle".format(prodfmt)
     pca_fpath = os.path.join(objectroot,pca_fname)
     if os.path.exists(pca_fpath):
-        P = load_pickle(fpath=pca_fpath)
+        P = utils.load_pickle(fpath=pca_fpath)
         kw = dict(classify=True,pca=P['pca'],features=P['features'],
                         scaler=P['scaler'])
     else:
@@ -494,6 +514,7 @@ def get_kw(prodfmt,utc,mem=None,initutc=None):
     kw['prod_code'] = prod
     kw['time_code'] = utc
     kw['lead_time'] = fcstmin
+    kw['fpath_save'] = fpath
 
     # print(fcstmin)
     return kw
@@ -507,18 +528,56 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
     # w adds on updraught information
 
     if os.path.exists(mega_fpath):
-        return load_pickle(mega_fpath)
+        return utils.load_pickle(mega_fpath)
 
     df_list = []
     for fmt in fmts:
         fname = "all_obj_dataframes_{}.pickle".format(fmt)
         fpath = os.path.join(objectroot,fname)
-        results = load_pickle(fpath)
+        results = utils.load_pickle(fpath)
         df_list.append(pandas.concat(results,ignore_index=True))
         del fname, fpath, results
     df_og = pandas.concat(df_list,ignore_index=True)
 
     # At this point, the megaframe indices are set in stone!
+
+    #### HACKS #####
+    # Remove these later!
+    #df_og.area *= df_og.dx
+    #print("Megaframe hacked: area changed to km")
+
+    #df_og.perimeter *= df_og.dx
+    #print("Megaframe hacked: perimeter changed to km")
+
+    # pdb.set_trace()
+
+    DTYPES = {"resolution":"object"}
+    diff_df = utils.do_new_df(DTYPES,len(df_og))
+    for oidx,o in enumerate(df_og.itertuples()):
+        if int(o.nlats) > 200:
+            res = "hi-res"
+        else:
+            res = "lo-res"
+        diff_df.loc[oidx,"resolution"] = res
+    df_og = pandas.concat((df_og,diff_df),axis=1)
+    print("Megaframe hacked: resolution added")
+
+
+    DTYPES = {"conv_mode":"object"}
+    mode_df = utils.do_new_df(DTYPES,len(df_og))
+    for oidx,o in enumerate(df_og.itertuples()):
+        if o.qlcsness < -0.5:
+            conv_mode = "cellular"
+        elif o.qlcsness > 0.5:
+            conv_mode = "linear"
+        else:
+            conv_mode = "ambiguous"
+        mode_df.loc[oidx,"conv_mode"] = conv_mode
+    df_og = pandas.concat((df_og,mode_df),axis=1)
+    print("Megaframe hacked: convective mode added")
+
+    ########################
+    ########################
 
     if add_ens:
         ens_df = load_ens_df(df_og)
@@ -536,29 +595,6 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
 
     print("Megaframe created.")
 
-    #### HACKS #####
-    # Remove these later!
-    df_og.area *= df_og.dx
-    print("Megaframe hacked: area changed to km")
-
-    df_og.perimeter *= df_og.dx
-    print("Megaframe hacked: perimeter changed to km")
-
-
-    DTYPES = {"conv_mode":"object"}
-    mode_df = utils.do_new_df(DTYPES,len(df_og))
-    for oidx,o in enumerate(df_og.itertuples()):
-        if o.qlcsness < -0.2:
-            conv_mode = "cellular"
-        elif o.qlcsness > 0.5:
-            conv_mode = "linear"
-        else:
-            conv_mode = "ambiguous"
-        mode_df.loc[oidx,"conv_mode"] = conv_mode
-    df_og = pandas.concat((df_og,mode_df),axis=1)
-    print("Megaframe hacked: convective mode added")
-
-
     # Save pickle
     df_og.to_pickle(mega_fpath)
     # pdb.set_trace()
@@ -572,7 +608,7 @@ def load_W_df(W_lookup,CAT):
         save_pickle(obj=W_df,fpath=fpath)
         print("Saved to",fpath)
     else:
-        W_df = load_pickle(fpath=fpath)
+        W_df = utils.load_pickle(fpath=fpath)
         print("W_df loaded from",fpath)
     return W_df
 
@@ -584,7 +620,7 @@ def load_W_lookup():#fmts):
         save_pickle(obj=W_lookup,fpath=fpath)
         print("Saved to",fpath)
     else:
-        W_lookup = load_pickle(fpath=fpath)
+        W_lookup = utils.load_pickle(fpath=fpath)
         print("W_lookup loaded from",fpath)
     return W_lookup
 
@@ -637,15 +673,43 @@ def load_ens_df(df_og):
         save_pickle(obj=ens_df,fpath=fpath)
         print("Saved to",fpath)
     else:
-        ens_df = load_pickle(fpath=fpath)
+        ens_df = utils.load_pickle(fpath=fpath)
         print("Ensemble metadata DataFrame loaded from",fpath)
     return ens_df
 
 def create_ens_df(megaframe):
     # TODO: parallelise
+    def get_case_code(utc):
+        if utc < datetime.datetime(2016,4,1,12,0,0):
+            case_code = "20160331"
+        elif utc < datetime.datetime(2017,5,2,12,0,0):
+            case_code = "20170501"
+        elif utc < datetime.datetime(2017,5,3,12,0,0):
+            case_code = "20170502"
+        elif utc < datetime.datetime(2017,5,5,12,0,0):
+            case_code = "20170504"
+        #elif utc < datetime.datetime():
+        #    case_code = "20180429"
+        else:
+            raise Exception
+        return case_code
+
+    def get_leadtime_group(lt):
+        if int(lt) < 62:
+            gr = "first_hour"
+        elif int(lt) < 122:
+            gr = "second_hour"
+        elif int(lt) < 182:
+            gr = "third_hour"
+        else:
+            raise Exception
+        return gr
+
     DTYPES = {
             "member":"object",
             "domain":"object",
+            "case_code":"object",
+            "leadtime_group":"object",
             # "dx":"f4",
 
             # This allows lookup with megaframe on top level.
@@ -673,6 +737,11 @@ def create_ens_df(megaframe):
         # ens_df.loc[oidx,"dx"] = float(dxkm[0])
         ens_df.loc[oidx,"megaframe_idx"] = o.Index
         #pdb.set_trace()
+
+        ens_df.loc[oidx,"case_code"] = get_case_code(o.time)
+        ens_df.loc[oidx,"leadtime_group"] = get_leadtime_group(o.lead_time)
+
+
         # assert True == False
         #ens_df.loc[o,"megaframe_idx"] = o.index
         #ens_df.loc[o,"megaframe_idx"] = o.label
@@ -755,6 +824,7 @@ PROD = {
 ### PROCEDURE ###
 
 if do_domains:
+    print(stars,"DOING DOMAINS",stars)
     fname = "domains.png"
     fpath = os.path.join(outroot,fname)
 
@@ -784,6 +854,8 @@ if do_domains:
 
 
 if do_performance:
+    print(stars,"DOING PERFORMANCE",stars)
+
     # TODO: a zoomed in version where each member is plotted individually as a swarm.
     # For every forecast valid time, load 36 members and 1 obs
     # Parallelise
@@ -851,6 +923,7 @@ if do_performance:
     PD0.save()
 
 if do_efss:
+    print(stars,"DOING EFSS",stars)
     def compute_efss(i,threshs,spatial_windows,temporal_window):
         fcst_vrbl, caseutc, initutc, fcst_fmt, validutc, = i
         fcst_data, obs_data = load_timewindow_both_data(vrbl=fcst_vrbl,fmt=fcst_fmt,
@@ -976,6 +1049,7 @@ if do_efss:
 
 
 if object_switch:
+    print(stars,"DOING OBJECT COMPUTATIONS",stars)
     # Plot type
     #plot_what = 'ratio'; plot_dir = 'check_ratio'
     # plot_what = 'qlcs'; plot_dir = 'qlcs_v_cell'
@@ -994,33 +1068,36 @@ if object_switch:
         # Check for object save file for obs/fcst
         pk_fpath = get_object_picklepaths(fcst_vrbl,fcst_fmt,validutc,caseutc,
                                         initutc=initutc,mem=mem)
-        # print(stars,"FCST DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
+        print(stars,"FCST DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
 
         if (not os.path.exists(pk_fpath)) or overwrite_pp:
-        #if True:
-            dx = 3 if fcst_fmt.startswith("d01") else 1
-            # print("dx set to",dx)
+            if "3km" in fcst_fmt:
+                dx = 3.0
+            elif "1km" in fcst_fmt:
+                dx = 1.0
+            else:
+                raise Exception
 
             fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
                                     validutc,caseutc,initutc,mem)
 
-            kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc)
+            kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,fpath=pk_fpath)
             obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
             save_pickle(obj=obj,fpath=pk_fpath)
             # print("Object instance newly created.")
         else:
             # print("Object instance already created.")
-            obj = load_pickle(pk_fpath)
+            obj = utils.load_pickle(pk_fpath)
 
         # QUICK LOOKS
         fcstmin = int(((validutc-initutc).seconds)/60)
-        if fcstmin in range(30,210,30):
+        if fcstmin in range(30,210,30) and do_quicklooks and (mem == "m01"):
         #if ((fcstmin % 30) == 0): # and (mem == "m01"):
             ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(fcst_fmt,initutc,fcstmin)
             outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
             ql_fpath = os.path.join(outdir,ql_fname)
             if (not os.path.exists(ql_fpath)) or overwrite_output:
-                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what,ecc=eccentricity)
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what)
             else:
                 #print("Figure already created")
                 pass
@@ -1035,27 +1112,30 @@ if object_switch:
         # print(stars,"OBS DEBUG:",obs_fmt,caseutc,validutc)
 
         if (not os.path.exists(fpath)) or overwrite_pp:
-        #if True:
-            # print("DEBUG:",obs_fmt,caseutc,validutc)
-            dx = 3 if obs_fmt.endswith("3km") else 1
-            # print("dx set to",dx)
+            print("DEBUG:",obs_fmt,caseutc,validutc)
+            if "3km" in obs_fmt:
+                dx = 3.0
+            elif "1km" in obs_fmt:
+                dx = 1.0
+            else:
+                raise Exception
 
             obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
                                 obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
-            kw = get_kw(prodfmt=obs_fmt,utc=validutc)
+            kw = get_kw(prodfmt=obs_fmt,utc=validutc,fpath=fpath)
             obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx,**kw)
             save_pickle(obj=obj,fpath=fpath)
             # print("Object instance newly created.")
         else:
             # print("Object instance already created.")
-            obj = load_pickle(fpath)
+            obj = utils.load_pickle(fpath)
 
-        if validutc.minute == 30:
+        if validutc.minute == 30 and do_quicklooks:
             ql_fname = "obj_{}_{:%Y%m%d%H%M}.png".format(obs_fmt,validutc)
             outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
             ql_fpath = os.path.join(outdir,ql_fname)
             if (not os.path.exists(ql_fpath)) or overwrite_output:
-                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what,ecc=eccentricity)
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what)
             else:
                 # print("Figure already created")
                 pass
@@ -1090,7 +1170,17 @@ if object_switch:
                     compute_obj_fcst(i)
             save_pickle(obj=results_fcst,fpath=fcst_fpath)
         else:
-            results_fcst = load_pickle(fcst_fpath)
+            results_fcst = utils.load_pickle(fcst_fpath)
+
+
+        fname = "pca_model_{}.pickle".format(fcst_fmt)
+        fpath = os.path.join(objectroot,fname)
+        if (not os.path.exists(fpath)) or overwrite_pp:
+            fcst_df = pandas.concat(results_fcst,ignore_index=True)
+            CAT = Catalogue(fcst_df,tempdir=objectroot,ncpus=ncpus)
+            pca, PC_df, features, scaler = CAT.do_pca()
+            save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+
 
         print("Now calculating objects for all observations on",obs_fmt)
         obs_fname = "all_obj_dataframes_{}.pickle".format(obs_fmt)
@@ -1105,65 +1195,52 @@ if object_switch:
                     compute_obj_obs(i)
             save_pickle(obj=results_obs,fpath=obs_fpath)
         else:
-            results_fcst = load_pickle(obs_fpath)
+            results_obs = utils.load_pickle(obs_fpath)
 
 
-
-if do_object_pca:
-
-    # for fmt in all_fmts:
-    if False:
-        fname = "all_obj_dataframes_{}.pickle".format(fmt)
+        fname = "pca_model_{}.pickle".format(obs_fmt)
         fpath = os.path.join(objectroot,fname)
-        results = load_pickle(fpath)
-        all_df = pandas.concat(results,ignore_index=True)
-        del fname, fpath, results
-
-        fname = "pca_model_{}.pickle".format(fmt)
-        fpath = os.path.join(objectroot,fname)
-
         if (not os.path.exists(fpath)) or overwrite_pp:
-            CAT = Catalogue(all_df,tempdir=objectroot,ncpus=ncpus)
+            obs_df = pandas.concat(results_obs,ignore_index=True)
+            CAT = Catalogue(obs_df,tempdir=objectroot,ncpus=ncpus)
             pca, PC_df, features, scaler = CAT.do_pca()
             save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
-        #else:
-        elif False:
-            P = load_pickle(fpath=fpath)
-            pca = P['pca']
-            features = P['features']
-            scaler = P['scaler']
-            PC_df = P['data']
-        else:
-            pass
 
-    # Load one big df with all objects
-    megaframe = load_megaframe(fmts=all_fmts)
+if do_object_pca:
+    print(stars,"DOING PCA",stars)
+    for fmt in all_fmts:
+        fname = "pca_model_{}.pickle".format(fmt)
+        fpath = os.path.join(objectroot,fname)
+        P = utils.load_pickle(fpath=fpath)
 
-    # Run PCA for subsets of objects:
-    # Cellular only in d01, d02, obs
-
-
-    # Line only in d01, d02, obs
-
-
-    #
-
-    # Plot!
-
-    assert 1==0
-
-if do_object_lda:
-    CAT = Catalogue(results,tempdir=objectroot,ncpus=ncpus)
-    lda = CAT.do_lda()
-    pdb.set_trace()
-
-
+        pca = P['pca']
+        features = P['features']
+        scaler = P['scaler']
+        PC_df = P['data']
+        do_pca_plots(pca,PC_df,features,fmt)
 
 if do_object_performance:
-    # Do 2x2 table from objects matched
-    pass
+    print(stars,"DOING OBJ PERFORMANCE",stars)
+    # Load one big df with all objects
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
+    megaframe = load_megaframe(fmts=all_fmts)
+
+    CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
+
+    # megaframe = load_megaframe()
+
+    # Match objects
+
+    for dom in ('d01','d02'):
+        verif_domain = 'nexrad'
+        matches = CAT.match_verif(members=member_names,initutcs=get_all_initutcs(),
+                            leadtimes=all_fcstmins,domain=dom,
+                            verif_domain=verif_domain)
 
 if do_object_distr:
+    print(stars,"DOING OBJ DISTRIBUTIONS",stars)
     # Plot distributions of objects in each domain and obs
     # TODO: run object ID for d02_3km?
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
@@ -1181,67 +1258,327 @@ if do_object_distr:
 
     if False:
         # Data from objects and updraught data
-        from evac.plot.fourhist import FourHist
-        fpath = os.path.join(outroot,"fourhist_test.png")
-        FH = FourHist(fpath)
-        FH.plot(megaframe,xname="domain",yname="conv_mode",dataname="max_updraught")
-    if True:
-        # Subset for only d01/d02
-        for fcstmin in (45,90,135):
-            miniframe = megaframe[(megaframe['domain'] != "nexrad") &
-                                    (megaframe['lead_time'] == fcstmin)] #&
-                                #(data['time'] == valid_time)]
-            from evac.plot.pairplot import PairPlot
-            fpath = os.path.join(outroot,"pairplots","pairmode_{}min.png".format(fcstmin))
-            utils.trycreate(fpath)
-            PP = PairPlot(fpath)
-            vars = ["max_updraught","max_intensity","perimeter","distance_from_centroid"]
-            PP.plot(miniframe.sample(frac=0.1),color_name="conv_mode",vars=vars)
+        df_fcst = megaframe[(megaframe['member'] != "obs")]
 
-            fpath2 = os.path.join(outroot,"pairplots","pairdx_{}min.png".format(fcstmin))
-            PP2 = PairPlot(fpath2)
-            PP2.plot(miniframe.sample(frac=0.1),color_name="dx",vars=vars)
+        from evac.plot.fourhist import FourHist
+        fpath = os.path.join(outroot,"histplots","fourhist_mode.png")
+        utils.trycreate(fpath)
+        FH = FourHist(fpath)
+        FH.plot(df_fcst,xname="resolution",yname="conv_mode",dataname="max_updraught")
+
+        fpath = os.path.join(outroot,"histplots","fourhist_case.png")
+        FH = FourHist(fpath)
+        FH.plot(df_fcst,xname="resolution",yname="case_code",dataname="max_updraught")
+
+        fpath = os.path.join(outroot,"histplots","fourhist_leadtime.png")
+        FH = FourHist(fpath)
+        FH.plot(df_fcst,xname="resolution",yname="leadtime_group",dataname="max_updraught")
+
+        fpath = os.path.join(outroot,"histplots","fourhist_reso.png")
+        FH = FourHist(fpath)
+        FH.plot(df_fcst,xname="resolution",yname="case_code",dataname="qlcsness")
+
 
     if False:
-        fpath = os.path.join(outroot,"multipanel_test.png")
+        # Subset for only d01/d02
+        from evac.plot.pairplot import PairPlot
 
-        df_1km = megaframe[(megaframe['dx'] == 1.0) &
-                                (megaframe['lead_time'] < 90) &
-                                (megaframe['lead_time'] > 30) ]
-        df_3km = megaframe[(megaframe['dx'] == 3.0) &
-                                (megaframe['lead_time'] < 90) &
-                                (megaframe['lead_time'] > 30) ]
-                                #(megaframe['lead_time'] in range(30,90,5))]
+        for fcstmin in (45,90,135,"ALL"):
+            if fcstmin == "ALL":
+                miniframe = megaframe[(megaframe['member'] != "obs")]
+            else:
+                        miniframe = megaframe[(megaframe['member'] != "obs") &
+                                    (megaframe['lead_time'] == fcstmin)]
 
+            vars = ["max_updraught","max_intensity","perimeter","ud_distance_from_centroid"]
+
+            fpath = os.path.join(outroot,"pairplots","pairmode_1_{}min.png".format(fcstmin))
+            utils.trycreate(fpath)
+            PP = PairPlot(fpath)
+            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars)
+
+            fpath2 = os.path.join(outroot,"pairplots","pairdx_1_{}min.png".format(fcstmin))
+            PP2 = PairPlot(fpath2)
+            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars)
+
+            vars = ["max_updraught","eccentricity","longaxis_km","qlcsness"]
+
+            fpath = os.path.join(outroot,"pairplots","pairmode_2_{}min.png".format(fcstmin))
+            utils.trycreate(fpath)
+            PP = PairPlot(fpath)
+            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars)
+
+            fpath2 = os.path.join(outroot,"pairplots","pairdx_2_{}min.png".format(fcstmin))
+            PP2 = PairPlot(fpath2)
+            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars)
+
+    if False:
+        # Plot updraught's distance from centroid against max intensity
+        # For d01/d02 separately.
         import seaborn as sns
-        f,axes = plt.subplots(2,2,figsize=(10,10))
+        sns.set(style='dark',font_scale=0.5)
 
-        col_3km = COLORS['d01_3km']
-        ax = axes[0,0]
-        dis = sns.distplot(df_3km.mean_updraught,color=col_3km,ax=ax)
+        fpath = os.path.join(outroot,"kdeplots","ud_distance_v_intensity.png")
+        utils.trycreate(fpath)
 
-        ax = axes[0,1]
+        f, axes = plt.subplots(2,4,figsize=(8,8),sharex=True,sharey=True)
 
-        ax = axes[1,0]
-        col_1km = COLORS['d02_1km']
-        dis = sns.distplot(df_1km.mean_updraught,color=col_1km,ax=ax)
+        def ax_gen(axes):
+            for n,ax in enumerate(axes.flat):
+                yield ax
 
-        ax = axes[1,1]
+        axf = ax_gen(axes)
 
-        fig.tight_layout()
-        fig.savefig(fpath)
-
-
-
-
+        for dx,res in zip((1.0,3.0),("hi-res","lo-res")):
+            print("Plotting the {}km stats".format(int(dx)))
+            df_km = megaframe[(megaframe['resolution'] == res) &
+                    (megaframe['member'] != 'obs')]
+            for n,case_code in enumerate(["20160331","20170501",
+                                        "20170502","20170504"]):
+                ax = next(axf)
+                df_case = df_km[(df_km['case_code'] == case_code)]
+                cmap = sns.cubehelix_palette(start=(n/2.5), light=1, as_cmap=True)
+                sns.kdeplot(df_case['max_updraught'],
+                    df_case['ud_distance_from_centroid'], cmap=cmap,
+                    shade=True, ax=ax,
+                    # cut=5,
+                    )
+                ax.set_xlim([0,40])
+                ax.set_ylim([0,40])
+                ax.set_title("{}km for {}".format(int(dx),case_code))
+        f.tight_layout()
+        f.savefig(fpath)
+        print("Figure saved to",fpath)
 
 if do_object_matching:
+    print(stars,"DOING OBJ MATCHING/DIFFS",stars)
     # Load one big df with all objects
-    megaframe = load_megaframe()
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
+    megaframe_all = load_megaframe(fmts=all_fmts)
+    # For testing
+    megaframe = megaframe_all[(megaframe_all['case_code'] == '20160331') &
+                                (megaframe_all['lead_time'] > 150)
+                                ]
+    CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
+
+    # megaframe = load_megaframe()
 
     # Match objects
+    fname = "object-matches_d01-d02.pickle"
+    fpath = os.path.join(objectroot,fname)
+    if (not os.path.exists(fpath)):
+        verif_domain = 'nexrad'
+        matches = CAT.match_domains(members=member_names,initutcs=get_all_initutcs(),
+                        leadtimes=all_fcstmins,domains=dom_names)
+        utils.save_pickle(obj=matches, fpath=fpath)
+    else:
+        matches = utils.load_pickle(fpath=fpath)
 
 
     # Do differences beteen difference domains/products
+    # Positive diffs means d02 is higher.
 
-    # Plot!
+    def write_row(df,n,key,val):
+        df.loc[n,key] = val
+        return
+
+    def find_row(df,megaidx):
+        row = df[(df['megaframe_idx'] == megaidx)]
+        return row
+
+    def do_write_diff(df,n,oldkey,newkey,d02,d01):
+        diff = d02.get(oldkey).values[0] - d01.get(oldkey).values[0]
+        write_row(df,nm,newkey,diff)
+        return
+
+    DTYPES = {
+                "d01_id":"i4",
+                "d02_id":"i4",
+
+                # diffs
+                "area_diff":"f4",
+                # "centroid_gap_angle":"f4",
+                "eccentricity_diff":"f4",
+                "equivalent_diameter_diff":"f4",
+                "extent_diff":"f4",
+                "max_intensity_diff":"f4",
+                "mean_intensity_diff":"f4",
+                "perimeter_diff":"f4",
+                "ratio_diff":"f4",
+                "longaxis_km_diff":"f4",
+                "qlcsness_diff":"f4",
+                "max_updraught_diff":"f4",
+                "mean_updraught_diff":"f4",
+                "min_updraught_diff":"f4",
+
+                # non-straight-forward diffs
+                "centroid_gap_km":"f4",
+                # "ud_centroid_diff_km":"f4",
+                }
+
+    prop_names = []
+    diff_df = utils.do_new_df(DTYPES,len(matches))
+    for nm,match in enumerate(matches):
+        if match is None:
+            continue
+        d01_obj_id, d02_obj_id = match
+        d01 = find_row(megaframe,d01_obj_id)
+        d02 = find_row(megaframe,d02_obj_id)
+
+        # diff_df.loc[nm,'d01_id'] = d01_obj
+        write_row(diff_df,nm,"d01_id",d01_obj_id)
+        write_row(diff_df,nm,"d02_id",d02_obj_id)
+
+        cd = utils.xs_distance(d02.centroid_lat.values[0],
+                    d02.centroid_lon.values[0],
+                    d01.centroid_lat.values[0],
+                    d01.centroid_lon.values[0])/1000.0
+        write_row(diff_df,nm,"centroid_gap_km",cd)
+
+        # Do distance between updraught max?
+        # Modify above.
+
+        props = ("area","eccentricity","equivalent_diameter","extent",
+                        "max_intensity","mean_intensity","perimeter",
+                        "ratio","longaxis_km","qlcsness",
+                        "max_updraught","mean_updraught",
+                        "min_updraught")
+        prop_diffs = [p + '_diff' for p in props]
+        for prop, prop_diff in zip(props,prop_diffs):
+            do_write_diff(diff_df,nm,prop,prop_diff,d02,d01)
+
+    # These is the dataframe with no missing data (Nones)
+    diff_df = diff_df[(diff_df['d01_id'] != 0.0)]
+
+
+    #from evac.plot.ridgeplot import RidgePlot
+    #fname = "diffs_ridgeplot.png"
+    #fpath = os.path.join(outroot,"ridgeplots",fname)
+    #utils.trycreate(fpath)
+    #RidgePlot(fpath).plot(diff_df,namelist=prop_diffs,)
+
+    fname = "hist_3x3.png"
+    fpath = os.path.join(outroot,"match_diffs",fname)
+    utils.trycreate(fpath)
+    fig,axes = plt.subplots(nrows=3,ncols=5,figsize=(12,8))
+    axit = axes.flat
+    for n,p_d in enumerate(prop_diffs):
+        ax = next(axit)
+        ax.hist(diff_df[p_d],bins=50,color='green')
+        ax.set_title(p_d)
+        ax.axvline(0,color='black')
+
+    ax = next(axit)
+    ax.hist(diff_df["centroid_gap_km"],bins=50,color='green')
+
+    fig.tight_layout()
+    fig.savefig(fpath)
+
+
+if do_object_examples:
+    print(stars,"DOING OBJ EXAMPLE PLOT",stars)
+    # Plot example storms for each range of qlcs values
+    # 6 storms from left to right, increasing in qlcsness
+    # Top, plot the bounding box from original data, plus pad
+    # Bottom, plot the object pcolormesh.
+
+    intv = 0.25; nstorms = 6
+    qlcsmin = round_nearest(qlcs_all.min(),intv,method='floor')
+    qlcsmax = round_nearest(qlcs_all.max(),intv,method='ceil')
+    qlcsness_vals = N.linspace(qlcsmin,qlcsmax,nstorms)
+
+    intensity_arr = N.zeros([100,40])
+    obj_arr = N.zeros_like(intensity_arr)
+
+    # Get subset of d02 only
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
+    megaframe = load_megaframe(fmts=all_fmts)
+
+    miniframe = megaframe[(megaframe['resolution'] == "hi-res") &
+                        (megaframe['member'] != 'obs') &
+                        (megaframe['qlcsness'] > minq) &
+                        (megaframe['qlcsness'] < maxq)
+                        ]
+
+    LOOKUP = {0:0,1:0,2:0,3:0,
+                4:0,5:0,}
+
+    for nq, q in enumerate(qlcsness_vals):
+        minq = q-(intv/3)
+        maxq = q+(intv/3)
+
+        # Subset objects in this range
+        miniframe = megaframe[(megaframe['resolution'] == "hi-res") &
+                        (megaframe['member'] != 'obs') &
+                        (megaframe['qlcsness'] > minq) &
+                        (megaframe['qlcsness'] < maxq) ]
+
+        # Pick this number
+        oo = miniframe.iloc[LOOKUP[nq]]
+        obj_id = oo.megaframe_idx
+        obj_obj = oo.fpath_save
+        obj = utils.load_pickle(obj_obj)
+        coords = obj.object_props.loc[obj_id,'coords']
+
+        # Transpose so bottom left is in bottom left of array
+
+
+        # Shift to the right until not overlapping previous storm
+
+
+
+        # "Stamp" the "real" storm, maybe >10 dBZ for clarity
+
+
+        # "Stamp" the object outline
+
+
+        # Annotate the QLCS-ness, object number, etc?
+
+
+    fname = "examples_from_pca.png"
+    fpath = os.path.join(outroot,fname)
+    fig,axes = subplots(ncols=1,nrows=2)
+    for nax,ax in enumerate(axes.flat):
+        if nax == 0:
+            S = Scales('REFL_comp')
+            ax.contourf(intensity_arr,cmap=S.cm,levels=S.clvs)
+        else:
+            ax.pcolormesh(obj_arr,alpha=0.5,cmap=M.cm.get_cmap("magma",3),
+                            #vmin=1,vmax=3,
+                            )
+    fig.tight_layout()
+    fig.savefig(fpath)
+    print("Saved image to",fpath)
+
+
+
+if do_object_waffle:
+    print(stars,"DOING WAFFLEPLOT",stars)
+    # Compute PCA for d01/d02 combined objects, but for cellular only
+    # Dump in every continuous variable
+    # Plot the leading three again - is PC1 the same as previous PC2?
+
+    # Then, find which PC corresponds to 'hi-res-ness'
+
+    # Subsample df (0.1?)
+
+    # Then order all objects by that PC
+
+    # Colour each object by domain, but the colour luminosity is PC value.
+
+    # Do we see that objects are easily 'recognisable' as from which domain?
+    pass
+
+if do_object_cluster:
+    print(stars,"DOING OBJ CLUSTERING",stars)
+    # Similar to waffle above, but do objects cluster by domain before case?
+
+    # Dendrogram?
+
+    # What about that cool dendrogram heatmap/matrix on seaborn?
+    pass
