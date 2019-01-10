@@ -49,12 +49,12 @@ do_quicklooks = not PA.no_quick
 ### SWITCHES ###
 do_domains = False
 do_performance = False
-do_efss = False # Also includes FISS, which is broken?
+do_efss = True # Also includes FISS, which is broken?
 
 object_switch = False
 do_object_pca = False
 do_object_performance = False
-do_object_distr = False
+do_object_distr = True
 do_object_matching = True
 do_object_examples = True
 do_object_waffle = True
@@ -520,6 +520,12 @@ def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     return kw
 
 def load_megaframe(fmts,add_ens=True,add_W=True):
+    # Overwrite fmts...
+    del fmts
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
+
     mega_fname = "MEGAFRAME.megaframe"
     mega_fpath = os.path.join(objectroot,mega_fname)
     # ens will create a similar df to megaframe, but separating
@@ -531,7 +537,7 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
         return utils.load_pickle(mega_fpath)
 
     df_list = []
-    for fmt in fmts:
+    for fmt in all_fmts:
         fname = "all_obj_dataframes_{}.pickle".format(fmt)
         fpath = os.path.join(objectroot,fname)
         results = utils.load_pickle(fpath)
@@ -542,6 +548,7 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
     # At this point, the megaframe indices are set in stone!
 
     #### HACKS #####
+    print("Adding/modifying megaframe...")
     # Remove these later!
     #df_og.area *= df_og.dx
     #print("Megaframe hacked: area changed to km")
@@ -588,10 +595,12 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
     # Add on W
     if add_W:
         CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
-        W_lookup = load_W_lookup()#fmts)
+        W_lookup = load_W_lookup(fcst_fmts)#fmts)
         W_df = load_W_df(W_lookup,CAT)
         # ens_df = create_ens_df(df_og)
-        df_og = pandas.concat((df_og,W_df),axis=1)
+        # pdb.set_trace()
+        # df_og = pandas.concat((df_og,W_df),axis=1)
+        df_og = concat_W_df(df_og,W_df)
 
     print("Megaframe created.")
 
@@ -600,24 +609,34 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
     # pdb.set_trace()
     return df_og
 
+def concat_W_df(df_og,W_df):
+    # df_og.set_index('megaframe_idx').join(other.set_index('megaframe_idx_test'))
+    new_df = df_og.join(W_df.set_index('megaframe_idx_test'),on='megaframe_idx')
+
+    #for oidx,obj in enumerate(df_og.itertuples()):
+    #    Ix = obj.megaframe_idx
+    #    new_df.loc[oidx,"megaframe_idx_test"] = Ix
+    # pdb.set_trace()
+    return new_df
+
 def load_W_df(W_lookup,CAT):
     fname = "W_df.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
         W_df = W_df = CAT.compute_new_attributes(W_lookup)
-        save_pickle(obj=W_df,fpath=fpath)
+        utils.save_pickle(obj=W_df,fpath=fpath)
         print("Saved to",fpath)
     else:
         W_df = utils.load_pickle(fpath=fpath)
         print("W_df loaded from",fpath)
     return W_df
 
-def load_W_lookup():#fmts):
+def load_W_lookup(fcst_fmts):#fmts):
     fname = "W_lookup.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
-        W_lookup = create_W_lookup()
-        save_pickle(obj=W_lookup,fpath=fpath)
+        W_lookup = create_W_lookup(fcst_fmts)
+        utils.save_pickle(obj=W_lookup,fpath=fpath)
         print("Saved to",fpath)
     else:
         W_lookup = utils.load_pickle(fpath=fpath)
@@ -641,9 +660,9 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                         prod_code = "_".join((fcst_fmt, mem))
                         yield dict(fcst_vrbl=fcst_vrbl, valid_time=validutc,
                                 fcst_min=validmin, prod_code=prod_code,
-                                path_to_pickle=path_to_pickle)
+                                path_to_pickle=path_to_pickle,fcst_fmt=fcst_fmt)
 
-def create_W_lookup():
+def create_W_lookup(fcst_fmts):
     itr = list(loop_ens_data(fcst_vrbl="Wmax",fcst_fmts=fcst_fmts))
     nobjs = len(itr)
 
@@ -653,6 +672,7 @@ def create_W_lookup():
             "fcst_min":"i4",
             "prod_code":"object",
             "path_to_pickle":"object",
+            "fcst_fmt":"object",
             }
 
     new_df = utils.do_new_df(DTYPES,nobjs)
@@ -670,7 +690,7 @@ def load_ens_df(df_og):
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
         ens_df = create_ens_df(df_og)
-        save_pickle(obj=ens_df,fpath=fpath)
+        utils.save_pickle(obj=ens_df,fpath=fpath)
         print("Saved to",fpath)
     else:
         ens_df = utils.load_pickle(fpath=fpath)
@@ -785,6 +805,11 @@ COLORS = {
         "d01_3km":"#1A85FF",
         "d02_1km":"#D41159", # See v v v v v v
         "d02_3km":"#D41159", # Same - differentiated by shape
+        }
+
+RESCOLS = {
+        "lo-res":"#1A85FF",
+        "hi-res":"#D41159",
         }
 
 RANCOL = {
@@ -943,8 +968,8 @@ if do_efss:
     # temporal_windows = (1,)
 
     #_fms = (30,60,90,120,150,180,)
-    # fcstmins = (30,60,90,120,150)
-    fcstmins = (150,)
+    fcstmins = (30,60,90,120,150,180)
+    # fcstmins = (150,)
     # fcstmins = (30,90,150)
     # vrbl = "accum_precip"
     # vrbl = "UH02"
@@ -1083,7 +1108,7 @@ if object_switch:
 
             kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,fpath=pk_fpath)
             obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
-            save_pickle(obj=obj,fpath=pk_fpath)
+            utils.save_pickle(obj=obj,fpath=pk_fpath)
             # print("Object instance newly created.")
         else:
             # print("Object instance already created.")
@@ -1124,7 +1149,7 @@ if object_switch:
                                 obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
             kw = get_kw(prodfmt=obs_fmt,utc=validutc,fpath=fpath)
             obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx,**kw)
-            save_pickle(obj=obj,fpath=fpath)
+            utils.save_pickle(obj=obj,fpath=fpath)
             # print("Object instance newly created.")
         else:
             # print("Object instance already created.")
@@ -1168,7 +1193,7 @@ if object_switch:
             else:
                 for i in itr_fcst:
                     compute_obj_fcst(i)
-            save_pickle(obj=results_fcst,fpath=fcst_fpath)
+            utils.save_pickle(obj=results_fcst,fpath=fcst_fpath)
         else:
             results_fcst = utils.load_pickle(fcst_fpath)
 
@@ -1179,7 +1204,7 @@ if object_switch:
             fcst_df = pandas.concat(results_fcst,ignore_index=True)
             CAT = Catalogue(fcst_df,tempdir=objectroot,ncpus=ncpus)
             pca, PC_df, features, scaler = CAT.do_pca()
-            save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
 
         print("Now calculating objects for all observations on",obs_fmt)
@@ -1193,7 +1218,7 @@ if object_switch:
             else:
                 for i in itr_obs:
                     compute_obj_obs(i)
-            save_pickle(obj=results_obs,fpath=obs_fpath)
+            utils.save_pickle(obj=results_obs,fpath=obs_fpath)
         else:
             results_obs = utils.load_pickle(obs_fpath)
 
@@ -1204,7 +1229,7 @@ if object_switch:
             obs_df = pandas.concat(results_obs,ignore_index=True)
             CAT = Catalogue(obs_df,tempdir=objectroot,ncpus=ncpus)
             pca, PC_df, features, scaler = CAT.do_pca()
-            save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
 if do_object_pca:
     print(stars,"DOING PCA",stars)
@@ -1247,7 +1272,6 @@ if do_object_distr:
     obs_fmts = ("nexrad_3km","nexrad_1km")
     all_fmts = list(fcst_fmts) + list(obs_fmts)
     megaframe = load_megaframe(fmts=all_fmts)
-
     # max_updraught
     # mean_updraught
     # distance_from_centroid
@@ -1279,7 +1303,7 @@ if do_object_distr:
         FH.plot(df_fcst,xname="resolution",yname="case_code",dataname="qlcsness")
 
 
-    if False:
+    if True:
         # Subset for only d01/d02
         from evac.plot.pairplot import PairPlot
 
@@ -1292,27 +1316,31 @@ if do_object_distr:
 
             vars = ["max_updraught","max_intensity","perimeter","ud_distance_from_centroid"]
 
+            miniframe.sort_values(axis=0,by="conv_mode",inplace=True)
             fpath = os.path.join(outroot,"pairplots","pairmode_1_{}min.png".format(fcstmin))
             utils.trycreate(fpath)
             PP = PairPlot(fpath)
-            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars)
+            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars,palette="husl")
 
+            miniframe.sort_values(axis=0,by="resolution",inplace=True)
             fpath2 = os.path.join(outroot,"pairplots","pairdx_1_{}min.png".format(fcstmin))
             PP2 = PairPlot(fpath2)
-            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars)
+            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars,palette=RESCOLS)
 
             vars = ["max_updraught","eccentricity","longaxis_km","qlcsness"]
 
+            miniframe.sort_values(axis=0,by="conv_mode",inplace=True)
             fpath = os.path.join(outroot,"pairplots","pairmode_2_{}min.png".format(fcstmin))
             utils.trycreate(fpath)
             PP = PairPlot(fpath)
-            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars)
+            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars,palette="Set2")
 
+            miniframe.sort_values(axis=0,by="resolution",inplace=True)
             fpath2 = os.path.join(outroot,"pairplots","pairdx_2_{}min.png".format(fcstmin))
             PP2 = PairPlot(fpath2)
-            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars)
+            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars,palette=RESCOLS)
 
-    if False:
+    if True:
         # Plot updraught's distance from centroid against max intensity
         # For d01/d02 separately.
         import seaborn as sns
@@ -1321,7 +1349,7 @@ if do_object_distr:
         fpath = os.path.join(outroot,"kdeplots","ud_distance_v_intensity.png")
         utils.trycreate(fpath)
 
-        f, axes = plt.subplots(2,4,figsize=(8,8),sharex=True,sharey=True)
+        f, axes = plt.subplots(2,4,figsize=(10,7),sharex=True,sharey=True)
 
         def ax_gen(axes):
             for n,ax in enumerate(axes.flat):
@@ -1337,18 +1365,20 @@ if do_object_distr:
                                         "20170502","20170504"]):
                 ax = next(axf)
                 df_case = df_km[(df_km['case_code'] == case_code)]
-                cmap = sns.cubehelix_palette(start=(n/2.5), light=1, as_cmap=True)
+                cmap = sns.cubehelix_palette(start=(n/2.5), light=0.8, dark=0.2, as_cmap=True)
                 sns.kdeplot(df_case['max_updraught'],
                     df_case['ud_distance_from_centroid'], cmap=cmap,
-                    shade=True, ax=ax,
+                    shade=True, ax=ax, aspect=1,
                     # cut=5,
                     )
                 ax.set_xlim([0,40])
                 ax.set_ylim([0,40])
+                ax.set_aspect('equal')
                 ax.set_title("{}km for {}".format(int(dx),case_code))
         f.tight_layout()
         f.savefig(fpath)
         print("Figure saved to",fpath)
+        plt.close(f)
 
 if do_object_matching:
     print(stars,"DOING OBJ MATCHING/DIFFS",stars)
@@ -1463,18 +1493,24 @@ if do_object_matching:
     fpath = os.path.join(outroot,"match_diffs",fname)
     utils.trycreate(fpath)
     fig,axes = plt.subplots(nrows=3,ncols=5,figsize=(12,8))
+
+    palette = itertools.cycle(sns.cubehelix_palette(14,light=0.8,dark=0.2))
+
     axit = axes.flat
     for n,p_d in enumerate(prop_diffs):
         ax = next(axit)
-        ax.hist(diff_df[p_d],bins=50,color='green')
+        ax.hist(diff_df[p_d],bins=50,color=next(palette))
         ax.set_title(p_d)
         ax.axvline(0,color='black')
 
     ax = next(axit)
     ax.hist(diff_df["centroid_gap_km"],bins=50,color='green')
+    ax.set_title("Gap in centroids (km)")
 
     fig.tight_layout()
     fig.savefig(fpath)
+
+    # Joint distributions
 
 
 if do_object_examples:
