@@ -54,11 +54,11 @@ do_efss = True # Also includes FISS, which is broken?
 object_switch = False
 do_object_pca = False
 do_object_performance = False
-do_object_distr = True
-do_object_matching = True
-do_object_examples = True
-do_object_waffle = True
-do_object_cluster = True
+do_object_distr = False
+do_object_matching = False
+do_object_examples = False
+do_object_waffle = False
+do_object_cluster = False
                 #max(do_object_performance,do_object_distr,
                 #    do_object_pca,do_object_lda,do_object_matching,)
 
@@ -824,14 +824,14 @@ MARKERS = {
         "d02_3km":'o', # Different, as it's interpolate
         }
 SIZES = {}
-ALPHAS = {
-        15:1.0,
-        25:0.9,
-        30:0.75,
-        45:0.5,
-        50:0.4,
-        55:0.2,
-        }
+
+alpha_dbzs = N.arange(10,65,5)
+alpha_vals = N.linspace(0.1,1.0,num=len(alpha_dbzs))
+
+# ALPHAS = { 10:1.0, 15:0.9, 20:0.9, 25:0.9, 30:0.75,
+                # 45:0.5, 50:0.4, 55:0.2, }
+ALPHAS = {d:v for d,v in zip(alpha_dbzs[::-1],alpha_vals)}
+
 alpha = 0.8
 size = 25
 for fmt in fcst_fmts:
@@ -960,12 +960,12 @@ if do_efss:
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return efss.results
 
-    threshs = (15,30,45,55)
-    spatial_windows = {"d01_3km":(1,3,5,7,9,15),
-                        "d02_1km":(1,3,9,15,21,27,45)}
+    threshs = (10,20,30,35,40,45,50,55)
+    spatial_windows = {"d01_3km":(1,3,5,7,9,11,13),
+                        "d02_1km":(1,3,9,15,21,27,33,39)}
 
-    temporal_windows = (1,3,)
-    # temporal_windows = (1,)
+    # temporal_windows = (1,3)
+    temporal_windows = (1,)
 
     #_fms = (30,60,90,120,150,180,)
     fcstmins = (30,60,90,120,150,180)
@@ -975,14 +975,24 @@ if do_efss:
     # vrbl = "UH02"
     # vrbl = "UH25"
     vrbl = "REFL_comp"
+    fssdir = os.path.join(extractroot,"efss_fiss")
+    utils.trycreate(fssdir,isdir=True)
+
 
     for fcstmin, temporal_window in itertools.product(fcstmins,temporal_windows):
+        print("Doing {} min, {} tw.".format(fcstmin, temporal_window))
         efss_data = {}
         fiss_data = {}
-        e_npy0 = "d01_3km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
-        e_npy1 = "d02_1km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
-        f_npy0 = "d01_3km_fiss_{}tw_{}min.npy".format(temporal_window,fcstmin)
-        f_npy1 = "d02_1km_fiss_{}tw_{}min.npy".format(temporal_window,fcstmin)
+        e_npy0_f = "d01_3km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
+        e_npy1_f = "d02_1km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
+        f_npy0_f = "d01_3km_fiss_{}tw_{}min.npy".format(temporal_window,fcstmin)
+        f_npy1_f = "d02_1km_fiss_{}tw_{}min.npy".format(temporal_window,fcstmin)
+
+        e_npy0 = os.path.join(fssdir,e_npy0_f)
+        e_npy1 = os.path.join(fssdir,e_npy1_f)
+        f_npy0 = os.path.join(fssdir,f_npy0_f)
+        f_npy1 = os.path.join(fssdir,f_npy1_f)
+
         if os.path.exists(e_npy0):
             efss_data['d01_3km'] = N.load(e_npy0)
             efss_data['d02_1km'] = N.load(e_npy1)
@@ -1031,7 +1041,8 @@ if do_efss:
 
         fig,ax = plt.subplots(1)
         fname = "efss_{}min_{}tw.png".format(fcstmin,temporal_window)
-        fpath = os.path.join(outroot,fname)
+        fpath = os.path.join(outroot,"efss",fname)
+        utils.trycreate(fpath)
         # Plotted in terms of diameter (3 = 3 grid spaces diameter = 9km for d01)
         for thidx, thresh in enumerate(threshs):
             label = "d02 (1km, raw) {} dBZ".format(thresh)
@@ -1051,7 +1062,8 @@ if do_efss:
 
         fig,ax = plt.subplots(1)
         fname = "fiss_{}min_{}tw.png".format(fcstmin,temporal_window)
-        fpath = os.path.join(outroot,fname)
+        fpath = os.path.join(outroot,"fiss",fname)
+        utils.trycreate(fpath)
         # Plotted in terms of diameter (3 = 3 grid spaces diameter = 9km for d01)
         for thidx, thresh in enumerate(threshs):
             label = "d02 (1km, raw) {} dBZ".format(thresh)
