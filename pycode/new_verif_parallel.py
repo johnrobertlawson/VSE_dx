@@ -25,7 +25,8 @@ from evac.datafiles.wrfout import WRFOut
 from evac.plot.domains import Domains
 from evac.stats.detscores import DetScores
 from evac.plot.performance import Performance
-from evac.stats.fi import FI
+# from evac.stats.fi import FI
+from fiss import FISS
 from evac.object.objectid import ObjectID
 from evac.object.catalogue import Catalogue
 
@@ -48,8 +49,8 @@ do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
 do_domains = False
-do_performance = False
-do_efss = True # Also includes FISS, which is broken?
+do_performance = True
+do_efss = False # Also includes FISS, which is broken?
 
 object_switch = False
 do_object_pca = False
@@ -832,8 +833,8 @@ alpha_vals = N.linspace(0.1,1.0,num=len(alpha_dbzs))
                 # 45:0.5, 50:0.4, 55:0.2, }
 ALPHAS = {d:v for d,v in zip(alpha_dbzs[::-1],alpha_vals)}
 
-alpha = 0.8
-size = 25
+alpha = 0.7
+size = 20
 for fmt in fcst_fmts:
     SIZES[fmt] = size
     ALPHAS[fmt] = alpha
@@ -887,28 +888,27 @@ if do_performance:
 
     def compute_perf(i):
         fcst_vrbl, caseutc, initutc, mem, fcst_fmt, validutc,thresh = i
-        fcst_data, obs_data = load_both_data(vrbl=fcst_vrbl,fmt=fcst_fmt,
+        fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
                         validutc=validutc,caseutc=caseutc,initutc=initutc,
                         mem=mem)
         DS = DetScores(fcst_arr=fcst_data,obs_arr=obs_data,thresh=thresh,
                         overunder='over')
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
-        return DS
+        return (DS,caseutc,mem)
 
     # Create a "master" figure for the paper
     fname = "perfdiag_REFL_comp_30_multi.png"
     fpath = os.path.join(outroot,fname)
-    PD0 = Performance(fpath=fpath,legendkwargs=None,legend=True)
+    PD0 = Performance(fpath=fpath,legendkwargs=None,legend=False)
     #_ths = (15,30,40,50)
     #_fms = (30,60,90,120,150,180,)
     _vs = ("REFL_comp",)
-    _ths = (30,)
-    _fms = (60,120,180)
+    _ths = (15,30,40,50)
+    #_fms = (60,120,180)
+    _fms = (30,60,90,120,150,180)
 
+    ZZZ = {}
     for thresh, vrbl, fcstmin in itertools.product(_ths,_vs,_fms):
-        fname = "perfdiag_{}_{}th_{}min".format(vrbl,thresh,fcstmin)
-        fpath = os.path.join(outroot,fname)
-        PD1 = Performance(fpath=fpath,legendkwargs=None,legend=True)
         for fmt in fcst_fmts:
             itr = loop_perf(vrbl=vrbl,thresh=thresh,fcstmin=fcstmin,fcst_fmt=fmt)
             itr2 = itertools.tee(itr)
@@ -921,30 +921,48 @@ if do_performance:
                 results = pool.map(compute_perf,itr)
             # for i in list(itr):
             #     compute_perf(i)
-            POD = []
-            FAR = []
+            casestrs = [utils.string_from_time('dir',c,strlen='day')
+                            for c in CASES.keys()]
+            ZZZ[fmt] = {}
+            ZZZ[fmt]["POD"] = {casestr:[] for casestr in casestrs}
+            ZZZ[fmt]["FAR"] = {casestr:[] for casestr in casestrs}
             for r in results:
-                POD.append(r.get("POD"))
-                FAR.append(r.get('FAR'))
-            pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
-                            'alpha':ALPHAS[fmt]}
-            lstr = "Domain {}".format(fmt)
-            print("Plotting",fmt,"to",fpath)
-            # pdb.set_trace()
-            PD1.plot_data(pod=N.mean(POD),far=N.mean(FAR),plotkwargs=pk,label=lstr)
+                casestr = utils.string_from_time('dir',r[1],strlen='day')
+                ZZZ[fmt]["POD"][casestr].append(r[0].get("POD"))
+                ZZZ[fmt]["FAR"][casestr].append(r[0].get("FAR"))
 
-            if (fcstmin in (60,120,180)) and (vrbl == "REFL_comp") and (thresh==30):
-                if fcstmin > 60:
-                    lstr = None
-                PD0.plot_data(pod=N.mean(POD),far=N.mean(FAR),plotkwargs=pk,label=lstr)
-                if fmt.startswith("d01"):
-                    annostr = "{} min".format(fcstmin)
-                    PD0.ax.annotate(annostr,xy=(1-N.mean(FAR)-0.055,N.mean(POD)+0.03),
-                                    xycoords='data',fontsize='8',color='black',
-                                    fontweight='bold')
+    
+        # pdb.set_trace()
+        for casestr in casestrs:
+            fname = "perfdiag_{}_{}th_{}min_{}".format(vrbl,thresh,fcstmin,casestr)
+            fpath = os.path.join(outroot,"perfdiag",casestr,fname)
+            PD1 = Performance(fpath=fpath,legendkwargs=None,legend=True)
+
+            for fmt in fcst_fmts:
+                POD = ZZZ[fmt]["POD"]
+                FAR = ZZZ[fmt]["FAR"]
+
+                pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                                'alpha':ALPHAS[fmt]}
+                lstr = "Domain {}".format(fmt)
+                print("Plotting",fmt,"to",fpath)
+                # pdb.set_trace()
+                PD1.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
+
+                #if (fcstmin in (60,120,180)) and (vrbl == "REFL_comp") and (thresh==30):
+                if (fcstmin in (30,90,150)) and (vrbl == "REFL_comp") and (thresh==30):
+                    if fcstmin > 60:
+                        lstr = None
+                    PD0.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,
+                                        label=lstr)
+                    if fmt.startswith("d01"):
+                        annostr = "{} min".format(fcstmin)
+                        PD0.ax.annotate(annostr,xy=(1-N.mean(FAR[casestr])-0.055,N.mean(POD[casestr])+0.03),
+                                        xycoords='data',fontsize='8',color='black',
+                                        fontweight='bold')
 
         # PD.ax.set_xlim([0,0.3])
-        PD1.save()
+            PD1.save()
     PD0.save()
 
 if do_efss:
@@ -954,21 +972,26 @@ if do_efss:
         fcst_data, obs_data = load_timewindow_both_data(vrbl=fcst_vrbl,fmt=fcst_fmt,
                         validutc=validutc,caseutc=caseutc,initutc=initutc,
                         mem='all',window=temporal_window)
-        efss = FI(xfs=fcst_data,xa=obs_data,thresholds=threshs,ncpus=ncpus,
+        efss = FISS(xfs=fcst_data,xa=obs_data,thresholds=threshs,ncpus=ncpus,
                         neighborhoods=spatial_windows,temporal_window=temporal_window,
                         efss=True)
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return efss.results
 
-    threshs = (10,20,30,35,40,45,50,55)
-    spatial_windows = {"d01_3km":(1,3,5,7,9,11,13),
-                        "d02_1km":(1,3,9,15,21,27,33,39)}
+    #threshs = (10,20,30,35,40,45,50,55)
+    threshs = (10,20,30,40,45,50)
+    spatial_windows = {
+                        # "d01_3km":(1,3,5,7,9,11,13),
+                        "d01_3km":(1,3,5,7,9,),
+                        # "d02_1km":(1,3,9,15,21,27,33,39)}
+                        "d02_1km":(1,3,9,15,21,27,)}
 
-    # temporal_windows = (1,3)
-    temporal_windows = (1,)
+    temporal_windows = (1,3)
+    # temporal_windows = (1,)
 
     #_fms = (30,60,90,120,150,180,)
-    fcstmins = (30,60,90,120,150,180)
+    # fcstmins = (30,60,90,120,150,180)
+    fcstmins = (30,90,150)
     # fcstmins = (150,)
     # fcstmins = (30,90,150)
     # vrbl = "accum_precip"
@@ -1053,10 +1076,13 @@ if do_efss:
             label = "d01 (3km, raw) {} dBZ".format(thresh)
             ax.plot(sw3,efss_data["d01_3km"][:,thidx],
                     color=COLORS["d01_3km"],label=label,alpha=ALPHAS[thresh])
-        ax.set_xlim([0,45])
+        ax.set_xlim([0,30])
+        ax.set_ylim([0,1])
         ax.set_xlabel("Neighborhood diameter (km)")
         ax.set_ylabel("Fractions Skill Score")
-        ax.legend()
+        ax.legend(prop=dict(size=8),bbox_to_anchor=(1.05,1),
+                    loc="upper left",borderaxespad=0.0)
+        fig.tight_layout()
         fig.savefig(fpath)
         plt.close(fig)
 
@@ -1074,12 +1100,14 @@ if do_efss:
             label = "d01 (3km, raw) {} dBZ".format(thresh)
             ax.plot(sw3,fiss_data["d01_3km"][:,thidx],
                     color=COLORS["d01_3km"],label=label,alpha=ALPHAS[thresh])
-        ax.set_xlim([0,45])
+        ax.set_xlim([0,30])
         ax.set_ylim([-1,1])
         ax.set_xlabel("Neighborhood diameter (km)")
         ax.set_ylabel("Fractional Ignorance Skill Score")
         ax.axhline(0)
-        ax.legend()
+        ax.legend(prop=dict(size=8),bbox_to_anchor=(1.05,1),
+                    loc="upper left",borderaxespad=0.0)
+        fig.tight_layout()
         fig.savefig(fpath)
         plt.close(fig)
 
