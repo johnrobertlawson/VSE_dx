@@ -792,6 +792,31 @@ def sync_dataframes(fmts=None,attr_df=None):
 
     return
 
+def get_color(fmt,mem):
+
+    CCC = {"d01_3km": {
+                1:"#71B4FD",
+                2:"#469DFF",
+                3:"#1A86FF",
+                4:"#077CFF",
+                5:"#015EC7",
+                6:"#000897",},
+            "d02_1km": {
+                1:"#E66393",
+                2:"#DD3C77",
+                3:"#D41159",
+                4:"#A80441",
+                5:"#850031",
+                6:"#650025",}}
+            
+    mem_no = int(mem[1:])
+    assert 0 < mem_no < 37
+    mem_combo = (mem_no % 6)+1
+    # YSU, Dudhia, RRTM MM5
+    # d01 or EE3km is #1A85FF or (26,133,255)
+    # d02 or EE1km is #D41159 or (212,17,89)
+    return CCC[fmt][mem_combo]
+
 ###############################################################################
 ############################### END OF FUNCTIONS ##############################
 ###############################################################################
@@ -908,6 +933,7 @@ if do_performance:
     _fms = (30,60,90,120,150,180)
 
     ZZZ = {}
+    YYY = {}
     for thresh, vrbl, fcstmin in itertools.product(_ths,_vs,_fms):
         for fmt in fcst_fmts:
             itr = loop_perf(vrbl=vrbl,thresh=thresh,fcstmin=fcstmin,fcst_fmt=fmt)
@@ -923,21 +949,42 @@ if do_performance:
             #     compute_perf(i)
             casestrs = [utils.string_from_time('dir',c,strlen='day')
                             for c in CASES.keys()]
-            ZZZ[fmt] = {}
+            ZZZ[fmt] = dict()
             ZZZ[fmt]["POD"] = {casestr:[] for casestr in casestrs}
             ZZZ[fmt]["FAR"] = {casestr:[] for casestr in casestrs}
+
+            YYY[fmt] = dict()
+            YYY[fmt]["POD"] = {casestr:{m:[] for m in member_names} for casestr in casestrs}
+            YYY[fmt]["FAR"] = {casestr:{m:[] for m in member_names} for casestr in casestrs}
+
             for r in results:
+                mem = r[2]
                 casestr = utils.string_from_time('dir',r[1],strlen='day')
-                ZZZ[fmt]["POD"][casestr].append(r[0].get("POD"))
-                ZZZ[fmt]["FAR"][casestr].append(r[0].get("FAR"))
+
+                _pod = r[0].get("POD")
+                _far = r[0].get("FAR")
+
+                ZZZ[fmt]["POD"][casestr].append(_pod)
+                ZZZ[fmt]["FAR"][casestr].append(_far)
+
+                YYY[fmt]["POD"][casestr][mem].append(_pod)
+                YYY[fmt]["FAR"][casestr][mem].append(_far)
 
     
         # pdb.set_trace()
         for casestr in casestrs:
-            fname = "perfdiag_{}_{}th_{}min_{}".format(vrbl,thresh,fcstmin,casestr)
-            fpath = os.path.join(outroot,"perfdiag",casestr,fname)
-            PD1 = Performance(fpath=fpath,legendkwargs=None,legend=True)
+            fname1 = "perfdiag_{}_{}th_{}min_{}".format(vrbl,thresh,fcstmin,casestr)
+            fpath1 = os.path.join(outroot,"perfdiag",casestr,fname1)
+            PD1 = Performance(fpath=fpath1,legendkwargs=None,legend=True)
 
+            fname2 = "perfdiag_{}_{}th_{}min_{}_eachens".format(vrbl,thresh,fcstmin,casestr)
+            fpath2 = os.path.join(outroot,"perfdiag","eachens",casestr,fname2)
+            PD2 = Performance(fpath=fpath2,legendkwargs=None,legend=False)
+
+            pod_all = []
+            far_all = []
+            pod_mem = {f:{m:[] for m in member_names} for f in fcst_fmts}
+            far_mem = {f:{m:[] for m in member_names} for f in fcst_fmts}
             for fmt in fcst_fmts:
                 POD = ZZZ[fmt]["POD"]
                 FAR = ZZZ[fmt]["FAR"]
@@ -945,7 +992,7 @@ if do_performance:
                 pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
                                 'alpha':ALPHAS[fmt]}
                 lstr = "Domain {}".format(fmt)
-                print("Plotting",fmt,"to",fpath)
+                print("Plotting",fmt,"to",fpath1)
                 # pdb.set_trace()
                 PD1.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
 
@@ -960,11 +1007,91 @@ if do_performance:
                         PD0.ax.annotate(annostr,xy=(1-N.mean(FAR[casestr])-0.055,N.mean(POD[casestr])+0.03),
                                         xycoords='data',fontsize='8',color='black',
                                         fontweight='bold')
+                for mem in member_names:
+                    _pod_ = YYY[fmt]["POD"][casestr][mem]
+                    pod_all.append(_pod_)
+                    _far_ = YYY[fmt]["FAR"][casestr][mem]
+                    far_all.append(_far_)
+
+                    pod_mem[fmt][mem].append(_pod_)
+                    far_mem[fmt][mem].append(_far_)
+
+            pod_max = N.nanmax(pod_all)
+            pod_min = N.nanmin(pod_all)
+            sr_min  = 1-N.nanmax(far_all)
+            sr_max = 1-N.nanmin(far_all)
+            pad = 0.1
+
+            sr_min = max(0,sr_min)
+            sr_max = min(1,sr_max)
+            pod_max = min(1,pod_max)
+            pod_min = max(0,pod_min)
+            PD2.ax.set_ylim([pod_min-pad,pod_max+pad])
+            PD2.ax.set_xlim([sr_min-pad,sr_max+pad])
+
+            for fmt in fcst_fmts:
+                for mem in member_names:
+                    POD_ea = YYY[fmt]["POD"][casestr][mem]
+                    FAR_ea = YYY[fmt]["FAR"][casestr][mem]
+
+                    pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                                    'alpha':0.4}
+                    PD2.plot_data(pod=N.mean(POD_ea),far=N.mean(FAR_ea),
+                                        plotkwargs=pk, label=lstr)
+
+
+            PD2.save()
+            PD1.save()
+        # pdb.set_trace()
 
         # PD.ax.set_xlim([0,0.3])
-            PD1.save()
-    PD0.save()
+        fname3 = "perfdiag_{}_{}th_{}min_mean_ens".format(vrbl,thresh,fcstmin)
+        fpath3 = os.path.join(outroot,"perfdiag","eachens",fname3)
+        PD3 = Performance(fpath=fpath3,legendkwargs=None,legend=False)
+        _podmms = []
+        _farmms = []
+        for fmt in fcst_fmts:
+            for mem in member_names:
+                annostr = "".format(mem)
+                pod_mem_mean = N.nanmean(pod_mem[fmt][mem])
+                far_mem_mean = N.nanmean(far_mem[fmt][mem])
 
+                _podmms.append(pod_mem_mean)
+                _farmms.append(far_mem_mean)
+
+        pod_max = N.nanmax(_podmms)
+        pod_min = N.nanmin(_podmms)
+        sr_min  = 1-N.nanmax(_farmms)
+        sr_max = 1-N.nanmin(_farmms)
+        pad = 0.04
+        apad = 0.01
+
+        sr_min = max(0,sr_min)
+        sr_max = min(1,sr_max)
+        pod_max = min(1,pod_max)
+        pod_min = max(0,pod_min)
+        PD3.ax.set_ylim([pod_min-pad,pod_max+pad])
+        PD3.ax.set_xlim([sr_min-pad,sr_max+pad])
+
+        for fmt in fcst_fmts:
+            for mem in member_names:
+                annostr = "{}".format(mem)
+                pod_mem_mean = N.nanmean(pod_mem[fmt][mem])
+                far_mem_mean = N.nanmean(far_mem[fmt][mem])
+                color_phys = get_color(fmt=fmt,mem=mem)
+                pk = {'marker':MARKERS[fmt],'c':color_phys,'s':SIZES[fmt],
+                                'alpha':0.4}
+                PD3.plot_data(pod=pod_mem_mean,far=far_mem_mean,
+                                    plotkwargs=pk, label=lstr)
+                PD3.ax.annotate(annostr,xy=(1-far_mem_mean-apad,pod_mem_mean+apad),
+                                xycoords='data',fontsize='6',color='black',
+                                fontweight='bold')
+        PD3.ax.set_ylim([pod_min-pad,pod_max+pad])
+        PD3.ax.set_xlim([sr_min-pad,sr_max+pad])
+
+        PD3.save()
+    PD0.save()
+    
 if do_efss:
     print(stars,"DOING EFSS",stars)
     def compute_efss(i,threshs,spatial_windows,temporal_window):
