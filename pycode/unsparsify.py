@@ -1,7 +1,8 @@
+import glob
+
 import netCDF4 as nc
 import numpy as np
 import matplotlib.pyplot as plt
-import glob
 from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import BoundaryNorm
 
@@ -12,7 +13,7 @@ def sparseFull(a):
     """SLOWWWWWWWWW"""
 
     # Create empty shape for filling
-    b = np.full([len(a.dimensions['Lat']),len(a.dimensions['Lon'])], -99900.)
+    b = np.full([len(a.dimensions['Lat']),len(a.dimensions['Lon'])], np.nan)
 
     # Create empty shape for filling
     xlen = len(a.dimensions['Lon'])
@@ -51,7 +52,10 @@ def readwdssii(fin):
 
     """This loads in the file"""
 
-    a = nc.Dataset(fin, 'r')
+    if isinstance(fin,str):
+        a = nc.Dataset(fin,)#format="NETCDF3_64BIT_OFFSET")
+    else:
+        a = fin
 
     xlen = len(a.dimensions['Lon'])
     ylen = len(a.dimensions['Lat'])
@@ -75,7 +79,3 @@ def readwdssii(fin):
 
     return xlen, lat, ylen, lon, varname, var
 
-
-###CODE HERE
-####can loop over this...
-# x1,ulat,y1,ulon, varname,ref1 = readwdssii('/Users/aereinha/Downloads/RotationTracks60min/00.50/20170528-235400.netcdf')

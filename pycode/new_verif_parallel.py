@@ -48,8 +48,10 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
+do_plot_test = True
+
 do_domains = False
-do_performance = True
+do_performance = False
 do_efss = False # Also includes FISS, which is broken?
 
 object_switch = False
@@ -100,12 +102,15 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 # CASES[datetime.datetime(2018,4,29,0,0,0)] = []
 
 ### DIRECTORIES ###
-extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
+# extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
+key_pp = 'AprilFool'
+extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
+
 objectroot = os.path.join(extractroot,'object_instances')
-#outroot = "/home/nothijngrad/Xmas_Shutdown/pyoutput"
-outroot = "/mnt/d/pyoutput"
-
-
+# outroot = "/home/john.lawson/VSE_dx/pyoutput"
+# outroot = "/scratch/john.lawson/VSE_dx/figures"
+#outroot = "/work/john.lawson/VSE_dx/figures"
+outroot = "/mnt/jlawson/VSE_dx/figures/"
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -114,25 +119,45 @@ dom_names = ("d01","d02")
 domnos = (1,2)
 member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 # doms = (1,2)
-fcst_vrbls = ("Wmax","UH02","UH25","RAINNC","REFL_comp")
+# RAINNC
+fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")
 obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 all_fcstmins = N.arange(5,185,5)
 # fcst_fmts = ("d01_3km","d02_1km","d02_3km")
 fcst_fmts =  ("d01_3km","d02_1km")
 
 
-
-
 #### FOR DEBUGGING ####
-# CASES = {datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,21,0,0),]}
+CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
 
 # fcst_vrbls = ("REFL_comp",)
 # fcst_vrbls = ("Wmax",)
-fcst_vrbls = ("REFL_comp","Wmax")
-obs_vrbls = ("NEXRAD",)
+# fcst_vrbls = ("REFL_comp","Wmax")
+# fcst_vrbls = ("UH25","UP_HELI_MAX")
+
+# obs_vrbls = ("NEXRAD",)
 # obs_vrbls = list()
+# obs_vrbls = ("AWS25")
 
 #########################
+##### OTHER ####
+########################
+
+VRBL_CODES = {
+                # "REFL_comp":"NEXRAD",
+                "REFL_comp":"DZ",
+                "UH02":"AWS02",
+                "UH25":"AWS25",
+                "accum_precip":"ST4",
+                }
+VRBL_CODES2 = {v:k for k,v in VRBL_CODES.items()}
+OBS_CODES = {
+                'NEXRAD':'nexrad',
+                "AWS02": 'mrms_dz',
+                "AWS25":'mrms_aws',
+                "ST4":'stageiv',
+                }
+
 
 ###############################################################################
 ################################# THE FUNCTIONS ###############################
@@ -165,7 +190,7 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
         fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,utcHHMM)
     else:
         raise Exception
-    return os.path.join(extractroot,caseYYYYMMDD,fname)
+    return os.path.join(extractroot,caseYYYYMMDD,vrbl,fname)
 
 def get_object_picklepaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     if vrbl in fcst_vrbls: # ("Wmax","UH02","UH25","RAINNC"):
@@ -225,23 +250,18 @@ def get_wrfout_fname(t,dom):
 def fc2ob(fcst_vrbl,fcst_fmt):
     """ Look up the corresponding variable/format name for obs, from vrbls.
     """
-    # This is the observational variable
-    VRBLS = {"REFL_comp":"NEXRAD",}
-    obs_vrbl = VRBLS[fcst_vrbl]
+    obs_vrbl = VRBL_CODES[fcst_vrbl]
 
     # This is the dx for the grid (e.g. 1km)
     *_, dx = fcst_fmt.split("_")
 
-    # These are the field codes
-    OO = {'NEXRAD':'nexrad'}
-    obs_fmt = "_".join((OO[obs_vrbl],dx))
+    obs_fmt = "_".join((OBS_CODES[obs_vrbl],dx))
 
     # pdb.set_trace()
     return obs_vrbl,obs_fmt
 
 def ob2fc(obs_vrbl,obs_fmt):
-    VRBLS = {"NEXRAD":"REFL_comp",}
-    fcst_vrbl = VRBLS[obs_vrbl]
+    fcst_vrbl = VRBL_CODES2[obs_vrbl]
 
     # This is the dx for the grid (e.g. 1km)
     *_, dx = obs_fmt.split("_")
@@ -333,6 +353,7 @@ def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
         obs_fpath = get_extraction_fpaths(vrbl=obs_vrbl,fmt=obs_fmt,
                         validutc=validutc,caseutc=caseutc)
         obs_data = N.load(obs_fpath)
+        pdb.set_trace()
 
         return fcst_data, obs_data
 
@@ -397,10 +418,14 @@ def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='al
         fcst_i, obs_i = load_both_data(vrbl,fmt,offsetutc,caseutc,initutc,'all')
         fcst_data[:,tidx,:,:] = fcst_i
         obs_data[tidx,:,:] = obs_i
-
     return fcst_data, obs_data
 
 def load_latlons(fmt,caseutc):
+    if fmt == "d02_1km":
+        fmt = "d02_raw"
+    elif fmt == "d01_3km":
+        fmt = "d01_raw"
+
     casestr = utils.string_from_time('dir',caseutc,strlen='day')
     ret = []
     for f in ("lats.npy","lons.npy"):
@@ -873,6 +898,53 @@ PROD = {
 
 ###############################################################################
 ### PROCEDURE ###
+
+if do_plot_test:
+    print(stars,"TESTS",stars)
+    fcst_vrbl = "UH25"
+    fcst_fmt = "d02_1km"
+
+    for caseutc,initutcs in CASES.items():
+        initutc = initutcs[0]
+        for fm in all_fcstmins:
+        # for fm in (30,80,85,90,95,100,180):
+        # for fm in (5,10,15):
+            fname = "test_UH_AWS_{:03d}min.png".format(int(fm))
+            fpath = os.path.join(outroot,fname)
+
+            validutc = initutc+datetime.timedelta(seconds=60*int(fm))
+            fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
+                        validutc=validutc,caseutc=caseutc,initutc=initutc,
+                        mem="m01")
+            lats, lons = load_latlons(fcst_fmt,caseutc)
+
+            fig,axes = plt.subplots(nrows=1,ncols=2)
+
+            # left figure: obs
+            ax = axes.flat[0]
+            bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
+                                llcrnrlat=lats.min(),llcrnrlon=lons.min(),
+                                ax=ax)
+            x,y = bmap(lons,lats)
+            cf = bmap.contourf(x,y,obs_data)
+            plt.colorbar(cf)
+
+            # right figure: fcst
+            ax = axes.flat[1]
+            bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
+                                llcrnrlat=lats.min(),llcrnrlon=lons.min(),
+                                ax=ax)
+            x,y = bmap(lons,lats)
+            cf = bmap.contourf(x,y,fcst_data)
+            plt.colorbar(cf)
+            
+            fig.tight_layout()
+            utils.trycreate(fpath)
+            fig.savefig(fpath)
+            print("saved to",fpath)
+            plt.close(fig)
+            pdb.set_trace()
+
 
 if do_domains:
     print(stars,"DOING DOMAINS",stars)

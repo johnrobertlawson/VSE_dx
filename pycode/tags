@@ -3,36 +3,132 @@
 !_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
-!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+!_TAG_PROGRAM_VERSION	5.8	//
 ALLDICT	old_generate_namelists.py	/^ALLDICT = {}$/;"	v
 ALPHAS	new_verif_parallel.py	/^ALPHAS = {d:v for d,v in zip(alpha_dbzs[::-1],alpha_vals)}$/;"	v
+AreaFill	_alt_verif_parallel.py	/^from evac.plot.areafill import AreaFill$/;"	i
+AreaFill	_old_verif_parallel.py	/^from evac.plot.areafill import AreaFill$/;"	i
+AreaFill	verif_parallel.py	/^from evac.plot.areafill import AreaFill$/;"	i
 BE	test_verif.py	/^                BE = BirdsEye(ax=ax,fig=fig,proj='merc')$/;"	v
+Basemap	_alt_verif_parallel.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+Basemap	_old_unsparsify.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+Basemap	_old_verif_parallel.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+Basemap	extract_fields.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+Basemap	new_verif_parallel.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+Basemap	unsparsify.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+Basemap	verif_parallel.py	/^from mpl_toolkits.basemap import Basemap$/;"	i
+BirdsEye	_alt_verif_parallel.py	/^from evac.plot.birdseye import BirdsEye$/;"	i
+BirdsEye	_old_verif_parallel.py	/^from evac.plot.birdseye import BirdsEye$/;"	i
+BirdsEye	ensemble_verification.py	/^from evac.plot.birdseye import BirdsEye$/;"	i
+BirdsEye	test_verif.py	/^from evac.plot.birdseye import BirdsEye$/;"	i
+BirdsEye	verif_parallel.py	/^from evac.plot.birdseye import BirdsEye$/;"	i
+BoundaryNorm	unsparsify.py	/^from matplotlib.colors import BoundaryNorm$/;"	i
+BoxPlot	_alt_verif_parallel.py	/^from evac.plot.boxplot import BoxPlot$/;"	i
+BoxPlot	_old_verif_parallel.py	/^from evac.plot.boxplot import BoxPlot$/;"	i
+BoxPlot	verif_parallel.py	/^from evac.plot.boxplot import BoxPlot$/;"	i
 CASES	_alt_verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
 CASES	_old_verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
 CASES	extract_fields.py	/^CASES = collections.OrderedDict()$/;"	v
+CASES	extract_fields.py	/^CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } $/;"	v
 CASES	new_verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
+CASES	new_verif_parallel.py	/^CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } $/;"	v
 CASES	old_verif.py	/^CASES = collections.OrderedDict()$/;"	v
 CASES	old_verif.py	/^CASES = {$/;"	v
 CASES	run_experiments.py	/^CASES = {$/;"	v
 CASES	verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
 CAT	new_verif_parallel.py	/^    CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)$/;"	v
 COLORS	new_verif_parallel.py	/^COLORS = {$/;"	v
+Casati	_alt_verif_parallel.py	/^from evac.stats.casati import Casati$/;"	i
+Casati	_old_verif_parallel.py	/^from evac.stats.casati import Casati$/;"	i
+Casati	verif_parallel.py	/^from evac.stats.casati import Casati$/;"	i
 CaseGrid	extract_fields.py	/^class CaseGrid:$/;"	c
+Catalogue	new_verif_parallel.py	/^from evac.object.catalogue import Catalogue$/;"	i
 DOMS	_test_newruns.py	/^DOMS = ($/;"	v
 DTYPES	new_verif_parallel.py	/^    DTYPES = {$/;"	v
+Dataset	_old_unsparsify.py	/^from netCDF4 import Dataset$/;"	i
+Dataset	extract_fields.py	/^from netCDF4 import Dataset$/;"	i
+Dataset	new_verif_parallel.py	/^from netCDF4 import Dataset$/;"	i
+DetScores	_alt_verif_parallel.py	/^from evac.stats.detscores import DetScores$/;"	i
+DetScores	_old_verif_parallel.py	/^from evac.stats.detscores import DetScores$/;"	i
+DetScores	new_verif_parallel.py	/^from evac.stats.detscores import DetScores$/;"	i
+DetScores	old_verif.py	/^from evac.stats.detscores import DetScores$/;"	i
+DetScores	verif_parallel.py	/^from evac.stats.detscores import DetScores$/;"	i
+Domains	new_verif_parallel.py	/^from evac.plot.domains import Domains$/;"	i
 E	_old_verif_parallel.py	/^    E = Ensemble(ensdir,initutc,ndoms=2,ctrl=False,allow_empty=False)$/;"	v
 E	ensemble_verification.py	/^E = Ensemble(dataroot,initutc,ctrl=False,loadobj=False,doms=2)$/;"	v
 E	old_verif.py	/^        E = Ensemble(ensdir,initutc,ndoms=2,ctrl=False)$/;"	v
 E	test_crps.py	/^        E = Ensemble(datadir,initutc,ndoms=2,ctrl=False)$/;"	v
 E	test_kde.py	/^E = Ensemble(rootdir=enspath,initutc=initutc,ndoms=2,ctrl=False,$/;"	v
 E	test_verif.py	/^E = Ensemble(dataroot,initutc,ctrl=False,loadobj=False,doms=2)$/;"	v
+EFSS	_alt_verif_parallel.py	/^from evac.stats.efss import EFSS$/;"	i
+EFSS	_old_verif_parallel.py	/^from evac.stats.efss import EFSS$/;"	i
+EFSS	verif_parallel.py	/^from evac.stats.efss import EFSS$/;"	i
+EFSS_Intensity	_alt_verif_parallel.py	/^from evac.plot.efss_intensity import EFSS_Intensity$/;"	i
+EFSS_Intensity	_old_verif_parallel.py	/^from evac.plot.efss_intensity import EFSS_Intensity$/;"	i
+EFSS_Intensity	verif_parallel.py	/^from evac.plot.efss_intensity import EFSS_Intensity$/;"	i
+ESAL	_alt_verif_parallel.py	/^from evac.stats.esal import ESAL$/;"	i
+ESAL	_old_verif_parallel.py	/^from evac.stats.esal import ESAL$/;"	i
+ESAL	verif_parallel.py	/^from evac.stats.esal import ESAL$/;"	i
+Ensemble	_alt_verif_parallel.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	_old_verif_parallel.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	ensemble_verification.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	old_verif.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	test_crps.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	test_kde.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	test_verif.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+Ensemble	verif_parallel.py	/^from evac.datafiles.ensemble import Ensemble$/;"	i
+FCST_VRBLS	extract_fields.py	/^FCST_VRBLS = ("Wmax","UH02","UH25","RAINNC","REFL_comp","UP_HELI_MAX")$/;"	v
+FI	_alt_verif_parallel.py	/^from evac.stats.fi import FI$/;"	i
+FI	_old_verif_parallel.py	/^from evac.stats.fi import FI$/;"	i
+FI	verif_parallel.py	/^from evac.stats.fi import FI$/;"	i
+FISS	new_verif_parallel.py	/^from fiss import FISS$/;"	i
 FOLDERS	_test_newruns.py	/^FOLDERS = ($/;"	v
+ForecastValue	_alt_verif_parallel.py	/^from evac.stats.forecastvalue import ForecastValue$/;"	i
+ForecastValue	_old_verif_parallel.py	/^from evac.stats.forecastvalue import ForecastValue$/;"	i
+ForecastValue	verif_parallel.py	/^from evac.stats.forecastvalue import ForecastValue$/;"	i
+FourHist	new_verif_parallel.py	/^        from evac.plot.fourhist import FourHist$/;"	i
 G	figure_caseoutline.py	/^G = GribFile(f)$/;"	v
+GribFile	figure_caseoutline.py	/^from evac.datafiles.gribfile import GribFile$/;"	i
+Grid	_alt_verif_parallel.py	/^from evac.utils.grid import Grid$/;"	i
+Grid	_old_verif_parallel.py	/^from evac.utils.grid import Grid$/;"	i
+Grid	verif_parallel.py	/^from evac.utils.grid import Grid$/;"	i
+Histogram	_alt_verif_parallel.py	/^from evac.plot.histogram import Histogram$/;"	i
+Histogram	_old_verif_parallel.py	/^from evac.plot.histogram import Histogram$/;"	i
+Histogram	verif_parallel.py	/^from evac.plot.histogram import Histogram$/;"	i
+KernelDensity	test_kde.py	/^from sklearn.neighbors.kde import KernelDensity$/;"	i
 L	run_experiments.py	/^        L = LazyEnsemble(**init_kwargs)$/;"	v
 LBCdir	run_experiments.py	/^            LBCdir = wofdir \/ newse_mem$/;"	v
 LOOKUP	new_verif_parallel.py	/^    LOOKUP = {0:0,1:0,2:0,3:0,$/;"	v
+LazyEnsemble	run_experiments.py	/^from evac.lazy.lazyensemble import LazyEnsemble$/;"	i
+LineGraph	_alt_verif_parallel.py	/^from evac.plot.linegraph import LineGraph$/;"	i
+LineGraph	_old_verif_parallel.py	/^from evac.plot.linegraph import LineGraph$/;"	i
+LineGraph	verif_parallel.py	/^from evac.plot.linegraph import LineGraph$/;"	i
+M	_alt_verif_parallel.py	/^import matplotlib as M$/;"	i
+M	_old_verif_parallel.py	/^import matplotlib as M$/;"	i
+M	extract_fields.py	/^import matplotlib as M$/;"	i
+M	new_verif_parallel.py	/^import matplotlib as M$/;"	i
+M	test_kde.py	/^import matplotlib as M$/;"	i
+M	verif_parallel.py	/^import matplotlib as M$/;"	i
 MARKERS	new_verif_parallel.py	/^MARKERS = {$/;"	v
 MEMS	_test_newruns.py	/^MEMS = ['m0{}'.format(n) for n in range(1,5)]$/;"	v
+Map	test_crps.py	/^from evac.plot.map import Map$/;"	i
+N	_alt_verif_parallel.py	/^import numpy as N$/;"	i
+N	_old_unsparsify.py	/^import numpy as N$/;"	i
+N	_old_verif_parallel.py	/^import numpy as N$/;"	i
+N	_test_newruns.py	/^import numpy as N$/;"	i
+N	ensemble_verification.py	/^import numpy as N$/;"	i
+N	extract_fields.py	/^import numpy as N$/;"	i
+N	figure_caseoutline.py	/^import numpy as N$/;"	i
+N	generate_namelists.py	/^import numpy as N$/;"	i
+N	new_verif_parallel.py	/^import numpy as N$/;"	i
+N	old_generate_namelists.py	/^import numpy as N$/;"	i
+N	old_verif.py	/^import numpy as N$/;"	i
+N	run_experiments.py	/^import numpy as N$/;"	i
+N	test_crps.py	/^import numpy as N$/;"	i
+N	test_extraction.py	/^import numpy as N$/;"	i
+N	test_kde.py	/^import numpy as N$/;"	i
+N	test_verif.py	/^import numpy as N$/;"	i
+N	verif_parallel.py	/^import numpy as N$/;"	i
 NEWGRID	_old_verif_parallel.py	/^    NEWGRID = try_load_newgrid(initstr=initstr,E=E)$/;"	v
 NL	generate_namelists.py	/^NL = {n:{} for n in ensnums}$/;"	v
 NL	old_generate_namelists.py	/^NL = {}$/;"	v
@@ -40,37 +136,92 @@ NS	generate_namelists.py	/^NS = parser.parse_args()$/;"	v
 NS	old_generate_namelists.py	/^NS = parser.parse_args()$/;"	v
 OBS	_old_verif_parallel.py	/^        OBS = ST4$/;"	v
 OBS	old_verif.py	/^OBS = (ST4,RADARS)$/;"	v
+OBS_CODES	new_verif_parallel.py	/^OBS_CODES = {$/;"	v
+OBS_VRBLS	extract_fields.py	/^OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)$/;"	v
+ObjectBased	_alt_verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
+ObjectBased	_old_verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
+ObjectBased	verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
+ObjectID	new_verif_parallel.py	/^from evac.object.objectid import ObjectID$/;"	i
+ObjectID	test_objectid.py	/^from objectID import ObjectID$/;"	i
+ObsGroup	_alt_verif_parallel.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
+ObsGroup	_old_verif_parallel.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
+ObsGroup	extract_fields.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
+ObsGroup	old_verif.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
+ObsGroup	verif_parallel.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
+PA	extract_fields.py	/^PA = parser.parse_args()$/;"	v
 PA	new_verif_parallel.py	/^PA = parser.parse_args()$/;"	v
 PD0	new_verif_parallel.py	/^    PD0 = Performance(fpath=fpath,legendkwargs=None,legend=False)$/;"	v
 PLOTS	test_extraction.py	/^PLOTS = {$/;"	v
 PRES	run_experiments.py	/^        PRES = {wrfdir\/p:'copy' for p in pres}$/;"	v
 PROD	new_verif_parallel.py	/^PROD = {$/;"	v
+PairPlot	new_verif_parallel.py	/^        from evac.plot.pairplot import PairPlot$/;"	i
+Performance	_alt_verif_parallel.py	/^from evac.plot.performance import Performance$/;"	i
+Performance	_old_verif_parallel.py	/^from evac.plot.performance import Performance$/;"	i
+Performance	new_verif_parallel.py	/^from evac.plot.performance import Performance$/;"	i
+Performance	verif_parallel.py	/^from evac.plot.performance import Performance$/;"	i
+Pool	test_kde.py	/^        from multiprocessing import Pool$/;"	i
+PosixPath	run_experiments.py	/^from pathlib import PosixPath$/;"	i
+ProbScores	_alt_verif_parallel.py	/^from evac.stats.probscores import ProbScores$/;"	i
+ProbScores	_old_verif_parallel.py	/^from evac.stats.probscores import ProbScores$/;"	i
+ProbScores	test_crps.py	/^from evac.stats.probscores import ProbScores$/;"	i
+ProbScores	verif_parallel.py	/^from evac.stats.probscores import ProbScores$/;"	i
 R	test_verif.py	/^            R = R_large$/;"	v
 R	test_verif.py	/^            R = R_small$/;"	v
-RADARS	extract_fields.py	/^RADARS = ObsGroup(radardir,'radar')$/;"	v
 RADARS	old_verif.py	/^RADARS = ObsGroup(radardir,'radar')$/;"	v
 RANCOL	new_verif_parallel.py	/^RANCOL = {$/;"	v
 RESCOLS	new_verif_parallel.py	/^RESCOLS = {$/;"	v
 R_large	test_verif.py	/^    R_large = Radar(plotutc,radardir)$/;"	v
 R_small	test_verif.py	/^    R_small = copy.copy(R_large)$/;"	v
+Radar	_alt_verif_parallel.py	/^from evac.datafiles.radar import Radar$/;"	i
+Radar	_old_verif_parallel.py	/^from evac.datafiles.radar import Radar$/;"	i
+Radar	ensemble_verification.py	/^from evac.datafiles.radar import Radar$/;"	i
+Radar	test_verif.py	/^from evac.datafiles.radar import Radar$/;"	i
+Radar	verif_parallel.py	/^from evac.datafiles.radar import Radar$/;"	i
 S	_test_newruns.py	/^                    S = Scales(vrbl=vrbl)$/;"	v
 S	ensemble_verification.py	/^S = Scales('REFL_comp')$/;"	v
 S	test_verif.py	/^S = Scales('REFL_comp')$/;"	v
+SALGraph	_alt_verif_parallel.py	/^from evac.plot.salgraph import SALGraph$/;"	i
+SALGraph	_old_verif_parallel.py	/^from evac.plot.salgraph import SALGraph$/;"	i
+SALGraph	verif_parallel.py	/^from evac.plot.salgraph import SALGraph$/;"	i
 SIZES	new_verif_parallel.py	/^SIZES = {}$/;"	v
 SPDICT	old_generate_namelists.py	/^SPDICT = {}$/;"	v
 ST4	ensemble_verification.py	/^ST4 = StageIV(st4dir)$/;"	v
-ST4	extract_fields.py	/^ST4 = ObsGroup(st4dir,'stageiv')$/;"	v
+ST4	extract_fields.py	/^    ST4 = ObsGroup(st4dir,'stageiv')$/;"	v
 ST4	old_verif.py	/^ST4 = ObsGroup(st4dir,'stageiv')$/;"	v
 STOCHS	old_generate_namelists.py	/^        STOCHS = generate_LHS_draw(seed_lhs,)$/;"	v
+Scales	_alt_verif_parallel.py	/^from evac.plot.scales import Scales$/;"	i
+Scales	_old_verif_parallel.py	/^from evac.plot.scales import Scales$/;"	i
+Scales	_test_newruns.py	/^from evac.plot.scales import Scales$/;"	i
+Scales	ensemble_verification.py	/^from evac.plot.scales import Scales$/;"	i
+Scales	test_verif.py	/^from evac.plot.scales import Scales$/;"	i
+Scales	verif_parallel.py	/^from evac.plot.scales import Scales$/;"	i
+StageIV	test_crps.py	/^from evac.datafiles.stageiv import StageIV$/;"	i
+ThumbNails	_alt_verif_parallel.py	/^from evac.plot.thumbnails import ThumbNails$/;"	i
+ThumbNails	_old_verif_parallel.py	/^from evac.plot.thumbnails import ThumbNails$/;"	i
+ThumbNails	verif_parallel.py	/^from evac.plot.thumbnails import ThumbNails$/;"	i
 V	old_verif.py	/^        V = Verif(ensemble=E,obs=OBS,outdir=outdir,$/;"	v
 V2	old_verif.py	/^        V2 = Verif(obs=OBS,outdir=outdir,$/;"	v
 VG1	test_crps.py	/^            VG1 = VerifGrid(W1,nx=nx,ny=ny)$/;"	v
 VG2	test_crps.py	/^            VG2 = VerifGrid(W2,nx=nx,ny=ny)$/;"	v
 VRBLS	_test_newruns.py	/^VRBLS = ($/;"	v
+VRBL_CODES	new_verif_parallel.py	/^VRBL_CODES = {$/;"	v
+VRBL_CODES2	new_verif_parallel.py	/^VRBL_CODES2 = {v:k for k,v in VRBL_CODES.items()}$/;"	v
+Verif	_alt_verif_parallel.py	/^from evac.stats.verif import Verif$/;"	i
+Verif	_old_verif_parallel.py	/^from evac.stats.verif import Verif$/;"	i
+Verif	old_verif.py	/^from evac.stats.verif import Verif$/;"	i
+Verif	verif_parallel.py	/^from evac.stats.verif import Verif$/;"	i
+VerifGrid	test_crps.py	/^from evac.utils.reproject_tools import reproject, WRF_native_grid, create_new_grid, VerifGrid$/;"	i
 W	_test_newruns.py	/^                W = WRFOut(fpath)$/;"	v
 W	test_verif.py	/^        W = E.arbitrary_pick(dom=dom,dataobj=True)$/;"	v
 W1	test_crps.py	/^            W1 = WRF_native_grid(E.arbitrary_pick(give_path=True,dom=1))$/;"	v
 W2	test_crps.py	/^            W2 = WRF_native_grid(E.arbitrary_pick(give_path=True,dom=2))$/;"	v
+WRFOut	_alt_verif_parallel.py	/^from evac.datafiles.wrfout import WRFOut$/;"	i
+WRFOut	_old_verif_parallel.py	/^from evac.datafiles.wrfout import WRFOut$/;"	i
+WRFOut	_test_newruns.py	/^from evac.datafiles.wrfout import WRFOut$/;"	i
+WRFOut	extract_fields.py	/^from evac.datafiles.wrfout import WRFOut$/;"	i
+WRFOut	new_verif_parallel.py	/^from evac.datafiles.wrfout import WRFOut$/;"	i
+WRFOut	verif_parallel.py	/^from evac.datafiles.wrfout import WRFOut$/;"	i
+WRF_native_grid	test_crps.py	/^from evac.utils.reproject_tools import reproject, WRF_native_grid, create_new_grid, VerifGrid$/;"	i
 YYY	new_verif_parallel.py	/^    YYY = {}$/;"	v
 ZZZ	new_verif_parallel.py	/^    ZZZ = {}$/;"	v
 __get_cut_radar	verif_parallel.py	/^def __get_cut_radar(utc,E,return_grid=False):$/;"	f	file:
@@ -79,8 +230,9 @@ __get_mrms_extraction_fpath	extract_fields.py	/^def __get_mrms_extraction_fpath(
 __init__	extract_fields.py	/^    def __init__(self,Wnc):$/;"	m	class:CaseGrid
 _fms	new_verif_parallel.py	/^    _fms = (30,60,90,120,150,180)$/;"	v
 _load_data	extract_fields.py	/^def _load_data(nc_fpath,vrbl,npyfpaths):$/;"	f
+_save	extract_fields.py	/^def _save(arr,file):$/;"	f
 _ths	new_verif_parallel.py	/^    _ths = (15,30,40,50)$/;"	v
-_unsparsify	extract_fields.py	/^def _unsparsify(mrms_nc,vrbl,d01_nc):$/;"	f
+_unsparsify	extract_fields.py	/^def _unsparsify(mrms_nc,vrbl,d01_nc=False):$/;"	f
 _vs	new_verif_parallel.py	/^    _vs = ("REFL_comp",)$/;"	v
 all_cmd	extract_fields.py	/^    all_cmd = []$/;"	v
 all_fcstmins	_old_verif_parallel.py	/^        all_fcstmins = (60,120,180)$/;"	v
@@ -88,13 +240,22 @@ all_fcstmins	_old_verif_parallel.py	/^        all_fcstmins = [int(t.seconds\/60)
 all_fcstmins	new_verif_parallel.py	/^all_fcstmins = N.arange(5,185,5)$/;"	v
 all_fcstmins_dt	_old_verif_parallel.py	/^        all_fcstmins_dt = [v-E.initutc for v in E.validtimes]$/;"	v
 all_fmts	new_verif_parallel.py	/^    all_fmts = list(fcst_fmts) + list(obs_fmts)$/;"	v
-all_folders	extract_fields.py	/^all_folders = list(generate_all_folders())$/;"	v
 allow_empty	test_kde.py	/^                allow_empty=False)$/;"	v
 alpha	new_verif_parallel.py	/^alpha = 0.7$/;"	v
 alpha_dbzs	new_verif_parallel.py	/^alpha_dbzs = N.arange(10,65,5)$/;"	v
 alpha_vals	new_verif_parallel.py	/^alpha_vals = N.linspace(0.1,1.0,num=len(alpha_dbzs))$/;"	v
+argparse	_alt_verif_parallel.py	/^import argparse$/;"	i
+argparse	_old_verif_parallel.py	/^import argparse$/;"	i
+argparse	extract_fields.py	/^import argparse$/;"	i
+argparse	generate_namelists.py	/^import argparse$/;"	i
+argparse	new_verif_parallel.py	/^import argparse$/;"	i
+argparse	old_generate_namelists.py	/^import argparse$/;"	i
+argparse	verif_parallel.py	/^import argparse$/;"	i
 attrs	new_verif_parallel.py	/^    attrs = ("max_updraught",)$/;"	v
 ax	_test_newruns.py	/^                ax = next(axit)$/;"	v
+ax	new_verif_parallel.py	/^                                ax=ax)$/;"	v
+ax	new_verif_parallel.py	/^            ax = axes.flat[0]$/;"	v
+ax	new_verif_parallel.py	/^            ax = axes.flat[1]$/;"	v
 ax	new_verif_parallel.py	/^    ax = next(axit)$/;"	v
 ax	test_kde.py	/^        ax = axes.flat[0]$/;"	v
 ax	test_kde.py	/^        ax = axes.flat[1]$/;"	v
@@ -113,22 +274,26 @@ bl_mems	generate_namelists.py	/^    bl_mems = sorted(x+(6*n) for x in [1,2] for 
 bl_mems	old_generate_namelists.py	/^        bl_mems = [x+(6*n) for x in [1,2] for n in range(5)]$/;"	v
 bl_pbl_physics	generate_namelists.py	/^bl_pbl_physics = None $/;"	v
 bl_pbl_physics	old_generate_namelists.py	/^bl_pbl_physics = None $/;"	v
+bmap	new_verif_parallel.py	/^            bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),$/;"	v
 bw	test_kde.py	/^                bw = get_bw(fcst1D)$/;"	v
 bw	test_kde.py	/^            bw = get_bw(fcst1D,factor=bwfc)$/;"	v
 bw	test_kde.py	/^    bw = get_bw(fcst1D)$/;"	v
 casati_cut	verif_parallel.py	/^def casati_cut(arr,nsq):$/;"	f
 casedt	generate_namelists.py	/^casedt = datetime.datetime.strptime(casestr,"%Y%m%d")$/;"	v
 casehour	generate_namelists.py	/^casehour = 0$/;"	v
-casestr	extract_fields.py	/^        casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
+casestr	extract_fields.py	/^    casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 casestr	generate_namelists.py	/^casestr = str(NS.casestr)$/;"	v
 casestr	new_verif_parallel.py	/^            casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 casestr	old_verif.py	/^    casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 casestr	run_experiments.py	/^        casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
-caseutc	extract_fields.py	/^                                    caseutc=caseutc)$/;"	v
+caseutc	extract_fields.py	/^                                            caseutc=caseutc)$/;"	v
+caseutc	extract_fields.py	/^                                        caseutc=caseutc)$/;"	v
+caseutc	extract_fields.py	/^                                        caseutc=caseutc,)$/;"	v
 caseutc	extract_fields.py	/^                                    caseutc=caseutc,)$/;"	v
-caseutc	extract_fields.py	/^                                caseutc=caseutc,)$/;"	v
 cbar_ax	test_kde.py	/^        cbar_ax = fig.add_axes([0.15,0.087,0.7,0.025])$/;"	v
 cbar_ax	test_kde.py	/^    cbar_ax = fig.add_axes([0.15,0.087,0.7,0.025])$/;"	v
+cf	new_verif_parallel.py	/^            cf = bmap.contourf(x,y,fcst_data)$/;"	v
+cf	new_verif_parallel.py	/^            cf = bmap.contourf(x,y,obs_data)$/;"	v
 cf	test_kde.py	/^        cf = ax.contourf(xx,yy,fcst_pp,cmap=M.cm.jet,levels=levels)$/;"	v
 cf	test_kde.py	/^        cf = ax.contourf(xx,yy,rawpc,cmap=M.cm.jet,levels=levels)$/;"	v
 cf	test_kde.py	/^    cf = ax.contourf(xx,yy,fcst_pp,cmap=M.cm.jet,levels=levels)$/;"	v
@@ -141,6 +306,12 @@ closest	extract_fields.py	/^def closest(arr,val,return_val=False):$/;"	f
 cmap	_test_newruns.py	/^                    cmap = 'gist_earth_r'$/;"	v
 cmap	_test_newruns.py	/^                    cmap = S.cm$/;"	v
 cmd	run_experiments.py	/^            cmd = ("python generate_namelists.py --donotenforce --nmems {}"$/;"	v
+collections	_alt_verif_parallel.py	/^import collections$/;"	i
+collections	_old_verif_parallel.py	/^import collections$/;"	i
+collections	extract_fields.py	/^import collections$/;"	i
+collections	new_verif_parallel.py	/^import collections$/;"	i
+collections	old_verif.py	/^import collections$/;"	i
+collections	verif_parallel.py	/^import collections$/;"	i
 commands	extract_fields.py	/^commands = []$/;"	v
 compute_brier	verif_parallel.py	/^compute_brier = 0$/;"	v
 compute_casati	verif_parallel.py	/^compute_casati = 0$/;"	v
@@ -160,6 +331,11 @@ compute_obj_obs	new_verif_parallel.py	/^    def compute_obj_obs(i):$/;"	f
 compute_perf	new_verif_parallel.py	/^    def compute_perf(i):$/;"	f
 concat_W_df	new_verif_parallel.py	/^def concat_W_df(df_og,W_df):$/;"	f
 config	run_experiments.py	/^        config = 'default'$/;"	v
+copy	ensemble_verification.py	/^import copy$/;"	i
+copy	new_verif_parallel.py	/^import copy$/;"	i
+copy	test_crps.py	/^import copy$/;"	i
+copy	test_verif.py	/^import copy$/;"	i
+copy	verif_parallel.py	/^        import copy$/;"	i
 copy_cmd	generate_namelists.py	/^    copy_cmd = 'cp {0} {1}'.format(paths_to_nl[n]['old'],paths_to_nl[n]['new'])$/;"	v
 copy_cmd	old_generate_namelists.py	/^    copy_cmd = 'cp {0} {1}'.format(paths_to_nl[n]['old'],paths_to_nl[n]['new'])$/;"	v
 cpus	run_experiments.py	/^                            cpus=24,$/;"	v
@@ -169,32 +345,33 @@ create_bmap	extract_fields.py	/^def create_bmap():$/;"	f
 create_bmap	new_verif_parallel.py	/^def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None):$/;"	f
 create_ens_df	new_verif_parallel.py	/^def create_ens_df(megaframe):$/;"	f
 create_neutral_bmap	extract_fields.py	/^    def create_neutral_bmap(self,$/;"	m	class:CaseGrid
+create_new_grid	test_crps.py	/^from evac.utils.reproject_tools import reproject, WRF_native_grid, create_new_grid, VerifGrid$/;"	i
 create_newgrid	test_crps.py	/^def create_newgrid(DF):$/;"	f
 crpsfpath	test_crps.py	/^crpsfpath = os.path.join(outdir,'crps_data.txt')$/;"	v
 cu_physics	old_generate_namelists.py	/^cu_physics = None$/;"	v
 d01	generate_namelists.py	/^        d01 = 221$/;"	v
 d01	generate_namelists.py	/^        d01 = 250$/;"	v
 d01	generate_namelists.py	/^        d01 = 251$/;"	v
-d01_fname	extract_fields.py	/^            d01_fname = get_wrfout_fname(initutc,1)$/;"	v
-d01_fpath	extract_fields.py	/^            d01_fpath = os.path.join(m01dir,d01_fname)$/;"	v
-d01_lats	extract_fields.py	/^            d01_lats = N.load(d01_latf)$/;"	v
-d01_lats	extract_fields.py	/^            d01_lats = d01_nc.variables['XLAT'][0,:,:]$/;"	v
+d01_fname	extract_fields.py	/^        d01_fname = get_wrfout_fname(initutc,1)$/;"	v
+d01_fpath	extract_fields.py	/^        d01_fpath = os.path.join(m01dir,d01_fname)$/;"	v
+d01_lats	extract_fields.py	/^        d01_lats = N.load(d01_latf)$/;"	v
+d01_lats	extract_fields.py	/^        d01_lats = d01_nc.variables['XLAT'][0,:,:]$/;"	v
 d01_limdict	ensemble_verification.py	/^d01_limdict = E.get_limits(dom=1)$/;"	v
 d01_limdict	test_verif.py	/^d01_limdict = E.get_limits(dom=1)$/;"	v
-d01_lons	extract_fields.py	/^            d01_lons = N.load(d01_lonf)$/;"	v
-d01_lons	extract_fields.py	/^            d01_lons = d01_nc.variables['XLONG'][0,:,:]$/;"	v
-d01_nc	extract_fields.py	/^            d01_nc = Dataset(d01_fpath)$/;"	v
+d01_lons	extract_fields.py	/^        d01_lons = N.load(d01_lonf)$/;"	v
+d01_lons	extract_fields.py	/^        d01_lons = d01_nc.variables['XLONG'][0,:,:]$/;"	v
+d01_nc	extract_fields.py	/^        d01_nc = Dataset(d01_fpath)$/;"	v
 d02	generate_namelists.py	/^        d02 = 322$/;"	v
-d02_GRID	extract_fields.py	/^            d02_GRID = CaseGrid(d02_nc)$/;"	v
-d02_fname	extract_fields.py	/^            d02_fname = get_wrfout_fname(initutc,2)$/;"	v
-d02_fpath	extract_fields.py	/^            d02_fpath = os.path.join(m01dir,d02_fname)$/;"	v
-d02_lats	extract_fields.py	/^            d02_lats = N.load(d02_latf)$/;"	v
-d02_lats	extract_fields.py	/^            d02_lats = d02_nc.variables['XLAT'][0,:,:]$/;"	v
+d02_GRID	extract_fields.py	/^        d02_GRID = CaseGrid(d02_nc)$/;"	v
+d02_fname	extract_fields.py	/^        d02_fname = get_wrfout_fname(initutc,2)$/;"	v
+d02_fpath	extract_fields.py	/^        d02_fpath = os.path.join(m01dir,d02_fname)$/;"	v
+d02_lats	extract_fields.py	/^        d02_lats = N.load(d02_latf)$/;"	v
+d02_lats	extract_fields.py	/^        d02_lats = d02_nc.variables['XLAT'][0,:,:]$/;"	v
 d02_limdict	ensemble_verification.py	/^d02_limdict = E.get_limits(dom=2)$/;"	v
 d02_limdict	test_verif.py	/^d02_limdict = E.get_limits(dom=2)$/;"	v
-d02_lons	extract_fields.py	/^            d02_lons = N.load(d02_lonf)$/;"	v
-d02_lons	extract_fields.py	/^            d02_lons = d02_nc.variables['XLONG'][0,:,:]$/;"	v
-d02_nc	extract_fields.py	/^            d02_nc = Dataset(d02_fpath)$/;"	v
+d02_lons	extract_fields.py	/^        d02_lons = N.load(d02_lonf)$/;"	v
+d02_lons	extract_fields.py	/^        d02_lons = d02_nc.variables['XLONG'][0,:,:]$/;"	v
+d02_nc	extract_fields.py	/^        d02_nc = Dataset(d02_fpath)$/;"	v
 data	_test_newruns.py	/^                data = W.get(vrbl=vrbl,utc=utc)[0,lvidx,:,:]$/;"	v
 data	test_verif.py	/^                data = E.get('REFL_comp',utc=plotutc,dom=dom,members=memname)[0,0,0,:,:]$/;"	v
 datadir	test_crps.py	/^        datadir = os.path.join(dataroot,initdir)$/;"	v
@@ -202,21 +379,37 @@ dataroot	ensemble_verification.py	/^dataroot = '\/scratch\/john.lawson\/WRF\/VSE
 dataroot	test_crps.py	/^dataroot = '\/scratch\/john.lawson\/WRF\/VSE_reso'$/;"	v
 dataroot	test_verif.py	/^dataroot = '\/scratch\/john.lawson\/WRF\/VSE_reso\/test\/test_datadir'$/;"	v
 datestr	test_objectid.py	/^        datestr = '20170504',$/;"	v
+datetime	_alt_verif_parallel.py	/^import datetime$/;"	i
+datetime	_old_verif_parallel.py	/^import datetime$/;"	i
+datetime	_test_newruns.py	/^import datetime$/;"	i
+datetime	ensemble_verification.py	/^import datetime$/;"	i
+datetime	extract_fields.py	/^import datetime$/;"	i
+datetime	generate_namelists.py	/^import datetime$/;"	i
+datetime	new_verif_parallel.py	/^import datetime$/;"	i
+datetime	old_verif.py	/^import datetime$/;"	i
+datetime	run_experiments.py	/^import datetime$/;"	i
+datetime	test_crps.py	/^import datetime$/;"	i
+datetime	test_kde.py	/^import datetime$/;"	i
+datetime	test_verif.py	/^import datetime$/;"	i
+datetime	verif_parallel.py	/^import datetime$/;"	i
 debug	generate_namelists.py	/^debug = False # Print more output$/;"	v
 debug	old_generate_namelists.py	/^debug = False # Print more output$/;"	v
+debug_mode	extract_fields.py	/^debug_mode = True$/;"	v
 denormalise	old_generate_namelists.py	/^def denormalise(normvals,xmin,xmax):$/;"	f
 diff_df	new_verif_parallel.py	/^    diff_df = diff_df[(diff_df['d01_id'] != 0.0)]$/;"	v
 diff_df	new_verif_parallel.py	/^    diff_df = utils.do_new_df(DTYPES,len(matches))$/;"	v
 do_1d	test_kde.py	/^    do_1d = 0$/;"	v
 do_2d	test_kde.py	/^    do_2d = 1$/;"	v
+do_5km	extract_fields.py	/^    do_5km = False$/;"	v
 do_all	test_objectid.py	/^        do_all = False,$/;"	v
 do_domains	new_verif_parallel.py	/^do_domains = False$/;"	v
 do_efss	new_verif_parallel.py	/^do_efss = False # Also includes FISS, which is broken?$/;"	v
 do_fcst_interp	verif_parallel.py	/^def do_fcst_interp(nc_fpath,vrbl,npyfpaths,newlats,newlons):$/;"	f
 do_interp	_alt_verif_parallel.py	/^def do_interp(fmt,old_field,old_lats,old_lons,new_lats,new_lons):$/;"	f
 do_kde	verif_parallel.py	/^def do_kde(arr3d):$/;"	f
-do_mrms	extract_fields.py	/^    do_mrms = False$/;"	v
+do_mrms	extract_fields.py	/^    do_mrms = True$/;"	v
 do_mrms_interp	verif_parallel.py	/^def do_mrms_interp(nc_fpath,npy_fpath,newlats,newlons,vrbl):$/;"	f
+do_nexrad	extract_fields.py	/^    do_nexrad = False$/;"	v
 do_object_cluster	new_verif_parallel.py	/^do_object_cluster = False$/;"	v
 do_object_distr	new_verif_parallel.py	/^do_object_distr = False$/;"	v
 do_object_examples	new_verif_parallel.py	/^do_object_examples = False$/;"	v
@@ -225,7 +418,8 @@ do_object_pca	new_verif_parallel.py	/^do_object_pca = False$/;"	v
 do_object_performance	new_verif_parallel.py	/^do_object_performance = False$/;"	v
 do_object_waffle	new_verif_parallel.py	/^do_object_waffle = False$/;"	v
 do_pca_plots	new_verif_parallel.py	/^def do_pca_plots(pca,PC_df,features,fmt):$/;"	f
-do_performance	new_verif_parallel.py	/^do_performance = True$/;"	v
+do_performance	new_verif_parallel.py	/^do_performance = False$/;"	v
+do_plot_test	new_verif_parallel.py	/^do_plot_test = True$/;"	v
 do_quicklooks	new_verif_parallel.py	/^do_quicklooks = not PA.no_quick$/;"	v
 do_unsparsify	_old_unsparsify.py	/^def do_unsparsify(mrms_nc,vrbl,d01_nc):$/;"	f
 do_write_diff	new_verif_parallel.py	/^    def do_write_diff(df,n,oldkey,newkey,d02,d01):$/;"	f
@@ -250,17 +444,30 @@ ensnums	old_generate_namelists.py	/^ensnums = range(1,nens+1) # names of each en
 enspath	test_kde.py	/^enspath = os.path.join(ensroot,initstr)$/;"	v
 ensroot	_alt_verif_parallel.py	/^ensroot = '\/scratch\/john.lawson\/WRF\/VSE_reso\/{}'.format(key_wrf)$/;"	v
 ensroot	_old_verif_parallel.py	/^ensroot = '\/scratch\/john.lawson\/WRF\/VSE_reso\/{}'.format(key_wrf)$/;"	v
-ensroot	extract_fields.py	/^ensroot = '\/scratch\/john.lawson\/WRF\/VSE_reso\/{}'.format(key_wrf)$/;"	v
+ensroot	extract_fields.py	/^ensroot = '\/oldscratch\/john.lawson\/WRF\/VSE_reso\/{}'.format(key_wrf)$/;"	v
 ensroot	old_verif.py	/^ensroot = '\/scratch\/john.lawson\/WRF\/VSE_reso'$/;"	v
 ensroot	test_kde.py	/^ensroot = '\/scratch\/john.lawson\/WRF\/VSE_reso\/ensembledata'$/;"	v
 ensroot	verif_parallel.py	/^ensroot = '\/scratch\/john.lawson\/WRF\/VSE_reso\/{}'.format(key_wrf)$/;"	v
+evac	_alt_verif_parallel.py	/^import evac.utils as utils$/;"	i
+evac	_old_verif_parallel.py	/^import evac.utils as utils$/;"	i
+evac	_test_newruns.py	/^import evac.utils.utils as utils$/;"	i
+evac	ensemble_verification.py	/^import evac.utils as utils$/;"	i
+evac	extract_fields.py	/^import evac.utils as utils$/;"	i
+evac	figure_caseoutline.py	/^import evac.utils as utils$/;"	i
+evac	new_verif_parallel.py	/^import evac.utils as utils$/;"	i
+evac	old_verif.py	/^import evac.utils as utils$/;"	i
+evac	run_experiments.py	/^import evac.utils.utils as utils$/;"	i
+evac	test_crps.py	/^import evac.utils as utils$/;"	i
+evac	test_kde.py	/^import evac.utils.utils as utils$/;"	i
+evac	test_verif.py	/^import evac.utils as utils$/;"	i
+evac	verif_parallel.py	/^import evac.utils as utils$/;"	i
 experiment	old_generate_namelists.py	/^        experiment = "MP"$/;"	v
 experiment	old_generate_namelists.py	/^        experiment = "MP-Stoch"$/;"	v
 experiment	old_generate_namelists.py	/^        experiment = "SP"$/;"	v
 experiment	old_generate_namelists.py	/^        experiment = "SP-Stoch"$/;"	v
 experiments	old_generate_namelists.py	/^experiments = NL.keys()$/;"	v
 extract_fields	verif_parallel.py	/^def extract_fields():$/;"	f
-extractroot	new_verif_parallel.py	/^extractroot = "\/home\/nothijngrad\/Xmas_Shutdown\/Xmas"$/;"	v
+extractroot	new_verif_parallel.py	/^extractroot = '\/work\/john.lawson\/VSE_reso\/pp\/{}'.format(key_pp)$/;"	v
 f1	test_extraction.py	/^f1 = 'REFL_comp_d01_3km_20160331_2200_2215_m01.npy'$/;"	v
 f3	test_extraction.py	/^f3 = 'REFL_comp_d02_1km_20160331_2200_2215_m01.npy'$/;"	v
 f4	test_extraction.py	/^f4 = 'REFL_comp_d02_3km_20160331_2200_2215_m01.npy'$/;"	v
@@ -277,6 +484,7 @@ fcst1Da	test_kde.py	/^    fcst1Da = N.hstack((fcst1D,N.array([0.0,0.0,0.0])))$/;
 fcst4d	_old_verif_parallel.py	/^    fcst4d = N.swapaxes(xfs_all,0,1)$/;"	v
 fcst_all	test_kde.py	/^    fcst_all = fcst_all - 273.15$/;"	v
 fcst_all	test_kde.py	/^fcst_all = E.get(fcsthr=fhr,vrbl=vrbl,dom=1)$/;"	v
+fcst_fmt	new_verif_parallel.py	/^    fcst_fmt = "d02_1km"$/;"	v
 fcst_fmts	new_verif_parallel.py	/^    fcst_fmts = ("d01_3km","d02_1km")$/;"	v
 fcst_fmts	new_verif_parallel.py	/^    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")$/;"	v
 fcst_fmts	new_verif_parallel.py	/^fcst_fmts =  ("d01_3km","d02_1km")$/;"	v
@@ -285,9 +493,9 @@ fcst_nt	test_objectid.py	/^        fcst_nt = int(180\/5) + 1,$/;"	v
 fcst_pp	test_kde.py	/^        fcst_pp = N.empty([nlat,nlon])$/;"	v
 fcst_pp	test_kde.py	/^    fcst_pp = N.empty([nlat,nlon])$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "REFL_comp"$/;"	v
-fcst_vrbls	extract_fields.py	/^fcst_vrbls = ('UH02','UH25')$/;"	v
-fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("REFL_comp","Wmax")$/;"	v
-fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("Wmax","UH02","UH25","RAINNC","REFL_comp")$/;"	v
+fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "UH25"$/;"	v
+fcst_vrbls	extract_fields.py	/^fcst_vrbls = list()$/;"	v
+fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")$/;"	v
 fcstmins	_alt_verif_parallel.py	/^fcstmins = N.arange(0,185,5)$/;"	v
 fcstmins	_test_newruns.py	/^fcstmins = range(30,210,30)$/;"	v
 fcstmins	new_verif_parallel.py	/^    fcstmins = (30,90,150)$/;"	v
@@ -303,6 +511,7 @@ fhstr	test_verif.py	/^        fhstr = utils.pretty_fhr(fhr)$/;"	v
 find_row	new_verif_parallel.py	/^    def find_row(df,megaidx):$/;"	f
 fname	_test_newruns.py	/^                fname = 'wrfout_{}_2017-05-03_02:00:00'.format(dom)$/;"	v
 fname	_test_newruns.py	/^        fname = "NCOruns_{:03d}min_{}_{}.png".format(fcstmin,vrbl,dom)$/;"	v
+fname	new_verif_parallel.py	/^            fname = "test_UH_AWS_{:03d}min.png".format(int(fm))$/;"	v
 fname	new_verif_parallel.py	/^    fname = "domains.png"$/;"	v
 fname	new_verif_parallel.py	/^    fname = "examples_from_pca.png"$/;"	v
 fname	new_verif_parallel.py	/^    fname = "hist_3x3.png"$/;"	v
@@ -320,6 +529,7 @@ fname3	test_kde.py	/^    fname3 = 'test_kde_seaborn3.png'$/;"	v
 fpath	_old_verif_parallel.py	/^    fpath = generate_fname(vrbl=vrbl,metric='eFSS',$/;"	v
 fpath	_test_newruns.py	/^                fpath = os.path.join(folder,mem,fname)$/;"	v
 fpath	_test_newruns.py	/^        fpath = os.path.join(outdir,fname)$/;"	v
+fpath	new_verif_parallel.py	/^            fpath = os.path.join(outroot,fname)$/;"	v
 fpath	new_verif_parallel.py	/^    fpath = os.path.join(objectroot,fname)$/;"	v
 fpath	new_verif_parallel.py	/^    fpath = os.path.join(outroot,"match_diffs",fname)$/;"	v
 fpath	new_verif_parallel.py	/^    fpath = os.path.join(outroot,fname)$/;"	v
@@ -340,6 +550,11 @@ fssdir	new_verif_parallel.py	/^    fssdir = os.path.join(extractroot,"efss_fiss"
 ftime	test_crps.py	/^            ftime = itime + datetime.timedelta(seconds=3600)$/;"	v
 gather_commands_one	extract_fields.py	/^def gather_commands_one(i):$/;"	f
 gather_commands_two	extract_fields.py	/^def gather_commands_two(i):$/;"	f
+gaussian_kde	_alt_verif_parallel.py	/^from scipy.stats import gaussian_kde$/;"	i
+gaussian_kde	_old_verif_parallel.py	/^from scipy.stats import gaussian_kde$/;"	i
+gaussian_kde	extract_fields.py	/^from scipy.stats import gaussian_kde$/;"	i
+gaussian_kde	test_kde.py	/^from scipy.stats import gaussian_kde$/;"	i
+gaussian_kde	verif_parallel.py	/^from scipy.stats import gaussian_kde$/;"	i
 generate_LHS_draw	old_generate_namelists.py	/^def generate_LHS_draw(seed):$/;"	f
 generate_all_folders	extract_fields.py	/^def generate_all_folders():$/;"	f
 generate_all_folders	verif_parallel.py	/^def generate_all_folders():$/;"	f
@@ -378,6 +593,12 @@ get_tempdata_fpath	extract_fields.py	/^def get_tempdata_fpath(caseutc,fmt,vrbl,v
 get_valid_time	verif_parallel.py	/^def get_valid_time(initutc,fcstmin=None,fchr=None):$/;"	f
 get_wrfout_fname	extract_fields.py	/^def get_wrfout_fname(t,dom):$/;"	f
 get_wrfout_fname	new_verif_parallel.py	/^def get_wrfout_fname(t,dom):$/;"	f
+glob	extract_fields.py	/^import glob$/;"	i
+glob	generate_namelists.py	/^import glob$/;"	i
+glob	new_verif_parallel.py	/^import glob$/;"	i
+glob	old_generate_namelists.py	/^import glob$/;"	i
+glob	unsparsify.py	/^import glob$/;"	i
+griddata	test_crps.py	/^from scipy.interpolate import griddata$/;"	i
 grids	_alt_verif_parallel.py	/^grids = ['d01_cut_3km','d01_interp_5km',$/;"	v
 grids	verif_parallel.py	/^grids = ['d01_3km','d01_5km',$/;"	v
 history_outname	generate_namelists.py	/^history_outname = False # Change this to absolute path of output file and location$/;"	v
@@ -394,13 +615,14 @@ init_kwargs	run_experiments.py	/^        init_kwargs = dict($/;"	v
 initdir	old_verif.py	/^        initdir = utils.string_from_time('dir',initutc,strlen='hour')$/;"	v
 initdir	test_crps.py	/^        initdir = utils.string_from_time('dir',initutc,strlen='hour')$/;"	v
 initdt	generate_namelists.py	/^initdt = datetime.datetime.strptime(initstr,"%Y%m%d%H")$/;"	v
-initstr	extract_fields.py	/^        initstr = utils.string_from_time('dir',initutc,strlen='hour')$/;"	v
+initstr	extract_fields.py	/^    initstr = utils.string_from_time('dir',initutc,strlen='hour')$/;"	v
 initstr	generate_namelists.py	/^initstr = str(NS.initstr)$/;"	v
 initstr	run_experiments.py	/^        initstr = utils.string_from_time('dir',initutc,strlen='hour')$/;"	v
 initstr	test_crps.py	/^        initstr = utils.string_from_time('title',initutc,)$/;"	v
 initstr	test_kde.py	/^initstr = '2016033120'$/;"	v
 initutc	ensemble_verification.py	/^initutc = datetime.datetime(2016,3,31,21,0,0)$/;"	v
-initutc	extract_fields.py	/^        initutc = initutcs[0]$/;"	v
+initutc	extract_fields.py	/^    initutc = initutcs[0]$/;"	v
+initutc	new_verif_parallel.py	/^        initutc = initutcs[0]$/;"	v
 initutc	run_experiments.py	/^            initutc = initutc,$/;"	v
 initutc	test_kde.py	/^initutc = datetime.datetime(2016,3,31,20,0,0)$/;"	v
 initutc	test_verif.py	/^initutc = datetime.datetime(2016,3,31,21,0,0)$/;"	v
@@ -410,6 +632,14 @@ initutcs	verif_parallel.py	/^initutcs = get_all_initutcs()$/;"	v
 intensity_arr	new_verif_parallel.py	/^    intensity_arr = N.zeros([100,40])$/;"	v
 interp_method	test_crps.py	/^interp_method = 'linear'$/;"	v
 interpolate	extract_fields.py	/^def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,$/;"	f
+itertools	_alt_verif_parallel.py	/^import itertools$/;"	i
+itertools	_old_verif_parallel.py	/^import itertools$/;"	i
+itertools	_test_newruns.py	/^import itertools$/;"	i
+itertools	extract_fields.py	/^import itertools$/;"	i
+itertools	generate_namelists.py	/^import itertools$/;"	i
+itertools	new_verif_parallel.py	/^import itertools$/;"	i
+itertools	old_generate_namelists.py	/^import itertools$/;"	i
+itertools	verif_parallel.py	/^import itertools$/;"	i
 itimes	test_crps.py	/^        itimes = [initutc + datetime.timedelta(seconds=3600*n) for n in range(3)]$/;"	v
 itr	_old_verif_parallel.py	/^    itr = generate_iterable()$/;"	v
 itr	_old_verif_parallel.py	/^    itr = list(generate_iterable())$/;"	v
@@ -434,15 +664,16 @@ key	old_generate_namelists.py	/^    key = NS.key$/;"	v
 key	run_experiments.py	/^key = 'ForReal_nco'$/;"	v
 key_plot	_alt_verif_parallel.py	/^key_plot = 'Xmas'$/;"	v
 key_plot	_old_verif_parallel.py	/^key_plot = 'Xmas'$/;"	v
-key_plot	extract_fields.py	/^key_plot = 'Xmas'$/;"	v
+key_plot	extract_fields.py	/^key_plot = 'AprilFool'$/;"	v
 key_plot	verif_parallel.py	/^key_plot = 'Xmas'$/;"	v
 key_pp	_alt_verif_parallel.py	/^key_pp = 'Xmas'$/;"	v
 key_pp	_old_verif_parallel.py	/^key_pp = 'Xmas'$/;"	v
-key_pp	extract_fields.py	/^key_pp = 'Xmas'$/;"	v
+key_pp	extract_fields.py	/^key_pp = 'AprilFool'$/;"	v
+key_pp	new_verif_parallel.py	/^key_pp = 'AprilFool'$/;"	v
 key_pp	verif_parallel.py	/^key_pp = 'Xmas'$/;"	v
 key_scores	_alt_verif_parallel.py	/^key_scores = 'Xmas'$/;"	v
 key_scores	_old_verif_parallel.py	/^key_scores = 'Xmas'$/;"	v
-key_scores	extract_fields.py	/^key_scores = 'Xmas'$/;"	v
+key_scores	extract_fields.py	/^key_scores = 'AprilFool'$/;"	v
 key_scores	verif_parallel.py	/^key_scores = 'Xmas'$/;"	v
 key_wrf	_alt_verif_parallel.py	/^key_wrf = 'ForReal_nco'$/;"	v
 key_wrf	_old_verif_parallel.py	/^key_wrf = 'ForReal_nco'$/;"	v
@@ -458,6 +689,7 @@ ld	test_verif.py	/^            ld = d02_limdict$/;"	v
 ld	test_verif.py	/^            ld = {}$/;"	v
 levels	test_kde.py	/^        levels = N.arange(2,102,2)$/;"	v
 levels	test_kde.py	/^    levels = N.arange(5,105,5)$/;"	v
+llcrnrlat	new_verif_parallel.py	/^                                llcrnrlat=lats.min(),llcrnrlon=lons.min(),$/;"	v
 load_W_df	new_verif_parallel.py	/^def load_W_df(W_lookup,CAT):$/;"	f
 load_W_lookup	new_verif_parallel.py	/^def load_W_lookup(fcst_fmts):#fmts):$/;"	f
 load_both_data	new_verif_parallel.py	/^def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):$/;"	f
@@ -470,6 +702,10 @@ load_megaframe	new_verif_parallel.py	/^def load_megaframe(fmts,add_ens=True,add_
 load_obj	new_verif_parallel.py	/^def load_obj():$/;"	f
 load_obs_dll	new_verif_parallel.py	/^def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,$/;"	f
 load_timewindow_both_data	new_verif_parallel.py	/^def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='all'):$/;"	f
+logging	_old_verif_parallel.py	/^import logging$/;"	i
+logging	extract_fields.py	/^import logging$/;"	i
+logging	new_verif_parallel.py	/^import logging$/;"	i
+logging	verif_parallel.py	/^import logging$/;"	i
 lons	new_verif_parallel.py	/^                lons = N.load(os.path.join(extractroot,fdir,casestr,"lons.npy"))$/;"	v
 lookup_mrms_metadata	extract_fields.py	/^def lookup_mrms_metadata(caseutc,vrbl):$/;"	f
 loop_efss	new_verif_parallel.py	/^def loop_efss(vrbl,fcstmin,fmt):$/;"	f
@@ -482,12 +718,26 @@ lvidx	_test_newruns.py	/^                    lvidx = 20$/;"	v
 lvidx	_test_newruns.py	/^                lvidx = 0$/;"	v
 lvs	_test_newruns.py	/^                    lvs = N.arange(2.5,22.5,2.5)$/;"	v
 lvs	_test_newruns.py	/^                    lvs = S.clvs$/;"	v
-m01dir	extract_fields.py	/^        m01dir = os.path.join(ensroot,initstr,"m01")$/;"	v
+m01dir	extract_fields.py	/^    m01dir = os.path.join(ensroot,initstr,"m01")$/;"	v
+math	test_kde.py	/^import math$/;"	i
+matplotlib	_alt_verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	_old_verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	_test_newruns.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	ensemble_verification.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	extract_fields.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	new_verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	test_crps.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	test_extraction.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	test_kde.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	test_verif.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	unsparsify.py	/^import matplotlib.pyplot as plt$/;"	i
+matplotlib	verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
 maxsize	_old_verif_parallel.py	/^    maxsize = max(xfs_all.shape[2:])$/;"	v
 megaframe	new_verif_parallel.py	/^    megaframe = load_megaframe(fmts=all_fmts)$/;"	v
 megaframe	new_verif_parallel.py	/^    megaframe = megaframe_all[(megaframe_all['case_code'] == '20160331') &$/;"	v
 megaframe_all	new_verif_parallel.py	/^    megaframe_all = load_megaframe(fmts=all_fmts)$/;"	v
-member_names	extract_fields.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,19)]$/;"	v
+mem	new_verif_parallel.py	/^                        mem="m01")$/;"	v
+member_names	extract_fields.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,5)]$/;"	v
 member_names	new_verif_parallel.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,37)]$/;"	v
 member_names	verif_parallel.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,37)]$/;"	v
 membernames	run_experiments.py	/^            membernames = membernames,$/;"	v
@@ -503,15 +753,21 @@ mrmsdir	_old_verif_parallel.py	/^mrmsdir = 'work\/john.lawson\/MRMS_data\/VSE_re
 mrmsdir	extract_fields.py	/^mrmsdir = '\/work\/john.lawson\/MRMS_data\/rot-dz'$/;"	v
 mrmsdir	test_objectid.py	/^        mrmsdir = '\/work1\/skinnerp\/MRMS_verif\/mrms_cressman\/20170504',$/;"	v
 mrmsdir	verif_parallel.py	/^mrmsdir = 'work\/john.lawson\/MRMS_data\/VSE_reso'$/;"	v
+multiprocessing	_alt_verif_parallel.py	/^import multiprocessing$/;"	i
+multiprocessing	_old_verif_parallel.py	/^import multiprocessing$/;"	i
+multiprocessing	extract_fields.py	/^import multiprocessing$/;"	i
+multiprocessing	new_verif_parallel.py	/^import multiprocessing$/;"	i
+multiprocessing	verif_parallel.py	/^import multiprocessing$/;"	i
 name	new_verif_parallel.py	/^                name = "_".join((casestr,dname))$/;"	v
 namelistdir	run_experiments.py	/^        namelistdir = PosixPath('\/home\/john.lawson\/VSE_reso\/pycode\/namelists\/{}\/{}'.format(key,casestr))$/;"	v
 namelists	generate_namelists.py	/^namelists = ['namelist.input.{0}'.format(n) for n in ensnums]$/;"	v
 namelists	old_generate_namelists.py	/^namelists = ['namelist.input.{0}'.format(n) for n in ensnums]$/;"	v
+nc	unsparsify.py	/^import netCDF4 as nc$/;"	i
 ncno	_test_newruns.py	/^                ncno = " ncrcat"$/;"	v
 ncno	_test_newruns.py	/^                ncno = 3$/;"	v
 ncno	_test_newruns.py	/^                ncno = 4$/;"	v
 ncpus	_old_verif_parallel.py	/^ncpus = parser.parse_args().ncpus$/;"	v
-ncpus	extract_fields.py	/^ncpus = 1$/;"	v
+ncpus	extract_fields.py	/^ncpus = PA.ncpus$/;"	v
 ncpus	new_verif_parallel.py	/^ncpus = PA.ncpus$/;"	v
 ncpus	old_verif.py	/^ncpus = 1$/;"	v
 ncpus	test_objectid.py	/^        ncpus = 30,$/;"	v
@@ -520,6 +776,10 @@ ndoms	run_experiments.py	/^            ndoms = 2,$/;"	v
 ne	test_objectid.py	/^        ne = 36,$/;"	v
 nens	generate_namelists.py	/^nens = int(NS.nmems) # Number of ensemble members$/;"	v
 nens	old_generate_namelists.py	/^nens = 18 # Number of ensemble members$/;"	v
+netCDF4	_alt_verif_parallel.py	/^import netCDF4$/;"	i
+netCDF4	_old_verif_parallel.py	/^import netCDF4$/;"	i
+netCDF4	extract_fields.py	/^import netCDF4$/;"	i
+netCDF4	verif_parallel.py	/^import netCDF4$/;"	i
 new_nl_path	run_experiments.py	/^        new_nl_path = namelistdir \/ 'namelist.input.template'$/;"	v
 newse_mems	run_experiments.py	/^        newse_mems =  ['mem{}'.format(n) for n in range(1,nmems+1)]$/;"	v
 nexrad_lats	extract_fields.py	/^            nexrad_lats = RADARS.lats.astype("float32")$/;"	v
@@ -533,6 +793,7 @@ nmems	run_experiments.py	/^        nmems = 36$/;"	v
 nmems	test_kde.py	/^                nmems = fcst1Da.size$/;"	v
 nodes	run_experiments.py	/^                            nodes=1,$/;"	v
 np	_old_unsparsify.py	/^np = N$/;"	v
+np	unsparsify.py	/^import numpy as np$/;"	i
 npydir	old_verif.py	/^        npydir = os.path.join(npyroot,initdir)$/;"	v
 npyroot	_alt_verif_parallel.py	/^npyroot = '\/work\/john.lawson\/VSE_reso\/scores\/{}'.format(key_scores)$/;"	v
 npyroot	_old_verif_parallel.py	/^npyroot = '\/work\/john.lawson\/VSE_reso\/scores\/{}'.format(key_scores)$/;"	v
@@ -548,16 +809,33 @@ object_switch	new_verif_parallel.py	/^object_switch = False$/;"	v
 objectroot	new_verif_parallel.py	/^objectroot = os.path.join(extractroot,'object_instances')$/;"	v
 obs_fmts	new_verif_parallel.py	/^    obs_fmts = ("nexrad_3km","nexrad_1km")$/;"	v
 obs_grid	_old_verif_parallel.py	/^    obs_grid = NEWGRID$/;"	v
-obs_vrbl	extract_fields.py	/^obs_vrbl = list()$/;"	v
 obs_vrbl	new_verif_parallel.py	/^    obs_vrbl = "NEXRAD"$/;"	v
+obs_vrbls	extract_fields.py	/^obs_vrbls = ("AWS25",)$/;"	v
 obs_vrbls	new_verif_parallel.py	/^obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
-obs_vrbls	new_verif_parallel.py	/^obs_vrbls = ("NEXRAD",)$/;"	v
 og_nl_path	run_experiments.py	/^        og_nl_path = wofdir \/ 'mem1' \/ 'namelist.input'$/;"	v
 onlydo	generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
 onlydo	old_generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
 open_random_rotdz	extract_fields.py	/^def open_random_rotdz(caseutc,vrbl):$/;"	f
 opt	test_verif.py	/^            opt = "large"$/;"	v
 opt	test_verif.py	/^            opt = "small"$/;"	v
+os	_alt_verif_parallel.py	/^import os$/;"	i
+os	_old_verif_parallel.py	/^import os$/;"	i
+os	_test_newruns.py	/^import os$/;"	i
+os	ensemble_verification.py	/^import os$/;"	i
+os	extract_fields.py	/^import os$/;"	i
+os	figure_caseoutline.py	/^import os$/;"	i
+os	generate_namelists.py	/^import os$/;"	i
+os	move_around_files.py	/^import os$/;"	i
+os	new_verif_parallel.py	/^import os$/;"	i
+os	old_generate_namelists.py	/^import os$/;"	i
+os	old_verif.py	/^import os$/;"	i
+os	run_experiments.py	/^import os$/;"	i
+os	test_crps.py	/^import os$/;"	i
+os	test_extraction.py	/^import os$/;"	i
+os	test_kde.py	/^import os$/;"	i
+os	test_objectid.py	/^import os$/;"	i
+os	test_verif.py	/^import os$/;"	i
+os	verif_parallel.py	/^import os$/;"	i
 otherdir	run_experiments.py	/^        otherdir = PosixPath('\/home\/john.lawson\/VSE_reso\/otherfiles')$/;"	v
 outdir	_test_newruns.py	/^outdir = '\/home\/john.lawson\/VSE_reso\/pyoutput\/tests'$/;"	v
 outdir	ensemble_verification.py	/^outdir = '\/home\/john.lawson\/VSE_reso\/pyoutput\/attempt1'$/;"	v
@@ -571,7 +849,7 @@ outdir	test_verif.py	/^outdir = '\/home\/john.lawson\/VSE_reso\/pyoutput\/test2'
 outfpath	test_verif.py	/^        outfpath = os.path.join(outdir,fname)$/;"	v
 outroot	_alt_verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
 outroot	_old_verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
-outroot	new_verif_parallel.py	/^outroot = "\/mnt\/d\/pyoutput"$/;"	v
+outroot	new_verif_parallel.py	/^outroot = "\/mnt\/jlawson\/VSE_dx\/figures\/"$/;"	v
 outroot	old_verif.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput'$/;"	v
 outroot	test_kde.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/'$/;"	v
 outroot	verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
@@ -584,7 +862,9 @@ overwrite_pp	new_verif_parallel.py	/^overwrite_pp = PA.overwrite_pp$/;"	v
 overwrite_scores	_old_verif_parallel.py	/^overwrite_scores = parser.parse_args().overwrite_scores$/;"	v
 overwrite_scores	verif_parallel.py	/^overwrite_scores = parser.parse_args().overwrite_scores$/;"	v
 palette	new_verif_parallel.py	/^    palette = itertools.cycle(sns.cubehelix_palette(14,light=0.8,dark=0.2))$/;"	v
+pandas	new_verif_parallel.py	/^import pandas$/;"	i
 parser	_old_verif_parallel.py	/^parser = argparse.ArgumentParser()$/;"	v
+parser	extract_fields.py	/^parser = argparse.ArgumentParser()$/;"	v
 parser	generate_namelists.py	/^parser = argparse.ArgumentParser()$/;"	v
 parser	new_verif_parallel.py	/^parser = argparse.ArgumentParser()$/;"	v
 parser	old_generate_namelists.py	/^parser = argparse.ArgumentParser()$/;"	v
@@ -602,6 +882,30 @@ path_to_newinput	run_experiments.py	/^            path_to_newinput = rundir \/ m
 path_to_outdir	run_experiments.py	/^            path_to_outdir = rootdir\/'outdir',$/;"	v
 paths_to_nl	generate_namelists.py	/^paths_to_nl = {}$/;"	v
 paths_to_nl	old_generate_namelists.py	/^paths_to_nl = {}$/;"	v
+pdb	_alt_verif_parallel.py	/^import pdb$/;"	i
+pdb	_old_unsparsify.py	/^import pdb$/;"	i
+pdb	_old_verif_parallel.py	/^import pdb$/;"	i
+pdb	_test_newruns.py	/^import pdb$/;"	i
+pdb	ensemble_verification.py	/^import pdb$/;"	i
+pdb	extract_fields.py	/^import pdb$/;"	i
+pdb	figure_caseoutline.py	/^import pdb$/;"	i
+pdb	generate_namelists.py	/^import pdb$/;"	i
+pdb	move_around_files.py	/^import pdb$/;"	i
+pdb	new_verif_parallel.py	/^import pdb$/;"	i
+pdb	old_generate_namelists.py	/^import pdb$/;"	i
+pdb	old_verif.py	/^import pdb$/;"	i
+pdb	run_experiments.py	/^import pdb$/;"	i
+pdb	test_crps.py	/^import pdb$/;"	i
+pdb	test_extraction.py	/^import pdb$/;"	i
+pdb	test_kde.py	/^import pdb$/;"	i
+pdb	test_objectid.py	/^import pdb$/;"	i
+pdb	test_verif.py	/^import pdb$/;"	i
+pdb	verif_parallel.py	/^import pdb$/;"	i
+pickle	_alt_verif_parallel.py	/^import pickle $/;"	i
+pickle	_old_verif_parallel.py	/^import pickle $/;"	i
+pickle	extract_fields.py	/^import pickle$/;"	i
+pickle	new_verif_parallel.py	/^import pickle$/;"	i
+pickle	verif_parallel.py	/^import pickle $/;"	i
 plot	_old_verif_parallel.py	/^def plot(itr):$/;"	f
 plot	verif_parallel.py	/^def plot(itr):$/;"	f
 plot_brier	verif_parallel.py	/^plot_brier = 0$/;"	v
@@ -630,6 +934,18 @@ plotlist	test_verif.py	/^plotlist = ['Verif',''] + list(range(1,11))$/;"	v
 plotroot	extract_fields.py	/^plotroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
 plotutc	_test_newruns.py	/^plotutc = datetime.datetime(2017,5,3,2,0,0)$/;"	v
 plotutc	test_verif.py	/^    plotutc = initutc + datetime.timedelta(seconds=int(3600*fhr))$/;"	v
+plt	_alt_verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	_old_verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	_test_newruns.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	ensemble_verification.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	extract_fields.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	new_verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	test_crps.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	test_extraction.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	test_kde.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	test_verif.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	unsparsify.py	/^import matplotlib.pyplot as plt$/;"	i
+plt	verif_parallel.py	/^import matplotlib.pyplot as plt$/;"	i
 pp_root	extract_fields.py	/^pp_root = '\/work\/john.lawson\/VSE_reso\/pp\/{}'.format(key_pp)$/;"	v
 pres	run_experiments.py	/^            pres = ['wrf.exe' ,  'qr_acr_qg.bin' ,$/;"	v
 pres	run_experiments.py	/^            pres = ['wrf.exe' , $/;"	v
@@ -648,11 +964,18 @@ radardir	ensemble_verification.py	/^radardir = '\/work\/john.lawson\/NEXRAD_data
 radardir	extract_fields.py	/^radardir = '\/work\/john.lawson\/NEXRAD_data'$/;"	v
 radardir	old_verif.py	/^radardir = '\/work\/john.lawson\/NEXRAD_data'$/;"	v
 radardir	test_verif.py	/^radardir = '\/work\/john.lawson\/NEXRAD_data'$/;"	v
+random	_alt_verif_parallel.py	/^import random$/;"	i
+random	_old_verif_parallel.py	/^import random$/;"	i
+random	extract_fields.py	/^import random$/;"	i
+random	generate_namelists.py	/^import random$/;"	i
+random	old_generate_namelists.py	/^import random$/;"	i
+random	verif_parallel.py	/^import random$/;"	i
 rawpc	test_kde.py	/^                rawpc = (len(fcst1Da[fcst1Da > thresh])\/nmems)*100$/;"	v
 rawpc	test_kde.py	/^        rawpc = utils.exceed_probs_2d(fcst,thresh)$/;"	v
 rawpc	test_kde.py	/^    rawpc = (len(fcst1D[fcst1D > thresh])\/nmems)*100$/;"	v
 rawpc	test_kde.py	/^    rawpc = utils.exceed_probs_2d(fcst,thresh)$/;"	v
 rd	old_verif.py	/^rd = dict(nx=50,ny=50)$/;"	v
+readwdssii	extract_fields.py	/^from unsparsify import readwdssii$/;"	i
 readwdssii	unsparsify.py	/^def readwdssii(fin):$/;"	f
 remove_nans	verif_parallel.py	/^def remove_nans(data,vrbl):$/;"	f
 reproj_fcst_root	_alt_verif_parallel.py	/^reproj_fcst_root = '\/work\/john.lawson\/VSE_reso\/reproj_fcst\/{}'.format(key_pp)$/;"	v
@@ -663,6 +986,7 @@ reproj_grid_root	_old_verif_parallel.py	/^reproj_grid_root = '\/work\/john.lawso
 reproj_obs_root	_alt_verif_parallel.py	/^reproj_obs_root = '\/work\/john.lawson\/VSE_reso\/reproj_obs\/{}'.format(key_pp)$/;"	v
 reproj_obs_root	_old_verif_parallel.py	/^reproj_obs_root = '\/work\/john.lawson\/VSE_reso\/reproj_obs\/{}'.format(key_pp)$/;"	v
 reproj_obs_root	verif_parallel.py	/^reproj_obs_root = '\/work\/john.lawson\/VSE_reso\/reproj_obs\/{}'.format(key_pp)$/;"	v
+reproject	test_crps.py	/^from evac.utils.reproject_tools import reproject, WRF_native_grid, create_new_grid, VerifGrid$/;"	i
 result_arr	test_kde.py	/^        result_arr = N.array(results)$/;"	v
 results	_old_verif_parallel.py	/^                results = pool.map(check_wrfout,iii,)#chunksize=1)$/;"	v
 results	_old_verif_parallel.py	/^                results = pool.map(run_parallel,itr,)#chunksize=1)$/;"	v
@@ -684,14 +1008,18 @@ rundir	run_experiments.py	/^        rundir = rootdir$/;"	v
 runlen	generate_namelists.py	/^runlen = 3 # Run length in hours$/;"	v
 runsec	run_experiments.py	/^            runsec = runsec,$/;"	v
 runsec	run_experiments.py	/^        runsec = utils.hr_to_sec(3)$/;"	v
+sample	old_generate_namelists.py	/^    from lhsmdu import sample$/;"	i
+save_to_fpath	extract_fields.py	/^                save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_3km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^    save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^    save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_3km",validutc,caseutc)$/;"	v
+scipy	extract_fields.py	/^import scipy$/;"	i
+scipy	new_verif_parallel.py	/^import scipy$/;"	i
 scipy_method	test_kde.py	/^scipy_method = 0$/;"	v
 scoreroot	extract_fields.py	/^scoreroot = '\/work\/john.lawson\/VSE_reso\/scores\/{}'.format(key_scores)$/;"	v
 scores	ensemble_verification.py	/^scores = ['CRPS',]$/;"	v
@@ -703,13 +1031,15 @@ seeds_sppt	old_generate_namelists.py	/^        seeds_sppt = generate_seeds(nens)
 size	new_verif_parallel.py	/^size = 20$/;"	v
 skiplist	old_verif.py	/^skiplist = [$/;"	v
 skiplist	old_verif.py	/^skiplist = []$/;"	v
-skipthis	extract_fields.py	/^skipthis = True$/;"	v
 sleepsec	run_experiments.py	/^        sleepsec = 3*60*60$/;"	v
+smapi	test_kde.py	/^import statsmodels.api as smapi$/;"	i
+sns	new_verif_parallel.py	/^        import seaborn as sns$/;"	i
+sns	test_kde.py	/^    import seaborn as sns$/;"	i
 some_cmd	extract_fields.py	/^                some_cmd = pool.map(func,genfunc())$/;"	v
 sparseFull	unsparsify.py	/^def sparseFull(a):$/;"	f
 spatial_windows	_old_verif_parallel.py	/^    spatial_windows = N.arange(1,maxsize,5)$/;"	v
 spatial_windows	new_verif_parallel.py	/^    spatial_windows = {$/;"	v
-speed_up_debug	extract_fields.py	/^speed_up_debug = "uh_inst.p"$/;"	v
+speed_up_debug	extract_fields.py	/^speed_up_debug = "march25.p"$/;"	v
 ss	_test_newruns.py	/^                ss = folder.split('\/')[-1]$/;"	v
 st4_lats	extract_fields.py	/^            st4_lats = ST4.lats$/;"	v
 st4_lons	extract_fields.py	/^            st4_lons = ST4.lons$/;"	v
@@ -722,13 +1052,17 @@ st4dir	verif_parallel.py	/^st4dir = '\/work\/john.lawson\/STAGEIV_data'$/;"	v
 stars	extract_fields.py	/^stars = "*"*10$/;"	v
 stars	new_verif_parallel.py	/^stars = "*"*10$/;"	v
 stars	verif_parallel.py	/^stars = "*"*10$/;"	v
+statsmodels	test_kde.py	/^import statsmodels.api as smapi$/;"	i
 statsmodels_method	test_kde.py	/^statsmodels_method = 1$/;"	v
 subcpus	_old_verif_parallel.py	/^subcpus = parser.parse_args().subcpus$/;"	v
 subcpus	verif_parallel.py	/^subcpus = parser.parse_args().subcpus$/;"	v
 submit_interp	extract_fields.py	/^def submit_interp(i):$/;"	f
+subprocess	run_experiments.py	/^        import subprocess$/;"	i
 sud	extract_fields.py	/^sud = speed_up_debug$/;"	v
 sumdir	test_objectid.py	/^        sumdir = os.path.join(rootdir,'summaryfiles'),$/;"	v
 sync_dataframes	new_verif_parallel.py	/^def sync_dataframes(fmts=None,attr_df=None):$/;"	f
+sys	generate_namelists.py	/^import sys$/;"	i
+sys	old_generate_namelists.py	/^import sys$/;"	i
 tempdir_root	extract_fields.py	/^tempdir_root = '\/work\/john.lawson\/VSE_reso\/pp_temp\/{}'.format(key_pp)$/;"	v
 temporal_windows	_old_verif_parallel.py	/^        temporal_windows = (1,)$/;"	v
 temporal_windows	_old_verif_parallel.py	/^        temporal_windows = (1,3,5)$/;"	v
@@ -740,6 +1074,11 @@ threshs	_old_verif_parallel.py	/^        threshs = N.arange(0,100,5)$/;"	v
 threshs	_old_verif_parallel.py	/^        threshs = N.arange(2.5,37.5,2.5)$/;"	v
 threshs	new_verif_parallel.py	/^    threshs = (10,20,30,40,45,50)$/;"	v
 thumbnails	ensemble_verification.py	/^thumbnails = ['REFL_comp',]$/;"	v
+time	generate_namelists.py	/^import time$/;"	i
+time	new_verif_parallel.py	/^import time$/;"	i
+time	old_generate_namelists.py	/^import time$/;"	i
+time	run_experiments.py	/^import time$/;"	i
+time_me	test_crps.py	/^from evac.utils.misc_tools import time_me$/;"	i
 timestr	run_experiments.py	/^        timestr = utils.string_from_time('dir',initutc)$/;"	v
 title	test_verif.py	/^                title = 'Member {:02d}'.format(plot)$/;"	v
 toprint	extract_fields.py	/^        toprint = ["{}\\n".format(c) for c in co]$/;"	v
@@ -751,10 +1090,23 @@ try_reproj_obs	verif_parallel.py	/^def try_reproj_obs(dom_pp,obs=None,utc=None,g
 trysave	verif_parallel.py	/^def trysave(data,fpath):$/;"	f
 utc	_old_verif_parallel.py	/^        utc = get_valid_time(initutc,fcstmin=fcstmin)$/;"	v
 utc	_test_newruns.py	/^        utc = plotutc + datetime.timedelta(seconds=(60*fcstmin))$/;"	v
+utils	_alt_verif_parallel.py	/^import evac.utils as utils$/;"	i
+utils	_old_verif_parallel.py	/^import evac.utils as utils$/;"	i
+utils	_test_newruns.py	/^import evac.utils.utils as utils$/;"	i
+utils	ensemble_verification.py	/^import evac.utils as utils$/;"	i
+utils	extract_fields.py	/^import evac.utils as utils$/;"	i
+utils	figure_caseoutline.py	/^import evac.utils as utils$/;"	i
+utils	new_verif_parallel.py	/^import evac.utils as utils$/;"	i
+utils	old_verif.py	/^import evac.utils as utils$/;"	i
+utils	run_experiments.py	/^import evac.utils.utils as utils$/;"	i
+utils	test_crps.py	/^import evac.utils as utils$/;"	i
+utils	test_kde.py	/^import evac.utils.utils as utils$/;"	i
+utils	test_verif.py	/^import evac.utils as utils$/;"	i
+utils	verif_parallel.py	/^import evac.utils as utils$/;"	i
+validutc	new_verif_parallel.py	/^            validutc = initutc+datetime.timedelta(seconds=60*int(fm))$/;"	v
 vrbl	new_verif_parallel.py	/^    vrbl = "REFL_comp"$/;"	v
 vrbl	test_crps.py	/^vrbl = 'accum_precip'$/;"	v
 vrbls	_alt_verif_parallel.py	/^vrbls = ("W","accum_precip","REFL_comp",)#"UH02","UH05")$/;"	v
-vrbls	extract_fields.py	/^vrbls = ("UH02","UH05")$/;"	v
 wofdir	run_experiments.py	/^        wofdir = PosixPath('\/work\/wof\/realtime\/{}'.format(casestr))$/;"	v
 wrfdir	run_experiments.py	/^        wrfdir = PosixPath('\/scratch\/john.lawson\/WRF\/VSE_reso\/my_build\/WRFV3\/run')$/;"	v
 wrfdir	test_objectid.py	/^        wrfdir = '\/scratch\/john.lawson\/WRF\/VSE_reso\/ForReal_nco\/2017050501',$/;"	v

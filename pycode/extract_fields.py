@@ -25,23 +25,32 @@ import evac.utils as utils
 # import unsparsify
 from unsparsify import readwdssii
 
+### ARG PARSE ####
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-N','--ncpus',dest='ncpus',default=20,type=int)
+
+PA = parser.parse_args()
+ncpus = PA.ncpus
+
 ### SETTINGS ###
 
 # Folder key for forecast data (wrfout)
 key_wrf = 'ForReal_nco'
-ensroot = '/scratch/john.lawson/WRF/VSE_reso/{}'.format(key_wrf)
+# ensroot = '/scratch/john.lawson/WRF/VSE_reso/{}'.format(key_wrf)
+ensroot = '/oldscratch/john.lawson/WRF/VSE_reso/{}'.format(key_wrf)
 
 # Folder key for post-processed fields (objects, lat/lon, etc)
-key_pp = 'Xmas'
+key_pp = 'AprilFool'
 pp_root = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 tempdir_root = '/work/john.lawson/VSE_reso/pp_temp/{}'.format(key_pp)
 
 # Folder key for scores (FSS, etc)
-key_scores = 'Xmas'
+key_scores = 'AprilFool'
 scoreroot = '/work/john.lawson/VSE_reso/scores/{}'.format(key_scores)
 
 # Folder key for plots
-key_plot = 'Xmas'
+key_plot = 'AprilFool'
 plotroot = '/home/john.lawson/VSE_reso/pyoutput/{}'.format(key_plot)
 
 st4dir = '/work/john.lawson/STAGEIV_data'
@@ -81,31 +90,45 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 
 ##### OTHER STUFF #####
 stars = "*"*10
-ncpus = 1
-# ncpus = 20
 dom_names = ("d01","d02")
 # member_names = ['m{:02d}'.format(n) for n in range(1,37)]
-member_names = ['m{:02d}'.format(n) for n in range(1,19)]
+# member_names = ['m{:02d}'.format(n) for n in range(1,19)]
+member_names = ['m{:02d}'.format(n) for n in range(1,5)]
 # doms = (1,2)
-# fcst_vrbls = ("Wmax","UH02","UH25","RAINNC","REFL_comp")
-fcst_vrbls = ('UH02','UH25')
-# fcst_vrbls = ("UP_HELI_MAX",) # Note that UP_HELI_MAX is 2-5 km time-window-max
-# obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")
-obs_vrbl = list()
 
+# THESE are all possible variables in the script
+# Note that UP_HELI_MAX is 2-5 km time-window-max
+FCST_VRBLS = ("Wmax","UH02","UH25","RAINNC","REFL_comp","UP_HELI_MAX")
+OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
+
+# These are the requests variables
+fcst_vrbls = list()
+# fcst_vrbls = ("UH25",)
+# "NEXRAD"
+# obs_vrbls = list()
+obs_vrbls = ("AWS25",)
+
+debug_mode = True
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
 #### FOR DEBUGGING ####
-# CASES = {
-        # datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),],
-        # }
-
+CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
 
 # fcstmins = N.arange(0,20,5)
 # maxsec = 60*60*0.25
 
 #########################
+def _save(arr,file):
+    if isinstance(arr,N.ma.core.MaskedArray):
+        data = arr.data
+    elif isinstance(arr,N.ndarray):
+        data = arr
+    else:
+        raise Exception
+    # pdb.set_trace()
+    N.save(arr=data,file=file)
+    return
 
 
 ### FUNCTIONS ###
@@ -207,7 +230,7 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     aws02_mrms_rot_3km_20160331_0335.npy
 
     """
-    if vrbl in fcst_vrbls: # ("Wmax","UH02","UH25","RAINNC"):
+    if vrbl in FCST_VRBLS: # ("Wmax","UH02","UH25","RAINNC"):
         # TODO: are we not just doing 5-min or 1-hr accum_precip?
         caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
                                                 caseutc.day)
@@ -215,13 +238,13 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
         validHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
         fname = "{}_{}_{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,initHHMM,
                                         validHHMM,mem)
-    elif vrbl in obs_vrbls: # ("AWS02","AWS25","DZ","ST4"):
+    elif vrbl in OBS_VRBLS: # ("AWS02","AWS25","DZ","ST4"):
         caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
                                                 caseutc.day)
         # utcYYYYMMDD = validutc
         utcHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
         fname = "{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,utcHHMM)
-    return os.path.join(pp_root,caseYYYYMMDD,fname)
+    return os.path.join(pp_root,caseYYYYMMDD,vrbl,fname)
 
 def get_tempdata_fpath(caseutc,fmt,vrbl,validutc,initutc,mem):
     if caseutc is None:
@@ -259,7 +282,7 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
     """
     casestr = utils.string_from_time('dir',caseutc,strlen='day')
     if mem:
-        assert initutc and (vrbl in fcst_vrbls)
+        assert initutc and (vrbl in FCST_VRBLS)
         initstr = utils.string_from_time('dir',initutc,strlen='hour')
         memdir = os.path.join(ensroot,initstr,mem)
 
@@ -306,35 +329,31 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
         fpath = os.path.join(fdir,FILES[t])
         mrms_nc = Dataset(fpath)
 
-        d01_nc = get_random_d01(caseutc)
-        data = _unsparsify(vrbl=key,mrms_nc=mrms_nc,d01_nc=d01_nc)
-
-    elif fmt == "mrms_aws_1km":
-        latf, lonf = get_llf_fpath(casestr,"stageiv_raw")
-        npy_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
-        data = N.load(npy_fpath)
+        # d01_nc = get_random_d01(caseutc)
+        data = _unsparsify(vrbl=key,mrms_nc=mrms_nc,)#d01_nc=d01_nc)
+        data[data<-100] = N.nan
+        data[data>100] = N.nan
+        # pdb.set_trace()
 
     elif fmt == "stageiv_raw":
         latf, lonf = get_llf_fpath(casestr,"stageiv_raw")
-
         # Load stage iv data
         data = ST4.get(utc=validutc)
 
     elif fmt == 'nexrad_raw':
         latf, lonf = get_llf_fpath(casestr,"nexrad_raw")
-
         # Load stage iv data
         data = RADARS.get(utc=validutc)
 
-
     else:
-        raise Exception
+        print("fmt not valid.")
+        pdb.set_trace()
 
-    if N.ma.is_masked:
-        data = data.data
-        # data = data.values
+    # This is now done in _save function
+    # if N.ma.is_masked(data):
+        # data = data.data
 
-    N.save(arr=data,file=data_fpath)
+    _save(arr=data,file=data_fpath)
 
     if load_latlons:
         return data_fpath, N.load(latf), N.load(lonf)
@@ -363,7 +382,7 @@ def _load_data(nc_fpath,vrbl,npyfpaths):
 
     for tidx,npyfpath in enumerate(npyfpaths):
         utils.trycreate(npyfpath,debug=False)
-        N.save(arr=data[tidx,:,:],file=npyfpath)
+        _save(arr=data[tidx,:,:],file=npyfpath)
     return
 
 def create_bmap():
@@ -409,6 +428,7 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
     assert latsA.ndim == 2
     assert latsB.ndim == 2
 
+    pdb.set_trace()
     if cut_only:
         assert dataA is not None
         dataB, _latsB, _lonsB = utils.return_subdomain(dataA,latsA,lonsA,cut_to_lats=latsB,
@@ -438,14 +458,14 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
         xdB = len(xxB[:,0])
         ydB = len(yyB[0,:])
         # if "nexrad" in save_to_fpath:
-            # pdb.set_trace()
         dataB = scipy.interpolate.griddata(points=(xxA.flat,yyA.flat),
                                             values=dataA.flat,
                                             xi=(xxB.flat,yyB.flat),
                                             method='linear').reshape(xdB,ydB)
+    pdb.set_trace()
     if save_to_fpath is not None:
         utils.trycreate(save_to_fpath,debug=False)
-        N.save(arr=dataB,file=save_to_fpath)
+        _save(arr=dataB,file=save_to_fpath)
         print("Saved to",save_to_fpath)
         return
     return dataB
@@ -487,7 +507,8 @@ def generate_obs_loop():
             # Earliest time:
             utc0 = initutcs[0]
             # Latest time is 3 hours after the latest initialisation
-            utc1 = initutcs[-1] + datetime.timedelta(seconds=3600*3)
+            secs = 3600*3 if not debug_mode else 60*15
+            utc1 = initutcs[-1] + datetime.timedelta(seconds=secs)
             # utc1 = initutcs[-1] + datetime.timedelta(seconds=maxsec)
 
             utc = utc0
@@ -528,12 +549,11 @@ def get_llf_fpath(casestr,key):
 
     return lats_fpath,lons_fpath
 
-def _unsparsify(mrms_nc,vrbl,d01_nc):
+def _unsparsify(mrms_nc,vrbl,d01_nc=False):
     # return mrms_low_x_y
     # return unsparsify.do_unsparsify(mrms_nc,vrbl,d01_nc)
-    x1,ulat,y1,ulon, varname,ref1 = readwdssii('/Users/aereinha/Downloads/RotationTracks60min/00.50/20170528-235400.netcdf')
-    pdb.set_trace()
-    return
+    x1,ulat,y1,ulon, varname,ref1 = readwdssii(mrms_nc)
+    return ref1
 
 
 def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):
@@ -672,6 +692,63 @@ def open_random_rotdz(caseutc,vrbl):
     return Dataset(os.path.join(fdir,f))
 
 
+def gather_commands_one(i):
+    commands = []
+    caseutc, initutc, mem, vrbl = i
+
+    initstr = utils.string_from_time('dir',initutc,strlen='hour')
+    casestr = utils.string_from_time('dir',caseutc,strlen='day')
+    memdir = os.path.join(ensroot,initstr,mem)
+    # print("Appending interpolation commands for",mem,"forecast grids of",vrbl,"on", initstr)
+
+    for validutc in generate_valid_utcs(initutc):
+        print(stars,validutc,stars)
+        ### d01_3km (d01 cut to d02)
+        save_to_fpath = get_extraction_fpaths(vrbl,"d01_3km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="d01_raw",validutc=validutc,
+                                caseutc=caseutc,initutc=initutc,mem=mem)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,True,save_to_fpath))
+
+        ### d02_1km - should be a simple one...
+        ### todo: compare interp to raw data! They should be very similar
+        save_to_fpath = get_extraction_fpaths(vrbl,"d02_1km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="d02_raw",validutc=validutc,
+                                caseutc=caseutc,initutc=initutc,mem=mem)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        ### d02_3km (d02 interpolated to 3 km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"d02_3km",validutc,
+                            caseutc=caseutc,initutc=initutc,mem=mem)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="d02_raw",validutc=validutc,
+                                caseutc=caseutc,initutc=initutc,mem=mem)
+            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+    return commands
+
+
+
+# for vrbl, validutc, caseutc in generate_obs_loop():
+def gather_commands_two(i):
+    commands = []
+    vrbl, validutc, caseutc = i
+    # print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
+    do_mrms = False
+    if do_mrms:
+        ### mrms_aws_1km (AWS data interpolated to d02_1km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+    return commands
 
 ######### PROCEDURE #########
 """ Numpy array extraction for Lawson et al, 2019.
@@ -726,73 +803,66 @@ available to move to another location with all lat/lon requirements
 present. TODO: make sure everything's in the same folder.
 
 """
-# Variables for plotting
-# vrbls = ("maxW","accum_precip","REFL_comp",)
-vrbls = ("UH02","UH05")
-all_folders = list(generate_all_folders())
 
 ### Get Stage IV catalogue
-ST4 = ObsGroup(st4dir,'stageiv')
-RADARS = ObsGroup(radardir,'radar')
+if "ST4" in obs_vrbls:
+    ST4 = ObsGroup(st4dir,'stageiv')
+# RADARS = ObsGroup(radardir,'radar')
 
-# for i in all_folders:
-# for caseutc, initutc in CASES.items():
-skipthis = True
+for caseutc, initutcs in CASES.items():
+    # We only need to look at the first time, as the grids are the same
+    initutc = initutcs[0]
+    casestr = utils.string_from_time('dir',caseutc,strlen='day')
+    initstr = utils.string_from_time('dir',initutc,strlen='hour')
+    print("Calculating lat/lon grids for", casestr)
 
-if not skipthis:
-    for caseutc, initutcs in CASES.items():
-        # We only need to look at the first time, as the grids are the same
-        initutc = initutcs[0]
-        casestr = utils.string_from_time('dir',caseutc,strlen='day')
-        initstr = utils.string_from_time('dir',initutc,strlen='hour')
-        print("Calculating lat/lon grids for", casestr)
+    ### First, let's make lat/lon arrays for each grid for this case
+    ### Open if they exist, else create/save
 
-        ### First, let's make lat/lon arrays for each grid for this case
-        ### Open if they exist, else create/save
+    # We only need to look at the first member, as the grids are the same
+    m01dir = os.path.join(ensroot,initstr,"m01")
 
-        # We only need to look at the first member, as the grids are the same
-        m01dir = os.path.join(ensroot,initstr,"m01")
+    # d02
+    d02_latf, d02_lonf = get_llf_fpath(casestr,"d02_raw")
 
-        # d02
-        d02_latf, d02_lonf = get_llf_fpath(casestr,"d02_raw")
+    # TODO: we just need to loop to check the lat/lon
+    # files have been created, or create them. We can
+    # delete the lat/lon array files, and not load them.
+    if os.path.exists(d02_latf):
+        # d02_lats = N.load(d02_latf)
+        # d02_lons = N.load(d02_lonf)
+        pass
+    else:
+        d02_fname = get_wrfout_fname(initutc,2)
+        d02_fpath = os.path.join(m01dir,d02_fname)
+        d02_nc = Dataset(d02_fpath)
+        d02_lats = d02_nc.variables['XLAT'][0,:,:]
+        d02_lons = d02_nc.variables['XLONG'][0,:,:]
 
-        # TODO: we just need to loop to check the lat/lon
-        # files have been created, or create them. We can
-        # delete the lat/lon array files, and not load them.
-        if os.path.exists(d02_latf):
-            # d02_lats = N.load(d02_latf)
-            # d02_lons = N.load(d02_lonf)
-            pass
-        else:
-            d02_fname = get_wrfout_fname(initutc,2)
-            d02_fpath = os.path.join(m01dir,d02_fname)
-            d02_nc = Dataset(d02_fpath)
-            d02_lats = d02_nc.variables['XLAT'][0,:,:]
-            d02_lons = d02_nc.variables['XLONG'][0,:,:]
+        utils.trycreate(d02_latf,debug=False)
+        _save(arr=d02_lats,file=d02_latf)
+        _save(arr=d02_lons,file=d02_lonf)
 
-            utils.trycreate(d02_latf,debug=False)
-            N.save(arr=d02_lats,file=d02_latf)
-            N.save(arr=d02_lons,file=d02_lonf)
+    # d01
+    d01_latf, d01_lonf = get_llf_fpath(casestr,"d01_raw")
 
-        # d01
-        d01_latf, d01_lonf = get_llf_fpath(casestr,"d01_raw")
+    if os.path.exists(d01_latf):
+        # d01_lats = N.load(d01_latf)
+        # d01_lons = N.load(d01_lonf)
+        pass
+    else:
+        d01_fname = get_wrfout_fname(initutc,1)
+        d01_fpath = os.path.join(m01dir,d01_fname)
+        d01_nc = Dataset(d01_fpath)
+        d01_lats = d01_nc.variables['XLAT'][0,:,:]
+        d01_lons = d01_nc.variables['XLONG'][0,:,:]
 
-        if os.path.exists(d01_latf):
-            # d01_lats = N.load(d01_latf)
-            # d01_lons = N.load(d01_lonf)
-            pass
-        else:
-            d01_fname = get_wrfout_fname(initutc,1)
-            d01_fpath = os.path.join(m01dir,d01_fname)
-            d01_nc = Dataset(d01_fpath)
-            d01_lats = d01_nc.variables['XLAT'][0,:,:]
-            d01_lons = d01_nc.variables['XLONG'][0,:,:]
+        utils.trycreate(d01_latf,debug=False)
+        _save(arr=d01_lats,file=d01_latf)
+        _save(arr=d01_lons,file=d01_lonf)
 
-            utils.trycreate(d01_latf,debug=False)
-            N.save(arr=d01_lats,file=d01_latf)
-            N.save(arr=d01_lons,file=d01_lonf)
-
-        # STAGE IV
+    # STAGE IV
+    if "ST4" in obs_vrbls:
         st4_latf, st4_lonf = get_llf_fpath(casestr,"stageiv_raw")
         if os.path.exists(st4_latf):
             # st4_lats = N.load(st4_latf)
@@ -804,38 +874,39 @@ if not skipthis:
             assert st4_lats.ndim == 2
 
             utils.trycreate(st4_latf,debug=False)
-            N.save(arr=st4_lats,file=st4_latf)
-            N.save(arr=st4_lons,file=st4_lonf)
+            _save(arr=st4_lats,file=st4_latf)
+            _save(arr=st4_lons,file=st4_lonf)
 
-        # MRMS LLAWS/MLAWS (rot)
-        mrms_aws_latf, mrms_aws_lonf = get_llf_fpath(casestr,"mrms_aws_raw")
-        if os.path.exists(mrms_aws_latf):
-            # mrms_aws_lats = N.load(mrms_aws_latf)
-            # mrms_aws_lons = N.load(mrms_aws_lonf)
-            pass
-        else:
-            # mrms_fpath = get_mrms_rotdz_fpath(caseutc)
-            # mrms_rotdz_nc = Dataset(mrms_fpath)
-            mrms_aws_lats,mrms_aws_lons = get_mrms_rotdz_grid(caseutc,"AWS02")
-            utils.trycreate(mrms_aws_latf,debug=False)
-            N.save(arr=mrms_aws_lats,file=mrms_aws_latf)
-            N.save(arr=mrms_aws_lons,file=mrms_aws_lonf)
+    # MRMS LLAWS/MLAWS (rot)
+    mrms_aws_latf, mrms_aws_lonf = get_llf_fpath(casestr,"mrms_aws_raw")
+    if os.path.exists(mrms_aws_latf):
+        # mrms_aws_lats = N.load(mrms_aws_latf)
+        # mrms_aws_lons = N.load(mrms_aws_lonf)
+        pass
+    else:
+        # mrms_fpath = get_mrms_rotdz_fpath(caseutc)
+        # mrms_rotdz_nc = Dataset(mrms_fpath)
+        mrms_aws_lats,mrms_aws_lons = get_mrms_rotdz_grid(caseutc,"AWS02")
+        utils.trycreate(mrms_aws_latf,debug=False)
+        _save(arr=mrms_aws_lats,file=mrms_aws_latf)
+        _save(arr=mrms_aws_lons,file=mrms_aws_lonf)
 
-        # MRMS DZ (cref)
-        mrms_dz_latf, mrms_dz_lonf = get_llf_fpath(casestr,"mrms_dz_raw")
-        if os.path.exists(mrms_dz_latf):
-            # mrms_dz_lats = N.load(mrms_dz_latf)
-            # mrms_dz_lons = N.load(mrms_dz_lonf)
-            pass
-        else:
-            # mrms_fpath = get_mrms_rotdz_fpath(caseutc)
-            # mrms_rotdz_nc = Dataset(mrms_fpath)
-            mrms_dz_lats,mrms_dz_lons = get_mrms_rotdz_grid(caseutc,"DZ")
-            utils.trycreate(mrms_dz_latf,debug=False)
-            N.save(arr=mrms_dz_lats,file=mrms_dz_latf)
-            N.save(arr=mrms_dz_lons,file=mrms_dz_lonf)
+    # MRMS DZ (cref)
+    mrms_dz_latf, mrms_dz_lonf = get_llf_fpath(casestr,"mrms_dz_raw")
+    if os.path.exists(mrms_dz_latf):
+        # mrms_dz_lats = N.load(mrms_dz_latf)
+        # mrms_dz_lons = N.load(mrms_dz_lonf)
+        pass
+    else:
+        # mrms_fpath = get_mrms_rotdz_fpath(caseutc)
+        # mrms_rotdz_nc = Dataset(mrms_fpath)
+        mrms_dz_lats,mrms_dz_lons = get_mrms_rotdz_grid(caseutc,"DZ")
+        utils.trycreate(mrms_dz_latf,debug=False)
+        _save(arr=mrms_dz_lats,file=mrms_dz_latf)
+        _save(arr=mrms_dz_lons,file=mrms_dz_lonf)
 
-        # NEXRAD raw
+    # NEXRAD raw
+    if "NEXRAD" in obs_vrbls:
         nexrad_latf, nexrad_lonf = get_llf_fpath(casestr,"nexrad_raw")
         if os.path.exists(nexrad_latf):
             pass
@@ -845,51 +916,51 @@ if not skipthis:
             assert nexrad_lats.ndim == 2
             
             utils.trycreate(nexrad_latf,debug=False)
-            N.save(arr=nexrad_lats,file=nexrad_latf)
-            N.save(arr=nexrad_lons,file=nexrad_lonf)
+            _save(arr=nexrad_lats,file=nexrad_latf)
+            _save(arr=nexrad_lons,file=nexrad_lonf)
 
-        # Neutral grid
-        neutral_latf, neutral_lonf = get_llf_fpath(casestr,"neutral")
-        if os.path.exists(neutral_latf):
-            # neutral_lats = N.load(neutral_latf)
-            # neutral_lons = N.load(neutral_lonf)
-            pass
-        else:
-            d02_fname = get_wrfout_fname(initutc,2)
-            d02_fpath = os.path.join(m01dir,d02_fname)
-            d02_nc = Dataset(d02_fpath)
+    # Neutral grid
+    neutral_latf, neutral_lonf = get_llf_fpath(casestr,"neutral")
+    if os.path.exists(neutral_latf):
+        # neutral_lats = N.load(neutral_latf)
+        # neutral_lons = N.load(neutral_lonf)
+        pass
+    else:
+        d02_fname = get_wrfout_fname(initutc,2)
+        d02_fpath = os.path.join(m01dir,d02_fname)
+        d02_nc = Dataset(d02_fpath)
 
-            d02_GRID = CaseGrid(d02_nc)
-            # pdb.set_trace()
-            neutral_lats, neutral_lons = d02_GRID.return_latlons()
-            utils.trycreate(neutral_latf,debug=False)
-            N.save(arr=neutral_lats,file=neutral_latf)
-            N.save(arr=neutral_lons,file=neutral_lonf)
+        d02_GRID = CaseGrid(d02_nc)
+        # pdb.set_trace()
+        neutral_lats, neutral_lons = d02_GRID.return_latlons()
+        utils.trycreate(neutral_latf,debug=False)
+        _save(arr=neutral_lats,file=neutral_latf)
+        _save(arr=neutral_lons,file=neutral_lonf)
 
-        # One last to compute:
-        ### d01_3km (d01 cut to d02_raw bounds)
+    # One last to compute:
+    ### d01_3km (d01 cut to d02_raw bounds)
 
-        d01_3km_latf, d01_3km_lonf = get_llf_fpath(casestr,"d01_3km")
-        if os.path.exists(d01_3km_latf):
-        #    neutral_lats = N.load(neutral_latf)
-        #    neutral_lons = N.load(neutral_lonf)
-            pass
-        else:
-            d01_latf, d01_lonf = get_llf_fpath(casestr,"d01_raw")
-            d02_latf, d02_lonf = get_llf_fpath(casestr,"d02_raw")
-            d01_lats = N.load(d01_latf)
-            d01_lons = N.load(d01_lonf)
-            d02_lats = N.load(d02_latf)
-            d02_lons = N.load(d02_lonf)
-            # new_lats,new_lons = interpolate(None,d01_lats,d01_lons,d02_lats,d02_lons,cut_only=True)
-            new_lats,new_lons = utils.return_subdomain(None,d01_lats,d01_lons,cut_to_lats=d02_lats,cut_to_lons=d02_lons)
-            #new_lats,new_lons = utils.return_subdomain(data=None,lats=d01_lats,
-            #                            lons=d01_lons,cut_to_lats=d02_lats,
-            #                            cut_to_lons=d02_lons)
-            utils.trycreate(d01_3km_latf,debug=False)
-            N.save(arr=new_lats,file=d01_3km_latf)
-            N.save(arr=new_lons,file=d01_3km_lonf)
-            # pdb.set_trace()
+    d01_3km_latf, d01_3km_lonf = get_llf_fpath(casestr,"d01_3km")
+    if os.path.exists(d01_3km_latf):
+    #    neutral_lats = N.load(neutral_latf)
+    #    neutral_lons = N.load(neutral_lonf)
+        pass
+    else:
+        d01_latf, d01_lonf = get_llf_fpath(casestr,"d01_raw")
+        d02_latf, d02_lonf = get_llf_fpath(casestr,"d02_raw")
+        d01_lats = N.load(d01_latf)
+        d01_lons = N.load(d01_lonf)
+        d02_lats = N.load(d02_latf)
+        d02_lons = N.load(d02_lonf)
+        # new_lats,new_lons = interpolate(None,d01_lats,d01_lons,d02_lats,d02_lons,cut_only=True)
+        new_lats,new_lons = utils.return_subdomain(None,d01_lats,d01_lons,cut_to_lats=d02_lats,cut_to_lons=d02_lons)
+        #new_lats,new_lons = utils.return_subdomain(data=None,lats=d01_lats,
+        #                            lons=d01_lons,cut_to_lats=d02_lats,
+        #                            cut_to_lons=d02_lons)
+        utils.trycreate(d01_3km_latf,debug=False)
+        _save(arr=new_lats,file=d01_3km_latf)
+        _save(arr=new_lons,file=d01_3km_lonf)
+        # pdb.set_trace()
 
 # Now the grids are there!
 
@@ -905,68 +976,11 @@ if not skipthis:
 
 #### FIRST: forecast
 # for caseutc, initutc, mem, vrbl in generate_fcst_loop():
-def gather_commands_one(i):
-    commands = []
-    caseutc, initutc, mem, vrbl = i
-
-    initstr = utils.string_from_time('dir',initutc,strlen='hour')
-    casestr = utils.string_from_time('dir',caseutc,strlen='day')
-    memdir = os.path.join(ensroot,initstr,mem)
-    print("Appending interpolation commands for",mem,"forecast grids of",vrbl,"on", initstr)
-
-    for validutc in generate_valid_utcs(initutc):
-        print(stars,validutc,stars)
-        ### d01_3km (d01 cut to d02)
-        save_to_fpath = get_extraction_fpaths(vrbl,"d01_3km",validutc,
-                            caseutc=caseutc,initutc=initutc,mem=mem)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="d01_raw",validutc=validutc,
-                                caseutc=caseutc,initutc=initutc,mem=mem)
-            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,True,save_to_fpath))
-
-        ### d02_1km - should be a simple one...
-        ### todo: compare interp to raw data! They should be very similar
-        save_to_fpath = get_extraction_fpaths(vrbl,"d02_1km",validutc,
-                            caseutc=caseutc,initutc=initutc,mem=mem)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="d02_raw",validutc=validutc,
-                                caseutc=caseutc,initutc=initutc,mem=mem)
-            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-
-        ### d02_3km (d02 interpolated to 3 km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"d02_3km",validutc,
-                            caseutc=caseutc,initutc=initutc,mem=mem)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="d02_raw",validutc=validutc,
-                                caseutc=caseutc,initutc=initutc,mem=mem)
-            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-    return commands
-
-
-
-# for vrbl, validutc, caseutc in generate_obs_loop():
-def gather_commands_two(i):
-    commands = []
-    vrbl, validutc, caseutc = i
-    print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
-    do_mrms = False
-    if do_mrms:
-        ### mrms_aws_1km (AWS data interpolated to d02_1km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
-                                    caseutc=caseutc,)
-            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-    return commands
 
 ### GENERATE COMMAND LISTS
-
+print("GENERATING COMMAND LISTS.")
 ### These 3 lines are only for speeding up testing
-speed_up_debug = "uh_inst.p"
+speed_up_debug = "march25.p"
 sud = speed_up_debug
 if sud and (os.path.exists(sud)):
     with open(sud,'rb') as f:
@@ -986,6 +1000,8 @@ else:
                 all_cmd.append(some_cmd)
     join_all_cmd = all_cmd[0] + all_cmd[1]
 
+print("SUBMIT JOBS.")
+
 # Now to submit them
 check_in_serial = False
 
@@ -1003,70 +1019,87 @@ else:
     with multiprocessing.Pool(ncpus) as pool:
         pool.map(submit_interp,itr)
 
+print("GENERATING COMMANDS FOR OBS GRIDS.")
 # New loop for obs data
 commands = []
 
 for vrbl, validutc, caseutc in generate_obs_loop():
     print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
 
-    # NEXRAD
-    save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)
-    if not os.path.exists(save_to_fpath):
-        data,latsA,lonsA = get_data(vrbl=vrbl,fmt="nexrad_raw",validutc=validutc,
-                                caseutc=caseutc,)
-        latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
-        commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-
-    save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_3km",validutc,caseutc)
-    if not os.path.exists(save_to_fpath):
-        data,latsA,lonsA = get_data(vrbl=vrbl,fmt="nexrad_raw",validutc=validutc,
-                                caseutc=caseutc,)
-        latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
-        commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-
-    # MRMS prods
-    do_mrms = False
-    if do_mrms:
-        # mrms_aws_3km (AWS 1km data interpolated to d01_3km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)
+    do_nexrad = False
+    do_5km = False
+    if do_nexrad:
+        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)
         if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_1km",validutc=validutc,
-                                    caseutc=caseutc,)
-            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-
-        # mrms_aws_5km (AWS 1km data interpolated to d01_5km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_1km",validutc=validutc,
-                                    caseutc=caseutc,)
-            latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
-
-        # mrms_dz_1km (cref data interpolated to d02_1km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_raw",validutc=validutc,
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="nexrad_raw",validutc=validutc,
                                     caseutc=caseutc,)
             latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
             commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
-        # mrms_dz_3km (cref 1km data interpolated to d02_3km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)
+        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_3km",validutc,caseutc)
         if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_1km",validutc=validutc,
-                                    caseutc=caseutc)
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="nexrad_raw",validutc=validutc,
+                                    caseutc=caseutc,)
             latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
             commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
-        # mrms_dz_5km (cref 1km data interpolated to d02_5km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc,caseutc)
+    # MRMS prods
+    do_mrms = True
+    if do_mrms:
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
         if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_1km",validutc=validutc,
-                                    caseutc=caseutc)
-            latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
+            # data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_1km",validutc=validutc,
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
             commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
+        # mrms_aws_3km (AWS 1km data interpolated to d01_3km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            # data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_1km",validutc=validutc,
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        if do_5km:
+            # mrms_aws_5km (AWS 1km data interpolated to d01_5km)
+            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)
+            if not os.path.exists(save_to_fpath):
+                # data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_1km",validutc=validutc,
+                data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                        caseutc=caseutc,)
+                latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
+                commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        # mrms_dz_1km (cref data interpolated to d02_1km)
+        if vrbl is "DZ":
+            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)
+            if not os.path.exists(save_to_fpath):
+                data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_raw",validutc=validutc,
+                                        caseutc=caseutc,)
+                latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+                commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+            # mrms_dz_3km (cref 1km data interpolated to d02_3km)
+            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)
+            if not os.path.exists(save_to_fpath):
+                data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_raw",validutc=validutc,
+                                        caseutc=caseutc)
+                latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+                commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+            if do_5km:
+                # mrms_dz_5km (cref 1km data interpolated to d02_5km)
+                save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc,caseutc)
+                if not os.path.exists(save_to_fpath):
+                    data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_raw",validutc=validutc,
+                                            caseutc=caseutc)
+                    latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
+                    commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+    if do_5km:
         # stageiv_5km (Stage IV data interpolated to neutral)
         save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)
         if not os.path.exists(save_to_fpath):
@@ -1075,7 +1108,7 @@ for vrbl, validutc, caseutc in generate_obs_loop():
             latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
             commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
-
+print("SUBMITTING INTERPOLATION COMMANDS.")
 if ncpus == 1:
     for co in commands:
         toprint = ["{}\n".format(c) for c in co]
