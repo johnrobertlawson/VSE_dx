@@ -102,11 +102,14 @@ FCST_VRBLS = ("Wmax","UH02","UH25","RAINNC","REFL_comp","UP_HELI_MAX")
 OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
 
 # These are the requests variables
-fcst_vrbls = list()
-# fcst_vrbls = ("UH25",)
+fcst_vrbls = ("UH25",)
 # "NEXRAD"
-# obs_vrbls = list()
 obs_vrbls = ("AWS25",)
+
+# Don't allow computation without both fcst and obs data requested
+# The WRF files are needed for lat/lon for interp.
+# Maybe not needed once lats.npy and lons.npy are created
+assert fcst_vrbls and obs_vrbls
 
 debug_mode = True
 # fcstmins = N.arange(0,185,5)
