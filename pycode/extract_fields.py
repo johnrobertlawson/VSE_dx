@@ -93,7 +93,7 @@ stars = "*"*10
 dom_names = ("d01","d02")
 # member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 # member_names = ['m{:02d}'.format(n) for n in range(1,19)]
-member_names = ['m{:02d}'.format(n) for n in range(1,5)]
+member_names = ['m{:02d}'.format(n) for n in range(1,2)]
 # doms = (1,2)
 
 # THESE are all possible variables in the script
@@ -101,17 +101,19 @@ member_names = ['m{:02d}'.format(n) for n in range(1,5)]
 FCST_VRBLS = ("Wmax","UH02","UH25","RAINNC","REFL_comp","UP_HELI_MAX")
 OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
 
-# These are the requests variables
-fcst_vrbls = ("UH25",)
 # "NEXRAD"
-obs_vrbls = ("AWS25",)
+# These are the requests variables
+# fcst_vrbls = ("UH25",)
+fcst_vrbls = ("REFL_comp",)
+# obs_vrbls = ("AWS25",)
+obs_vrbls = ("DZ",)
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
 # Maybe not needed once lats.npy and lons.npy are created
 assert fcst_vrbls and obs_vrbls
 
-debug_mode = True
+debug_mode = False
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
@@ -334,8 +336,9 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
 
         # d01_nc = get_random_d01(caseutc)
         data = _unsparsify(vrbl=key,mrms_nc=mrms_nc,)#d01_nc=d01_nc)
-        data[data<-100] = N.nan
-        data[data>100] = N.nan
+        with N.errstate(invalid='ignore'):
+            data[data<-100] = N.nan
+            data[data>100] = N.nan
         # pdb.set_trace()
 
     elif fmt == "stageiv_raw":
@@ -350,7 +353,7 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
 
     else:
         print("fmt not valid.")
-        pdb.set_trace()
+        assert True is False
 
     # This is now done in _save function
     # if N.ma.is_masked(data):
@@ -431,13 +434,16 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
     assert latsA.ndim == 2
     assert latsB.ndim == 2
 
-    pdb.set_trace()
     if cut_only:
         assert dataA is not None
         dataB, _latsB, _lonsB = utils.return_subdomain(dataA,latsA,lonsA,cut_to_lats=latsB,
                                 cut_to_lons=lonsB)
     else:
         if cut_first:
+            # _dataA = N.copy(dataA)
+            # _latsA = N.copy(latsA)
+            # _lonsA = N.copy(lonsA)
+
             Nlim = N.max(latsB)+0.5
             Elim = N.max(lonsB)+0.5
             Slim = N.min(latsB)-0.5
@@ -448,12 +454,23 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
             Sidx = closest(latsA[:,0],Slim)
             Widx = closest(lonsA[0,:],Wlim)
 
-            s1 = slice(Sidx,Nidx+1)
-            s2 = slice(Widx,Eidx+1)
+            old_method = False
+            if old_method:
+                s1 = slice(Sidx,Nidx+1)
+                s2 = slice(Widx,Eidx+1)
 
-            dataA = dataA[s1,s2]
-            latsA = latsA[s1,s2]
-            lonsA = lonsA[s1,s2]
+                dataA = dataA[s1,s2]
+                latsA = latsA[s1,s2]
+                lonsA = lonsA[s1,s2]
+
+            else:
+                dataA = dataA[Sidx:Nidx+1,Widx:Eidx+1]
+                latsA = latsA[Sidx:Nidx+1,Widx:Eidx+1]
+                lonsA = lonsA[Sidx:Nidx+1,Widx:Eidx+1]
+
+
+            # if "mrms" in save_to_fpath:
+                # pdb.set_trace()
 
         bmap = create_bmap()
         xxA, yyA = bmap(lonsA,latsA)
@@ -461,11 +478,20 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
         xdB = len(xxB[:,0])
         ydB = len(yyB[0,:])
         # if "nexrad" in save_to_fpath:
+        if "mrms" in save_to_fpath:
+            # print("MRMS")
+            dataA = N.copy(dataA)
+            xxA = N.copy(xxA)
+            yyA = N.copy(yyA)
+            xxB = N.copy(xxB)
+            yyB = N.copy(yyB)
+            # pdb.set_trace()
         dataB = scipy.interpolate.griddata(points=(xxA.flat,yyA.flat),
                                             values=dataA.flat,
                                             xi=(xxB.flat,yyB.flat),
                                             method='linear').reshape(xdB,ydB)
-    pdb.set_trace()
+    # if "mrms" in save_to_fpath:
+        # pdb.set_trace()
     if save_to_fpath is not None:
         utils.trycreate(save_to_fpath,debug=False)
         _save(arr=dataB,file=save_to_fpath)
@@ -493,7 +519,10 @@ def generate_itr_from_commands(commands):
         yield c
 
 def generate_valid_utcs(initutc):
-    utc1 = initutc + datetime.timedelta(seconds=3600*3)
+    if debug_mode:
+        utc1 = initutc + datetime.timedelta(seconds=25*60)
+    else:
+        utc1 = initutc + datetime.timedelta(seconds=3600*3)
     # utc1 = initutcs[-1] + datetime.timedelta(seconds=maxsec)
     utc = initutc
     # print("Generate until"utc1)
@@ -510,7 +539,7 @@ def generate_obs_loop():
             # Earliest time:
             utc0 = initutcs[0]
             # Latest time is 3 hours after the latest initialisation
-            secs = 3600*3 if not debug_mode else 60*15
+            secs = 3600*3 if not debug_mode else 60*25
             utc1 = initutcs[-1] + datetime.timedelta(seconds=secs)
             # utc1 = initutcs[-1] + datetime.timedelta(seconds=maxsec)
 
@@ -556,7 +585,9 @@ def _unsparsify(mrms_nc,vrbl,d01_nc=False):
     # return mrms_low_x_y
     # return unsparsify.do_unsparsify(mrms_nc,vrbl,d01_nc)
     x1,ulat,y1,ulon, varname,ref1 = readwdssii(mrms_nc)
-    return ref1
+    # pdb.set_trace()
+    output = N.flipud(ref1)
+    return output
 
 
 def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):
@@ -579,10 +610,12 @@ def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):
 
     ss = slice(0,nlat*dlat,dlat)
     _x, _y = N.mgrid[ss,ss]
-    lats = _x + ullat
+    lats = -1.0 * (_x - ullat)
     lons = _y + ullon
 
-    return lats,lons
+    # pdb.set_trace()
+
+    return N.flipud(lats),lons
 
 def return_all_mrms(caseutc,vrbl):
     """ Return sorted dictionary of times and files.
@@ -733,6 +766,7 @@ def gather_commands_one(i):
                                 caseutc=caseutc,initutc=initutc,mem=mem)
             latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
             commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+    # pdb.set_trace()
     return commands
 
 
@@ -742,15 +776,24 @@ def gather_commands_two(i):
     commands = []
     vrbl, validutc, caseutc = i
     # print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
-    do_mrms = False
-    if do_mrms:
-        ### mrms_aws_1km (AWS data interpolated to d02_1km)
-        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
-        if not os.path.exists(save_to_fpath):
-            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
-                                    caseutc=caseutc,)
-            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
-            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+    ### mrms_aws_1km (AWS data interpolated to d02_1km)
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                caseutc=caseutc,)
+        latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+        commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+    ### mrms_aws_1km (AWS data interpolated to d01_3km)
+    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)
+    if not os.path.exists(save_to_fpath):
+        data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                caseutc=caseutc,)
+        latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+        commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+    # pdb.set_trace()
     return commands
 
 ######### PROCEDURE #########
@@ -982,33 +1025,26 @@ for caseutc, initutcs in CASES.items():
 
 ### GENERATE COMMAND LISTS
 print("GENERATING COMMAND LISTS.")
-### These 3 lines are only for speeding up testing
-speed_up_debug = "march25.p"
-sud = speed_up_debug
-if sud and (os.path.exists(sud)):
-    with open(sud,'rb') as f:
-        join_all_cmd = pickle.load(f)
-else:
-    all_cmd = []
-    for func, genfunc in zip([gather_commands_one,gather_commands_two],
-    # for func, genfunc in zip([gather_commands_one,],
-                    [generate_fcst_loop,generate_obs_loop]):
-                    # [generate_fcst_loop,]):
-        if ncpus == 1:
-            for i in genfunc():
-                all_cmd.append(func(i))
-        else:
-            with multiprocessing.Pool(ncpus) as pool:
-                some_cmd = pool.map(func,genfunc())
-                all_cmd.append(some_cmd)
-    join_all_cmd = all_cmd[0] + all_cmd[1]
+
+all_cmd = []
+for func, genfunc in zip([gather_commands_one,gather_commands_two],
+# for func, genfunc in zip([gather_commands_one,],
+                [generate_fcst_loop,generate_obs_loop]):
+                # [generate_fcst_loop,]):
+    if ncpus == 1:
+        for i in genfunc():
+            all_cmd.append(func(i))
+    else:
+        with multiprocessing.Pool(ncpus) as pool:
+            some_cmd = pool.map(func,genfunc())
+            all_cmd.append(some_cmd)
+join_all_cmd = all_cmd[0] + all_cmd[1]
 
 print("SUBMIT JOBS.")
 
 # Now to submit them
 check_in_serial = False
 
-join_all_cmd = [el for sublist in join_all_cmd for el in sublist]
 
 if (ncpus == 1) or (check_in_serial):
     for co in join_all_cmd:
@@ -1018,7 +1054,10 @@ if (ncpus == 1) or (check_in_serial):
         print(stars,stars,"DONE!",stars,stars)
         # pdb.set_trace()
 else:
-    itr = generate_itr_from_commands(join_all_cmd)
+    join_all_cmd = [el for sublist in join_all_cmd for el in sublist]
+    # itr = generate_itr_from_commands(join_all_cmd)
+    itr = join_all_cmd
+    # pdb.set_trace()
     with multiprocessing.Pool(ncpus) as pool:
         pool.map(submit_interp,itr)
 

@@ -29,6 +29,7 @@ from evac.plot.performance import Performance
 from fiss import FISS
 from evac.object.objectid import ObjectID
 from evac.object.catalogue import Catalogue
+from evac.plot.scales import Scales
 
 ### ARG PARSE ####
 parser = argparse.ArgumentParser()
@@ -156,6 +157,7 @@ OBS_CODES = {
                 "AWS02": 'mrms_dz',
                 "AWS25":'mrms_aws',
                 "ST4":'stageiv',
+                "DZ":"mrms_dz",
                 }
 
 
@@ -220,13 +222,14 @@ def round_nearest(x,a,method='floor'):
                 'round':N.round,}
     return FUNCS[method](x/a) * a
 
-def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None):
+def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None,
+                    proj="lcc",):
     bmap = Basemap(
                 # width=12000000,height=9000000,
                 urcrnrlat=urcrnrlat,urcrnrlon=urcrnrlon,
                 llcrnrlat=llcrnrlat,llcrnrlon=llcrnrlon,
                 rsphere=(6378137.00,6356752.3142),
-                resolution='l',projection='lcc',ax=ax,
+                resolution='l',projection=proj,ax=ax,
                 lat_1=45.,lat_2=55,lat_0=50,lon_0=-107.0)
     return bmap
 
@@ -353,7 +356,7 @@ def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
         obs_fpath = get_extraction_fpaths(vrbl=obs_vrbl,fmt=obs_fmt,
                         validutc=validutc,caseutc=caseutc)
         obs_data = N.load(obs_fpath)
-        pdb.set_trace()
+        # pdb.set_trace()
 
         return fcst_data, obs_data
 
@@ -423,8 +426,14 @@ def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='al
 def load_latlons(fmt,caseutc):
     if fmt == "d02_1km":
         fmt = "d02_raw"
+    elif fmt == "d01_raw":
+        print("Loading raw (uncut?) d01 lat/lons")
     elif fmt == "d01_3km":
-        fmt = "d01_raw"
+        print("Loading raw (3km) d01 lat/lons")
+    # elif fmt == "d01_3km":
+        # fmt = "d01_raw"
+    else:
+        raise Exception
 
     casestr = utils.string_from_time('dir',caseutc,strlen='day')
     ret = []
@@ -901,49 +910,60 @@ PROD = {
 
 if do_plot_test:
     print(stars,"TESTS",stars)
+
     fcst_vrbl = "UH25"
-    fcst_fmt = "d02_1km"
+    # for fcst_fmt in ("d02_1km","d01_3km"):
+    for fcst_fmt in ("d01_3km","d02_1km"):
+    # fcst_fmt = "d02_1km"
+        kmstr = "1km" if "1km" in fcst_fmt else "3km"
 
-    for caseutc,initutcs in CASES.items():
-        initutc = initutcs[0]
-        for fm in all_fcstmins:
-        # for fm in (30,80,85,90,95,100,180):
-        # for fm in (5,10,15):
-            fname = "test_UH_AWS_{:03d}min.png".format(int(fm))
-            fpath = os.path.join(outroot,fname)
+        for caseutc,initutcs in CASES.items():
+            initutc = initutcs[0]
+            for fm in all_fcstmins:
+            # for fm in (30,80,85,90,95,100,180):
+            # for fm in (5,10,15):
+                fname = "test_UH_AWS_{:03d}min_{}.png".format(int(fm),kmstr)
+                fpath = os.path.join(outroot,fname)
 
-            validutc = initutc+datetime.timedelta(seconds=60*int(fm))
-            fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
-                        validutc=validutc,caseutc=caseutc,initutc=initutc,
-                        mem="m01")
-            lats, lons = load_latlons(fcst_fmt,caseutc)
+                validutc = initutc+datetime.timedelta(seconds=60*int(fm))
+                # fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
+                            # validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
+                lats, lons = load_latlons(fcst_fmt,caseutc)
 
-            fig,axes = plt.subplots(nrows=1,ncols=2)
+                fig,axes = plt.subplots(nrows=2,ncols=2,figsize=(8,5))
 
-            # left figure: obs
-            ax = axes.flat[0]
-            bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
-                                llcrnrlat=lats.min(),llcrnrlon=lons.min(),
-                                ax=ax)
-            x,y = bmap(lons,lats)
-            cf = bmap.contourf(x,y,obs_data)
-            plt.colorbar(cf)
+                # left figure: obs
+                for nax, ax in enumerate(axes.flat):
+                    fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp" 
+                    fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
+                            validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
+                    bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
+                                        llcrnrlat=lats.min(),llcrnrlon=lons.min(),
+                                        ax=ax,proj="merc")
+                    # bmap.drawcounties()
+                    bmap.drawstates()
+                    x,y = bmap(lons,lats)
 
-            # right figure: fcst
-            ax = axes.flat[1]
-            bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
-                                llcrnrlat=lats.min(),llcrnrlon=lons.min(),
-                                ax=ax)
-            x,y = bmap(lons,lats)
-            cf = bmap.contourf(x,y,fcst_data)
-            plt.colorbar(cf)
-            
-            fig.tight_layout()
-            utils.trycreate(fpath)
-            fig.savefig(fpath)
-            print("saved to",fpath)
-            plt.close(fig)
-            pdb.set_trace()
+                    S = Scales('cref')
+                    if nax in (0,1):
+                        kw = dict(alpha=0.5,levels=N.arange(0.001,0.50,0.001))
+                    else:
+                        kw = dict(levels=N.arange(5,95),cmap=S.cm)
+
+                    if nax in (0,2):
+                        cf = bmap.contourf(x,y,obs_data,**kw)
+                        ax.set_title("Obs")
+                    else:
+                        cf = bmap.contourf(x,y,fcst_data,**kw)
+                        ax.set_title("Fcst")
+                
+                fig.tight_layout()
+                utils.trycreate(fpath)
+                fig.savefig(fpath)
+                print("saved to",fpath)
+                plt.close(fig)
+                # pdb.set_trace()
+                pass
 
 
 if do_domains:

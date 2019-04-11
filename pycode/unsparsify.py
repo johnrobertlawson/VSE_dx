@@ -1,4 +1,5 @@
 import glob
+import pdb
 
 import netCDF4 as nc
 import numpy as np
@@ -74,8 +75,9 @@ def readwdssii(fin):
     except:
         print('except')
         return xlen,ylen,varname,0
+
+    # pdb.set_trace()
     a.close()
-    del(a)
 
     return xlen, lat, ylen, lon, varname, var
 
