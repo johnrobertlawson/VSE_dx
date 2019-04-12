@@ -49,7 +49,7 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
-do_plot_test = True
+do_plot_test = False
 
 do_domains = False
 do_performance = False

@@ -29,7 +29,6 @@ BoxPlot	verif_parallel.py	/^from evac.plot.boxplot import BoxPlot$/;"	i
 CASES	_alt_verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
 CASES	_old_verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
 CASES	extract_fields.py	/^CASES = collections.OrderedDict()$/;"	v
-CASES	extract_fields.py	/^CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } $/;"	v
 CASES	new_verif_parallel.py	/^CASES = collections.OrderedDict()$/;"	v
 CASES	new_verif_parallel.py	/^CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } $/;"	v
 CASES	old_verif.py	/^CASES = collections.OrderedDict()$/;"	v
@@ -493,7 +492,7 @@ fcst_pp	test_kde.py	/^    fcst_pp = N.empty([nlat,nlon])$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^                    fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp" $/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "REFL_comp"$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "UH25"$/;"	v
-fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("REFL_comp",)$/;"	v
+fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")$/;"	v
 fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")$/;"	v
 fcstmins	_alt_verif_parallel.py	/^fcstmins = N.arange(0,185,5)$/;"	v
 fcstmins	_test_newruns.py	/^fcstmins = range(30,210,30)$/;"	v
@@ -737,7 +736,7 @@ maxsize	_old_verif_parallel.py	/^    maxsize = max(xfs_all.shape[2:])$/;"	v
 megaframe	new_verif_parallel.py	/^    megaframe = load_megaframe(fmts=all_fmts)$/;"	v
 megaframe	new_verif_parallel.py	/^    megaframe = megaframe_all[(megaframe_all['case_code'] == '20160331') &$/;"	v
 megaframe_all	new_verif_parallel.py	/^    megaframe_all = load_megaframe(fmts=all_fmts)$/;"	v
-member_names	extract_fields.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,2)]$/;"	v
+member_names	extract_fields.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,37)]$/;"	v
 member_names	new_verif_parallel.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,37)]$/;"	v
 member_names	verif_parallel.py	/^member_names = ['m{:02d}'.format(n) for n in range(1,37)]$/;"	v
 membernames	run_experiments.py	/^            membernames = membernames,$/;"	v
@@ -810,7 +809,7 @@ objectroot	new_verif_parallel.py	/^objectroot = os.path.join(extractroot,'object
 obs_fmts	new_verif_parallel.py	/^    obs_fmts = ("nexrad_3km","nexrad_1km")$/;"	v
 obs_grid	_old_verif_parallel.py	/^    obs_grid = NEWGRID$/;"	v
 obs_vrbl	new_verif_parallel.py	/^    obs_vrbl = "NEXRAD"$/;"	v
-obs_vrbls	extract_fields.py	/^obs_vrbls = ("DZ",)$/;"	v
+obs_vrbls	extract_fields.py	/^obs_vrbls = ("DZ","AWS25","AWS02")$/;"	v
 obs_vrbls	new_verif_parallel.py	/^obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 og_nl_path	run_experiments.py	/^        og_nl_path = wofdir \/ 'mem1' \/ 'namelist.input'$/;"	v
 onlydo	generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
