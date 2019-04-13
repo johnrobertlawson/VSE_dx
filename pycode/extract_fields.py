@@ -103,11 +103,11 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
 
 # "NEXRAD"
 # These are the requests variables
-# fcst_vrbls = ("UH25",)
+fcst_vrbls = ("UH25",)
 #fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
-fcst_vrbls = ("Wmax","RAINNC")
+# fcst_vrbls = ("Wmax","RAINNC")
 # obs_vrbls = ("AWS25",)
-obs_vrbls = ("DZ","AWS25","AWS02",)#"ST4")
+obs_vrbls = ("DZ","AWS25","AWS02","ST4")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
@@ -778,21 +778,54 @@ def gather_commands_two(i):
     vrbl, validutc, caseutc = i
     # print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
 
-    ### mrms_aws_1km (AWS data interpolated to d02_1km)
-    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
-    if not os.path.exists(save_to_fpath):
-        data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
-                                caseutc=caseutc,)
-        latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
-        commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+    if vrbl in ("AWS02","AWS25"):
+        ### mrms_aws_1km (AWS data interpolated to d02_1km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
-    ### mrms_aws_3km (AWS data interpolated to d01_3km)
-    save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)
-    if not os.path.exists(save_to_fpath):
-        data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
-                                caseutc=caseutc,)
-        latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
-        commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+        ### mrms_aws_3km (AWS data interpolated to d01_3km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+    elif vrbl == "DZ":
+        ### mrms_dz_1km (DZ data interpolated to d02_1km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        ### mrms_dz_3km (DZ data interpolated to d01_3km)
+        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_dz_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+    elif vrbl == "ST4":
+        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_1km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="stageiv_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_3km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="stageiv_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
     # pdb.set_trace()
     return commands
