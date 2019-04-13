@@ -127,6 +127,11 @@ all_fcstmins = N.arange(5,185,5)
 # fcst_fmts = ("d01_3km","d02_1km","d02_3km")
 fcst_fmts =  ("d01_3km","d02_1km")
 
+NICENAMES = dict("d01_3km"="EE3km",
+                    "d01_raw"="EE3km",
+                    "d02_raw"="EE1km",
+                    "d02_1km"="EE1km",
+                    "d02_3km"="EE1km-i",)
 
 #### FOR DEBUGGING ####
 CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
@@ -164,6 +169,8 @@ OBS_CODES = {
 ###############################################################################
 ################################# THE FUNCTIONS ###############################
 ###############################################################################
+def get_nice(fmt):
+    return NICENAMES[fmt]
 
 def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     """ Return the file path for the .npy of an interpolated field.
@@ -463,31 +470,43 @@ def do_pca_plots(pca,PC_df,features,fmt):
     utils.trycreate(fpath)
     fig.savefig(fpath)
 
+    # JRL TODO: this needs to be pretty for paper
     ### PCs in feature space ###
-    fname = "pca_test_bar_{}.png".format(fmt)
-    fpath = os.path.join(outroot,"pca",fname)
-    fig,ax = plt.subplots(1,figsize=(8,8))
-    names = []
-    scores = []
-    for n,pc in enumerate(pca.components_):
-        label = "PC #{}".format(n)
-        names.append(label)
-        scores.append(pc*100)
+    for num_feats in (1,3):
+        fname = "pca_test_bar_{}.png".format(fmt)
+        fpath = os.path.join(outroot,"pca",fname)
+        fig,ax = plt.subplots(1,figsize=(8,8))
+        names = []
+        scores = []
+        if num_feats == 1:
+            plot_these_components = pca.components_[:1]
+        else:
+            plot_these_components = pca.components_
 
-    bw = 0.2
-    pos = N.arange(len(features))
-    poss = [pos+(n*bw) for n in (1,0,-1)]
+        # for n,pc in enumerate(pca.components_):
+        # for n,pc in enumerate(pca.components_[:1]):
+        for n,pc in enumerate(plot_these_components):
+            if n == 0:
+                label = "Morph. Index (PC1)"
+            else:
+                label = "PC{}".format(n)
+            names.append(label)
+            scores.append(pc*100)
 
-    for n, (pos,label, scorearray) in enumerate(zip(poss,names,scores)):
-        ax.barh(pos, scorearray, bw, alpha=0.6, align='center',
-                color=RANCOL[n],label=label,
-                tick_label=features,)
-    ax.set_xlabel("Variance explained (%)")
-    ax.set_ylabel("Storm-object characteristic")
-    ax.legend()
-    utils.trycreate(fpath)
-    fig.subplots_adjust(left=0.3)
-    fig.savefig(fpath)
+        bw = 0.2
+        pos = N.arange(len(features))
+        poss = [pos+(n*bw) for n in (1,0,-1)]
+
+        for n, (pos,label, scorearray) in enumerate(zip(poss,names,scores)):
+            ax.barh(pos, scorearray, bw, alpha=0.6, align='center',
+                    color=RANCOL[n],label=label,
+                    tick_label=features,)
+        ax.set_xlabel("Variance explained (%)")
+        ax.set_ylabel("Storm-object characteristic")
+        ax.legend()
+        utils.trycreate(fpath)
+        fig.subplots_adjust(left=0.3)
+        fig.savefig(fpath)
 
     ### Show distribution of PC scores.
     fname = "pca_test_distr_{}.png".format(fmt)
@@ -546,6 +565,7 @@ def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     else:
         fcstmin = int(((utc-initutc).total_seconds())/60)
 
+    # JRL TODO: is this where to convert to NICENAMES?
     kw['prod_code'] = prod
     kw['time_code'] = utc
     kw['lead_time'] = fcstmin
@@ -617,6 +637,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
         mode_df.loc[oidx,"conv_mode"] = conv_mode
     df_og = pandas.concat((df_og,mode_df),axis=1)
     print("Megaframe hacked: convective mode added")
+
+    # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
 
     ########################
     ########################
@@ -1083,7 +1105,7 @@ if do_performance:
 
                 pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
                                 'alpha':ALPHAS[fmt]}
-                lstr = "Domain {}".format(fmt)
+                lstr = get_nice(fmt)
                 print("Plotting",fmt,"to",fpath1)
                 # pdb.set_trace()
                 PD1.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
@@ -1196,6 +1218,10 @@ if do_efss:
                         efss=True)
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return efss.results
+
+    # JRL TODO: change eFSS/FISS threshold variable so it is 
+    # independent (obs/fcst) and can be used to do a 
+    # percentile evaluation, for instance
 
     #threshs = (10,20,30,35,40,45,50,55)
     threshs = (10,20,30,40,45,50)
@@ -1440,6 +1466,8 @@ if object_switch:
 
     # member_names = ['m{:02d}'.format(n) for n in range(2,3)]
 
+    # Append the fcst dataframes for "all object" PCA
+    fcst_dfs = []
     for fcst_fmt, obs_fmt in zip(fcst_fmts,obs_fmts):
         print("Now calculating objects for all forecasts on",fcst_fmt)
         fcst_fname = "all_obj_dataframes_{}.pickle".format(fcst_fmt)
@@ -1465,6 +1493,8 @@ if object_switch:
             pca, PC_df, features, scaler = CAT.do_pca()
             utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
+            fcst_dfs.append(fcst_df)
+            del fcst_df
 
         print("Now calculating objects for all observations on",obs_fmt)
         obs_fname = "all_obj_dataframes_{}.pickle".format(obs_fmt)
@@ -1490,10 +1520,32 @@ if object_switch:
             pca, PC_df, features, scaler = CAT.do_pca()
             utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
+    # Do combined PCA
+    fname = "pca_all_fcst_objs.pickle"
+    fpath = os.path.join(objectroot,fname)
+    
+    all_features = ['area','eccentricity','extent','max_intensity',
+                    'mean_intensity','perimeter','longaxis_km',
+                    # JRL TODO: more features to discriminate
+                    # between the two domains
+                    'max_updraught','ud_distance_from_centroid',
+                    'mean_updraught',
+                    # JRL TODO: az shear! QPF! 
+                    # Will have to hack the megaframe more
+                    ]
+    if (not os.path.exists(fpath)) or overwrite_pp:
+        allobj_df = pandas.concat(fcst_dfs,ignore_index=True)
+        CAT = Catalogue(allobj_df,tempdir=objectroot,ncpus=ncpus)
+        pca, PC_df, features, scaler = CAT.do_pca(all_features)
+        utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+
 if do_object_pca:
     print(stars,"DOING PCA",stars)
-    for fmt in all_fmts:
-        fname = "pca_model_{}.pickle".format(fmt)
+    for fmt in all_fmts.append("all"):
+        if fmt == "all":
+            fname = "pca_all_fcst_objs.pickle"
+        else:
+            fname = "pca_model_{}.pickle".format(fmt)
         fpath = os.path.join(objectroot,fname)
         P = utils.load_pickle(fpath=fpath)
 
@@ -1502,6 +1554,9 @@ if do_object_pca:
         scaler = P['scaler']
         PC_df = P['data']
         do_pca_plots(pca,PC_df,features,fmt)
+
+        # JRL: the QLCS-ness will be called:
+        # Morphology Discrimination Index (MDI)
 
 if do_object_performance:
     print(stars,"DOING OBJ PERFORMANCE",stars)
@@ -1855,18 +1910,32 @@ if do_object_examples:
 if do_object_waffle:
     print(stars,"DOING WAFFLEPLOT",stars)
     # Compute PCA for d01/d02 combined objects, but for cellular only
-    # Dump in every continuous variable
-    # Plot the leading three again - is PC1 the same as previous PC2?
+    # Check the leading PCs again - is PC1 the same as previous PC2?
+
+    fname = "pca_all_fcst_objs.pickle"
+    fpath = os.path.join(objectroot,fname)
+    P = utils.load_pickle(fpath=fpath)
+    pca = P['pca']
+    features = P['features']
+    scaler = P['scaler']
+    PC_df = P['data']
 
     # Then, find which PC corresponds to 'hi-res-ness'
 
-    # Subsample df (0.1?)
+    # Consider looping over all three PCs? Would need to know what
+    # each PC represents in the all-fcst-obs PCA.
+
+    # Subsample df (we need ~200-500 objects to make the waffle)
+    PC_df_sub = PC_df.sample(n=250)
 
     # Then order all objects by that PC
+    # JRL TODO: might need a new df megaframe hack, addition to Morph Index
+    # Could call it the "Resolution Discrimination Index (RDI)"
 
     # Colour each object by domain, but the colour luminosity is PC value.
 
     # Do we see that objects are easily 'recognisable' as from which domain?
+    # Clustering by domain it was simulated on, or random? We would "want" latter.
     pass
 
 if do_object_cluster:
