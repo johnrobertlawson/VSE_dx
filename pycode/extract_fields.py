@@ -104,9 +104,10 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
 # "NEXRAD"
 # These are the requests variables
 # fcst_vrbls = ("UH25",)
-fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
+#fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
+fcst_vrbls = ("Wmax","RAINNC")
 # obs_vrbls = ("AWS25",)
-obs_vrbls = ("DZ","AWS25","AWS02")
+obs_vrbls = ("DZ","AWS25","AWS02",)#"ST4")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
@@ -785,7 +786,7 @@ def gather_commands_two(i):
         latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
         commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
-    ### mrms_aws_1km (AWS data interpolated to d01_3km)
+    ### mrms_aws_3km (AWS data interpolated to d01_3km)
     save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)
     if not os.path.exists(save_to_fpath):
         data,latsA,lonsA = get_data(vrbl=vrbl,fmt="mrms_aws_raw",validutc=validutc,

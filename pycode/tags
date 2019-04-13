@@ -417,7 +417,7 @@ do_object_performance	new_verif_parallel.py	/^do_object_performance = False$/;"	
 do_object_waffle	new_verif_parallel.py	/^do_object_waffle = False$/;"	v
 do_pca_plots	new_verif_parallel.py	/^def do_pca_plots(pca,PC_df,features,fmt):$/;"	f
 do_performance	new_verif_parallel.py	/^do_performance = False$/;"	v
-do_plot_test	new_verif_parallel.py	/^do_plot_test = True$/;"	v
+do_plot_test	new_verif_parallel.py	/^do_plot_test = False$/;"	v
 do_quicklooks	new_verif_parallel.py	/^do_quicklooks = not PA.no_quick$/;"	v
 do_unsparsify	_old_unsparsify.py	/^def do_unsparsify(mrms_nc,vrbl,d01_nc):$/;"	f
 do_write_diff	new_verif_parallel.py	/^    def do_write_diff(df,n,oldkey,newkey,d02,d01):$/;"	f
@@ -492,7 +492,7 @@ fcst_pp	test_kde.py	/^    fcst_pp = N.empty([nlat,nlon])$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^                    fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp" $/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "REFL_comp"$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "UH25"$/;"	v
-fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")$/;"	v
+fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("Wmax","RAINNC")$/;"	v
 fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")$/;"	v
 fcstmins	_alt_verif_parallel.py	/^fcstmins = N.arange(0,185,5)$/;"	v
 fcstmins	_test_newruns.py	/^fcstmins = range(30,210,30)$/;"	v
@@ -809,7 +809,7 @@ objectroot	new_verif_parallel.py	/^objectroot = os.path.join(extractroot,'object
 obs_fmts	new_verif_parallel.py	/^    obs_fmts = ("nexrad_3km","nexrad_1km")$/;"	v
 obs_grid	_old_verif_parallel.py	/^    obs_grid = NEWGRID$/;"	v
 obs_vrbl	new_verif_parallel.py	/^    obs_vrbl = "NEXRAD"$/;"	v
-obs_vrbls	extract_fields.py	/^obs_vrbls = ("DZ","AWS25","AWS02")$/;"	v
+obs_vrbls	extract_fields.py	/^obs_vrbls = ("DZ","AWS25","AWS02",)#"ST4")$/;"	v
 obs_vrbls	new_verif_parallel.py	/^obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 og_nl_path	run_experiments.py	/^        og_nl_path = wofdir \/ 'mem1' \/ 'namelist.input'$/;"	v
 onlydo	generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
