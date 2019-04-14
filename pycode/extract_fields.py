@@ -350,8 +350,8 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
     elif fmt == "stageiv_raw":
         latf, lonf = get_llf_fpath(casestr,"stageiv_raw")
         # Load stage iv data
-        data = ST4.get(utc=validutc)
-        pdb.set_trace()
+        data = ST4.get(utc=validutc)[0,0,:,:]
+        # pdb.set_trace()
 
     elif fmt == 'nexrad_raw':
         latf, lonf = get_llf_fpath(casestr,"nexrad_raw")
