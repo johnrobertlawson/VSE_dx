@@ -1106,10 +1106,10 @@ commands = []
 
 for vrbl, validutc, caseutc in generate_obs_loop():
     print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
+    do_5km = False
 
     # do_nexrad = False
     do_nexrad = True if vrbl is "NEXRAD" else False
-    do_5km = False
     if do_nexrad:
         save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)
         if not os.path.exists(save_to_fpath):
@@ -1183,14 +1183,28 @@ for vrbl, validutc, caseutc in generate_obs_loop():
                     latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
                     commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
-    if do_5km and (vrbl == "ST4"):
-        # stageiv_5km (Stage IV data interpolated to neutral)
-        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)
+    elif vrbl == "ST4":
+        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_1km",validutc,caseutc)
         if not os.path.exists(save_to_fpath):
             data,latsA,lonsA = get_data(vrbl=vrbl,fmt="stageiv_raw",validutc=validutc,
                                     caseutc=caseutc,)
-            latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
+            latsB,lonsB =  get_data(caseutc,"d02_raw",latlon_only=True)
             commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_3km",validutc,caseutc)
+        if not os.path.exists(save_to_fpath):
+            data,latsA,lonsA = get_data(vrbl=vrbl,fmt="stageiv_raw",validutc=validutc,
+                                    caseutc=caseutc,)
+            latsB,lonsB =  get_data(caseutc,"d01_3km",latlon_only=True)
+            commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
+
+        if do_5km:
+            save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)
+            if not os.path.exists(save_to_fpath):
+                data,latsA,lonsA = get_data(vrbl=vrbl,fmt="stageiv_raw",validutc=validutc,
+                                        caseutc=caseutc,)
+                latsB,lonsB =  get_data(caseutc,"neutral",latlon_only=True)
+                commands.append((data,latsA,lonsA,latsB,lonsB,False,save_to_fpath))
 
 print("SUBMITTING INTERPOLATION COMMANDS.")
 if ncpus == 1:
