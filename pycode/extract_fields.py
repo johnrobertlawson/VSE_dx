@@ -119,7 +119,7 @@ obs_vrbls = ("ST4",)
 # Maybe not needed once lats.npy and lons.npy are created
 assert fcst_vrbls and obs_vrbls
 
-debug_mode = True
+debug_mode = False
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
