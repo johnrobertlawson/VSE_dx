@@ -351,6 +351,7 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
         latf, lonf = get_llf_fpath(casestr,"stageiv_raw")
         # Load stage iv data
         data = ST4.get(utc=validutc)
+        pdb.set_trace()
 
     elif fmt == 'nexrad_raw':
         latf, lonf = get_llf_fpath(casestr,"nexrad_raw")
@@ -439,7 +440,7 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
 
     assert latsA.ndim == 2
     assert latsB.ndim == 2
-    pdb.set_trace()
+    # pdb.set_trace()
 
     if cut_only:
         assert dataA is not None
