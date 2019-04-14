@@ -29,9 +29,11 @@ from unsparsify import readwdssii
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-N','--ncpus',dest='ncpus',default=20,type=int)
+parser.add_argument('-D','--debug',dest='check_in_serial',default=False,type=bool)
 
 PA = parser.parse_args()
 ncpus = PA.ncpus
+check_in_serial = PA.check_in_serial
 
 ### SETTINGS ###
 
@@ -59,7 +61,7 @@ radardir = '/work/john.lawson/NEXRAD_data'
 
 
 CASES = collections.OrderedDict()
-if True: # works for aws - test for others
+if False: # works for aws - test for others
     CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                             datetime.datetime(2016,3,31,19,0,0),
                             datetime.datetime(2016,3,31,20,0,0),
@@ -83,13 +85,13 @@ if False: # kernel hull issue
                             # datetime.datetime(2017,5,3,2,0,0),
                             # datetime.datetime(2017,5,3,3,0,0),
                             ]
-if False: # kernel hull issue
+if True: # kernel hull issue
     CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                             datetime.datetime(2017,5,4,22,0,0),
-                            datetime.datetime(2017,5,4,23,0,0),
-                            datetime.datetime(2017,5,5,0,0,0),
-                            datetime.datetime(2017,5,5,1,0,0),
-                            datetime.datetime(2017,5,5,2,0,0),
+                            #datetime.datetime(2017,5,4,23,0,0),
+                            #datetime.datetime(2017,5,5,0,0,0),
+                            #datetime.datetime(2017,5,5,1,0,0),
+                            #datetime.datetime(2017,5,5,2,0,0),
                             ]
 
 ##### OTHER STUFF #####
@@ -107,12 +109,12 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
 
 # "NEXRAD"
 # These are the requests variables
-# fcst_vrbls = ("UH25",)
-fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
+fcst_vrbls = ("UH25",)
+# fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
 # Stage IV has wrong vals/pts
-# obs_vrbls = ("AWS25",)
-obs_vrbls = ("AWS25","AWS02","ST4","DZ")
+obs_vrbls = ("AWS25",)
+# obs_vrbls = ("AWS25","AWS02","ST4","DZ")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
@@ -1082,7 +1084,6 @@ join_all_cmd = all_cmd[0] + all_cmd[1]
 print("SUBMIT JOBS.")
 
 # Now to submit them
-check_in_serial = False
 
 
 if (ncpus == 1) or (check_in_serial):
