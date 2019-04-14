@@ -77,7 +77,7 @@ if False: # sizes messed up
                             # datetime.datetime(2017,5,1,22,0,0),
                             # datetime.datetime(2017,5,1,23,0,0),
                             ]
-if False: # kernel hull issue
+if True: # kernel hull issue
     CASES[datetime.datetime(2017,5,2,0,0,0)] = [
                             datetime.datetime(2017,5,2,23,0,0),
                             # datetime.datetime(2017,5,3,0,0,0),
@@ -85,7 +85,7 @@ if False: # kernel hull issue
                             # datetime.datetime(2017,5,3,2,0,0),
                             # datetime.datetime(2017,5,3,3,0,0),
                             ]
-if True: # kernel hull issue
+if False: # kernel hull issue
     CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                             datetime.datetime(2017,5,4,22,0,0),
                             #datetime.datetime(2017,5,4,23,0,0),
