@@ -615,9 +615,11 @@ def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):
     nlat = nc.dimensions['Lat'].size
     nlon = nc.dimensions['Lon'].size
     dlat = nc.LatGridSpacing
+    dlon = nc.LonGridSpacing
 
-    ss = slice(0,nlat*dlat,dlat)
-    _x, _y = N.mgrid[ss,ss]
+    ss_lat = slice(0,nlat*dlat,dlat)
+    ss_lon = slice(0,nlon*dlon,dlon)
+    _x, _y = N.mgrid[ss_lon,ss_lat]
     lats = -1.0 * (_x - ullat)
     lons = _y + ullon
 
