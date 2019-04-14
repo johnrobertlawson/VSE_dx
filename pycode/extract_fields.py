@@ -111,8 +111,8 @@ fcst_vrbls = ("UH25",)
 #fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
 # Stage IV has wrong vals/pts
-obs_vrbls = ("ST4",)
-# obs_vrbls = ("AWS25","AWS02","ST4","DZ")
+# obs_vrbls = ("ST4",)
+obs_vrbls = ("AWS25","AWS02","ST4","DZ")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
