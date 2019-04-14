@@ -1082,7 +1082,7 @@ join_all_cmd = all_cmd[0] + all_cmd[1]
 print("SUBMIT JOBS.")
 
 # Now to submit them
-check_in_serial = False
+check_in_serial = True
 
 
 if (ncpus == 1) or (check_in_serial):
