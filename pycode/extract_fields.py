@@ -67,7 +67,7 @@ if False: # works for aws - test for others
                             datetime.datetime(2016,3,31,22,0,0),
                             datetime.datetime(2016,3,31,23,0,0),
                             ]
-if True: # sizes messed up
+if False: # sizes messed up
     CASES[datetime.datetime(2017,5,1,0,0,0)] = [
                             datetime.datetime(2017,5,1,19,0,0),
                             # datetime.datetime(2017,5,1,20,0,0),
@@ -75,13 +75,13 @@ if True: # sizes messed up
                             # datetime.datetime(2017,5,1,22,0,0),
                             # datetime.datetime(2017,5,1,23,0,0),
                             ]
-if False: # kernel hull issue
+if True: # kernel hull issue
     CASES[datetime.datetime(2017,5,2,0,0,0)] = [
                             datetime.datetime(2017,5,2,23,0,0),
-                            datetime.datetime(2017,5,3,0,0,0),
-                            datetime.datetime(2017,5,3,1,0,0),
-                            datetime.datetime(2017,5,3,2,0,0),
-                            datetime.datetime(2017,5,3,3,0,0),
+                            # datetime.datetime(2017,5,3,0,0,0),
+                            # datetime.datetime(2017,5,3,1,0,0),
+                            # datetime.datetime(2017,5,3,2,0,0),
+                            # datetime.datetime(2017,5,3,3,0,0),
                             ]
 if False: # kernel hull issue
     CASES[datetime.datetime(2017,5,4,0,0,0)] = [
