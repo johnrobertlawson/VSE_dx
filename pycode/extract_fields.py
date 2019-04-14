@@ -62,10 +62,10 @@ CASES = collections.OrderedDict()
 if True: # works for aws - test for others
     CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                             datetime.datetime(2016,3,31,19,0,0),
-                            datetime.datetime(2016,3,31,20,0,0),
-                            datetime.datetime(2016,3,31,21,0,0),
-                            datetime.datetime(2016,3,31,22,0,0),
-                            datetime.datetime(2016,3,31,23,0,0),
+                            # datetime.datetime(2016,3,31,20,0,0),
+                            # datetime.datetime(2016,3,31,21,0,0),
+                            # datetime.datetime(2016,3,31,22,0,0),
+                            # datetime.datetime(2016,3,31,23,0,0),
                             ]
 if False: # sizes messed up
     CASES[datetime.datetime(2017,5,1,0,0,0)] = [
@@ -111,7 +111,7 @@ fcst_vrbls = ("UH25",)
 #fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
 # Stage IV has wrong vals/pts
-obs_vrbls = ("DZ",)
+obs_vrbls = ("ST4",)
 # obs_vrbls = ("AWS25","AWS02","ST4","DZ")
 
 # Don't allow computation without both fcst and obs data requested
@@ -119,7 +119,7 @@ obs_vrbls = ("DZ",)
 # Maybe not needed once lats.npy and lons.npy are created
 assert fcst_vrbls and obs_vrbls
 
-debug_mode = False
+debug_mode = True
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
