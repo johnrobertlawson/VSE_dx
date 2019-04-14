@@ -623,7 +623,7 @@ def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):
     lats = -1.0 * (_x - ullat)
     lons = _y + ullon
 
-    # pdb.set_trace()
+    pdb.set_trace()
 
     return N.flipud(lats),lons
 
