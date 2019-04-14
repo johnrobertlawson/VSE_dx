@@ -1086,6 +1086,7 @@ check_in_serial = True
 
 
 if (ncpus == 1) or (check_in_serial):
+    join_all_cmd = [el for sublist in join_all_cmd for el in sublist]
     for co in join_all_cmd:
         toprint = ["{}\n".format(c) for c in co]
         print(stars,"\nRunning interpolate() with: \n",*toprint,stars)
