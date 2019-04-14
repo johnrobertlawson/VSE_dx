@@ -59,21 +59,21 @@ radardir = '/work/john.lawson/NEXRAD_data'
 
 
 CASES = collections.OrderedDict()
-if True: # works for aws - test for others
+if False: # works for aws - test for others
     CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                             datetime.datetime(2016,3,31,19,0,0),
-                            # datetime.datetime(2016,3,31,20,0,0),
-                            # datetime.datetime(2016,3,31,21,0,0),
-                            # datetime.datetime(2016,3,31,22,0,0),
-                            # datetime.datetime(2016,3,31,23,0,0),
+                            datetime.datetime(2016,3,31,20,0,0),
+                            datetime.datetime(2016,3,31,21,0,0),
+                            datetime.datetime(2016,3,31,22,0,0),
+                            datetime.datetime(2016,3,31,23,0,0),
                             ]
-if False: # sizes messed up
+if True: # sizes messed up
     CASES[datetime.datetime(2017,5,1,0,0,0)] = [
                             datetime.datetime(2017,5,1,19,0,0),
-                            datetime.datetime(2017,5,1,20,0,0),
-                            datetime.datetime(2017,5,1,21,0,0),
-                            datetime.datetime(2017,5,1,22,0,0),
-                            datetime.datetime(2017,5,1,23,0,0),
+                            # datetime.datetime(2017,5,1,20,0,0),
+                            # datetime.datetime(2017,5,1,21,0,0),
+                            # datetime.datetime(2017,5,1,22,0,0),
+                            # datetime.datetime(2017,5,1,23,0,0),
                             ]
 if False: # kernel hull issue
     CASES[datetime.datetime(2017,5,2,0,0,0)] = [
@@ -111,8 +111,8 @@ fcst_vrbls = ("UH25",)
 #fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
 # Stage IV has wrong vals/pts
-# obs_vrbls = ("ST4",)
-obs_vrbls = ("AWS25","AWS02","ST4","DZ")
+obs_vrbls = ("ST4",)
+# obs_vrbls = ("AWS25","AWS02","ST4","DZ")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
