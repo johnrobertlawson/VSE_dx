@@ -486,14 +486,12 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
         xdB = len(xxB[:,0])
         ydB = len(yyB[0,:])
         # if "nexrad" in save_to_fpath:
-        if "mrms" in save_to_fpath:
-            # print("MRMS")
-            dataA = N.copy(dataA)
-            xxA = N.copy(xxA)
-            yyA = N.copy(yyA)
-            xxB = N.copy(xxB)
-            yyB = N.copy(yyB)
-            # pdb.set_trace()
+        # if "mrms" in save_to_fpath:
+        dataA = N.copy(dataA)
+        xxA = N.copy(xxA)
+        yyA = N.copy(yyA)
+        xxB = N.copy(xxB)
+        yyB = N.copy(yyB)
         dataB = scipy.interpolate.griddata(points=(xxA.flat,yyA.flat),
                                             values=dataA.flat,
                                             xi=(xxB.flat,yyB.flat),
