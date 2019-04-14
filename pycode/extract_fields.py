@@ -448,9 +448,9 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
                                 cut_to_lons=lonsB)
     else:
         if cut_first:
-            # _dataA = N.copy(dataA)
-            # _latsA = N.copy(latsA)
-            # _lonsA = N.copy(lonsA)
+            _dataA = N.copy(dataA)
+            _latsA = N.copy(latsA)
+            _lonsA = N.copy(lonsA)
 
             Nlim = N.max(latsB)+0.5
             Elim = N.max(lonsB)+0.5
