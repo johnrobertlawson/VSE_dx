@@ -1108,7 +1108,7 @@ for vrbl, validutc, caseutc in generate_obs_loop():
     print("Appending interpolation commands for observational grids of",vrbl,"at", validutc)
 
     # do_nexrad = False
-    do_nexrad = True if vrbl in ("NEXRAD","nexrad")
+    do_nexrad = True if vrbl is "NEXRAD" else False
     do_5km = False
     if do_nexrad:
         save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)
@@ -1127,7 +1127,7 @@ for vrbl, validutc, caseutc in generate_obs_loop():
 
     # MRMS prods
     # do_mrms = True
-    do_mrms = True if ("mrms" in vrbl)
+    do_mrms = True if ("mrms" in vrbl) else False
     if do_mrms:
         if "AWS" in vrbl:
             save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)
