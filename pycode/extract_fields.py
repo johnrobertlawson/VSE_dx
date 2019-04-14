@@ -439,6 +439,7 @@ def interpolate(dataA,latsA,lonsA,latsB,lonsB,cut_only=False,
 
     assert latsA.ndim == 2
     assert latsB.ndim == 2
+    pdb.set_trace()
 
     if cut_only:
         assert dataA is not None
