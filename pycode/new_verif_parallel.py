@@ -49,7 +49,7 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
-do_plot_test = True
+do_plot_test = False
 
 do_domains = False
 do_percentiles = False
@@ -1030,6 +1030,10 @@ if do_percentiles:
     # TODO: should object ID be based on percentiles too? Or should a storm
     # always be >?? dBZ? Maybe show how different the location of e.g. 45 dBZ is
     # on the two distributions. If they are close, use the same mask threshold.
+
+    # Do 10,001-bin cdf/pdf of each time for obs (3km and 1km) and fcst (EE3, EE1).
+    # Compute in parallel then sum over each category to produce four hists:
+
 
 if do_performance:
     print(stars,"DOING PERFORMANCE",stars)
