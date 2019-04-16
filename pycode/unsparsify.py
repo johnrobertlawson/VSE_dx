@@ -39,7 +39,8 @@ def sparseFull(a):
                 b[x+1,0:(pixelsLeft-1)] = w
             else:
                 rowsLeft, pixelCount_RemainingRow = divmod(pixelsLeft, xlen)
-                b[x:(x+rowsLeft+1),0:7001] = w
+                # b[x:(x+rowsLeft+1),0:7001] = w
+                b[x:(x+rowsLeft+1),0:int(b.shape[1])] = w
                 # check if pixels are remaining
                 if pixelCount_RemainingRow > 0:
                     b[(x+rowsLeft+1),0:pixelCount_RemainingRow] = w

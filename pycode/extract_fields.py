@@ -69,7 +69,7 @@ if False: # works for aws - test for others
                             datetime.datetime(2016,3,31,22,0,0),
                             datetime.datetime(2016,3,31,23,0,0),
                             ]
-if False: # sizes messed up
+if True: # sizes messed up
     CASES[datetime.datetime(2017,5,1,0,0,0)] = [
                             datetime.datetime(2017,5,1,19,0,0),
                             # datetime.datetime(2017,5,1,20,0,0),
@@ -80,17 +80,17 @@ if False: # sizes messed up
 if False: # kernel hull issue
     CASES[datetime.datetime(2017,5,2,0,0,0)] = [
                             datetime.datetime(2017,5,2,23,0,0),
-                            # datetime.datetime(2017,5,3,0,0,0),
-                            # datetime.datetime(2017,5,3,1,0,0),
-                            # datetime.datetime(2017,5,3,2,0,0),
-                            # datetime.datetime(2017,5,3,3,0,0),
+                            datetime.datetime(2017,5,3,0,0,0),
+                            datetime.datetime(2017,5,3,1,0,0),
+                            datetime.datetime(2017,5,3,2,0,0),
+                            datetime.datetime(2017,5,3,3,0,0),
                             ]
-if True: # kernel hull issue
+if False: # kernel hull issue
     CASES[datetime.datetime(2017,5,4,0,0,0)] = [
-                            #datetime.datetime(2017,5,4,22,0,0),
-                            #datetime.datetime(2017,5,4,23,0,0),
-                            #datetime.datetime(2017,5,5,0,0,0),
-                            #datetime.datetime(2017,5,5,1,0,0),
+                            datetime.datetime(2017,5,4,22,0,0),
+                            datetime.datetime(2017,5,4,23,0,0),
+                            datetime.datetime(2017,5,5,0,0,0),
+                            datetime.datetime(2017,5,5,1,0,0),
                             datetime.datetime(2017,5,5,2,0,0),
                             ]
 
@@ -105,15 +105,14 @@ member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 # THESE are all possible variables in the script
 # Note that UP_HELI_MAX is 2-5 km time-window-max
 FCST_VRBLS = ("Wmax","UH02","UH25","RAINNC","REFL_comp","UP_HELI_MAX")
-OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)
+OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 
 # "NEXRAD"
 # These are the requests variables
 fcst_vrbls = ("UH25",)
 # fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
-# Stage IV has wrong vals/pts
-obs_vrbls = ("AWS25",)
+obs_vrbls = ("AWS02",)
 # obs_vrbls = ("AWS25","AWS02","ST4","DZ")
 
 # Don't allow computation without both fcst and obs data requested
@@ -593,8 +592,8 @@ def _unsparsify(mrms_nc,vrbl,d01_nc=False):
     # return mrms_low_x_y
     # return unsparsify.do_unsparsify(mrms_nc,vrbl,d01_nc)
     x1,ulat,y1,ulon, varname,ref1 = readwdssii(mrms_nc)
-    # pdb.set_trace()
     output = N.flipud(ref1)
+    pdb.set_trace()
     return output
 
 
@@ -896,7 +895,8 @@ present. TODO: make sure everything's in the same folder.
 ### Get Stage IV catalogue
 if "ST4" in obs_vrbls:
     ST4 = ObsGroup(st4dir,'stageiv')
-# RADARS = ObsGroup(radardir,'radar')
+if "NEXRAD" in obs_vrbls:
+    RADARS = ObsGroup(radardir,'radar')
 
 for caseutc, initutcs in CASES.items():
     # We only need to look at the first time, as the grids are the same

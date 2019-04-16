@@ -129,6 +129,7 @@ N	test_kde.py	/^import numpy as N$/;"	i
 N	test_verif.py	/^import numpy as N$/;"	i
 N	verif_parallel.py	/^import numpy as N$/;"	i
 NEWGRID	_old_verif_parallel.py	/^    NEWGRID = try_load_newgrid(initstr=initstr,E=E)$/;"	v
+NICENAMES	new_verif_parallel.py	/^NICENAMES = dict("d01_3km"="EE3km",$/;"	v
 NL	generate_namelists.py	/^NL = {n:{} for n in ensnums}$/;"	v
 NL	old_generate_namelists.py	/^NL = {}$/;"	v
 NS	generate_namelists.py	/^NS = parser.parse_args()$/;"	v
@@ -147,8 +148,11 @@ ObsGroup	_old_verif_parallel.py	/^from evac.datafiles.obsgroup import ObsGroup$/
 ObsGroup	extract_fields.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
 ObsGroup	old_verif.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
 ObsGroup	verif_parallel.py	/^from evac.datafiles.obsgroup import ObsGroup$/;"	i
+P	new_verif_parallel.py	/^    P = utils.load_pickle(fpath=fpath)$/;"	v
 PA	extract_fields.py	/^PA = parser.parse_args()$/;"	v
 PA	new_verif_parallel.py	/^PA = parser.parse_args()$/;"	v
+PC_df	new_verif_parallel.py	/^    PC_df = P['data']$/;"	v
+PC_df_sub	new_verif_parallel.py	/^    PC_df_sub = PC_df.sample(n=250)$/;"	v
 PD0	new_verif_parallel.py	/^    PD0 = Performance(fpath=fpath,legendkwargs=None,legend=False)$/;"	v
 PLOTS	test_extraction.py	/^PLOTS = {$/;"	v
 PRES	run_experiments.py	/^        PRES = {wrfdir\/p:'copy' for p in pres}$/;"	v
@@ -240,6 +244,7 @@ all_fcstmins	_old_verif_parallel.py	/^        all_fcstmins = (60,120,180)$/;"	v
 all_fcstmins	_old_verif_parallel.py	/^        all_fcstmins = [int(t.seconds\/60) for t in all_fcstmins_dt]$/;"	v
 all_fcstmins	new_verif_parallel.py	/^all_fcstmins = N.arange(5,185,5)$/;"	v
 all_fcstmins_dt	_old_verif_parallel.py	/^        all_fcstmins_dt = [v-E.initutc for v in E.validtimes]$/;"	v
+all_features	new_verif_parallel.py	/^    all_features = ['area','eccentricity','extent','max_intensity',$/;"	v
 all_fmts	new_verif_parallel.py	/^    all_fmts = list(fcst_fmts) + list(obs_fmts)$/;"	v
 allow_empty	test_kde.py	/^                allow_empty=False)$/;"	v
 alpha	new_verif_parallel.py	/^alpha = 0.7$/;"	v
@@ -285,6 +290,7 @@ casestr	new_verif_parallel.py	/^            casestr = utils.string_from_time('di
 casestr	old_verif.py	/^    casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 casestr	run_experiments.py	/^        casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 caseutc	extract_fields.py	/^                                            caseutc=caseutc)$/;"	v
+caseutc	extract_fields.py	/^                                            caseutc=caseutc,)$/;"	v
 caseutc	extract_fields.py	/^                                        caseutc=caseutc)$/;"	v
 caseutc	extract_fields.py	/^                                        caseutc=caseutc,)$/;"	v
 caseutc	extract_fields.py	/^                                    caseutc=caseutc,)$/;"	v
@@ -297,7 +303,7 @@ cf	test_kde.py	/^        cf = ax.contourf(xx,yy,rawpc,cmap=M.cm.jet,levels=level
 cf	test_kde.py	/^    cf = ax.contourf(xx,yy,fcst_pp,cmap=M.cm.jet,levels=levels)$/;"	v
 cf	test_kde.py	/^    cf = ax.contourf(xx,yy,rawpc,cmap=M.cm.jet,levels=levels)$/;"	v
 check_before	run_experiments.py	/^check_before = False$/;"	v
-check_in_serial	extract_fields.py	/^check_in_serial = False$/;"	v
+check_in_serial	extract_fields.py	/^check_in_serial = PA.check_in_serial$/;"	v
 check_only	_old_verif_parallel.py	/^check_only = parser.parse_args().check_only$/;"	v
 check_only	verif_parallel.py	/^check_only = parser.parse_args().check_only$/;"	v
 closest	extract_fields.py	/^def closest(arr,val,return_val=False):$/;"	f
@@ -405,9 +411,9 @@ do_efss	new_verif_parallel.py	/^do_efss = False # Also includes FISS, which is b
 do_fcst_interp	verif_parallel.py	/^def do_fcst_interp(nc_fpath,vrbl,npyfpaths,newlats,newlons):$/;"	f
 do_interp	_alt_verif_parallel.py	/^def do_interp(fmt,old_field,old_lats,old_lons,new_lats,new_lons):$/;"	f
 do_kde	verif_parallel.py	/^def do_kde(arr3d):$/;"	f
-do_mrms	extract_fields.py	/^    do_mrms = True$/;"	v
+do_mrms	extract_fields.py	/^    do_mrms = True if ("mrms" in vrbl) else False$/;"	v
 do_mrms_interp	verif_parallel.py	/^def do_mrms_interp(nc_fpath,npy_fpath,newlats,newlons,vrbl):$/;"	f
-do_nexrad	extract_fields.py	/^    do_nexrad = False$/;"	v
+do_nexrad	extract_fields.py	/^    do_nexrad = True if vrbl is "NEXRAD" else False$/;"	v
 do_object_cluster	new_verif_parallel.py	/^do_object_cluster = False$/;"	v
 do_object_distr	new_verif_parallel.py	/^do_object_distr = False$/;"	v
 do_object_examples	new_verif_parallel.py	/^do_object_examples = False$/;"	v
@@ -482,6 +488,7 @@ fcst1Da	test_kde.py	/^    fcst1Da = N.hstack((fcst1D,N.array([0.0,0.0,0.0])))$/;
 fcst4d	_old_verif_parallel.py	/^    fcst4d = N.swapaxes(xfs_all,0,1)$/;"	v
 fcst_all	test_kde.py	/^    fcst_all = fcst_all - 273.15$/;"	v
 fcst_all	test_kde.py	/^fcst_all = E.get(fcsthr=fhr,vrbl=vrbl,dom=1)$/;"	v
+fcst_dfs	new_verif_parallel.py	/^    fcst_dfs = []$/;"	v
 fcst_fmts	new_verif_parallel.py	/^    fcst_fmts = ("d01_3km","d02_1km")$/;"	v
 fcst_fmts	new_verif_parallel.py	/^    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")$/;"	v
 fcst_fmts	new_verif_parallel.py	/^fcst_fmts =  ("d01_3km","d02_1km")$/;"	v
@@ -492,7 +499,7 @@ fcst_pp	test_kde.py	/^    fcst_pp = N.empty([nlat,nlon])$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^                    fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp" $/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "REFL_comp"$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "UH25"$/;"	v
-fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("Wmax","RAINNC")$/;"	v
+fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("UH25",)$/;"	v
 fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")$/;"	v
 fcstmins	_alt_verif_parallel.py	/^fcstmins = N.arange(0,185,5)$/;"	v
 fcstmins	_test_newruns.py	/^fcstmins = range(30,210,30)$/;"	v
@@ -502,6 +509,7 @@ fcstmins	verif_parallel.py	/^fcstmins = N.arange(0,185,5)$/;"	v
 fctimes	old_verif.py	/^fctimes = list(range(1,4))$/;"	v
 fdir	new_verif_parallel.py	/^                fdir = dname + "_raw"$/;"	v
 fdir_efss	_old_verif_parallel.py	/^    fdir_efss = npydir$/;"	v
+features	new_verif_parallel.py	/^    features = P['features']$/;"	v
 fhr	test_kde.py	/^fhr = 1$/;"	v
 fhrs	ensemble_verification.py	/^fhrs = [0.25,] + list(range(1,3))$/;"	v
 fhrs	test_verif.py	/^fhrs = [0.25,] + list(range(1,3))$/;"	v
@@ -514,6 +522,7 @@ fname	new_verif_parallel.py	/^    fname = "domains.png"$/;"	v
 fname	new_verif_parallel.py	/^    fname = "examples_from_pca.png"$/;"	v
 fname	new_verif_parallel.py	/^    fname = "hist_3x3.png"$/;"	v
 fname	new_verif_parallel.py	/^    fname = "object-matches_d01-d02.pickle"$/;"	v
+fname	new_verif_parallel.py	/^    fname = "pca_all_fcst_objs.pickle"$/;"	v
 fname	new_verif_parallel.py	/^    fname = "perfdiag_REFL_comp_30_multi.png"$/;"	v
 fname	test_kde.py	/^                fname = 'test_kde_sm_{}_bwfc{}.png'.format(plottype,bwfc)$/;"	v
 fname	test_kde.py	/^        fname = 'test_kde2d_sm.png'$/;"	v
@@ -582,6 +591,7 @@ get_leadtime_group	new_verif_parallel.py	/^    def get_leadtime_group(lt):$/;"	f
 get_llf_fpath	extract_fields.py	/^def get_llf_fpath(casestr,key):$/;"	f
 get_mrms_extraction_fpath	verif_parallel.py	/^def get_mrms_extraction_fpath(initstr,validutc,vrbl,fmt):$/;"	f
 get_mrms_rotdz_grid	extract_fields.py	/^def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):$/;"	f
+get_nice	new_verif_parallel.py	/^def get_nice(fmt):$/;"	f
 get_object_picklepaths	new_verif_parallel.py	/^def get_object_picklepaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):$/;"	f
 get_prob	test_kde.py	/^        def get_prob(itr,method=2):$/;"	f
 get_prob	verif_parallel.py	/^    def get_prob(itr,method=2):$/;"	f	function:do_kde
@@ -809,7 +819,7 @@ objectroot	new_verif_parallel.py	/^objectroot = os.path.join(extractroot,'object
 obs_fmts	new_verif_parallel.py	/^    obs_fmts = ("nexrad_3km","nexrad_1km")$/;"	v
 obs_grid	_old_verif_parallel.py	/^    obs_grid = NEWGRID$/;"	v
 obs_vrbl	new_verif_parallel.py	/^    obs_vrbl = "NEXRAD"$/;"	v
-obs_vrbls	extract_fields.py	/^obs_vrbls = ("DZ","AWS25","AWS02",)#"ST4")$/;"	v
+obs_vrbls	extract_fields.py	/^obs_vrbls = ("AWS25",)$/;"	v
 obs_vrbls	new_verif_parallel.py	/^obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 og_nl_path	run_experiments.py	/^        og_nl_path = wofdir \/ 'mem1' \/ 'namelist.input'$/;"	v
 onlydo	generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
@@ -881,6 +891,7 @@ path_to_newinput	run_experiments.py	/^            path_to_newinput = rundir \/ m
 path_to_outdir	run_experiments.py	/^            path_to_outdir = rootdir\/'outdir',$/;"	v
 paths_to_nl	generate_namelists.py	/^paths_to_nl = {}$/;"	v
 paths_to_nl	old_generate_namelists.py	/^paths_to_nl = {}$/;"	v
+pca	new_verif_parallel.py	/^    pca = P['pca']$/;"	v
 pdb	_alt_verif_parallel.py	/^import pdb$/;"	i
 pdb	_old_unsparsify.py	/^import pdb$/;"	i
 pdb	_old_verif_parallel.py	/^import pdb$/;"	i
@@ -1009,15 +1020,18 @@ runlen	generate_namelists.py	/^runlen = 3 # Run length in hours$/;"	v
 runsec	run_experiments.py	/^            runsec = runsec,$/;"	v
 runsec	run_experiments.py	/^        runsec = utils.hr_to_sec(3)$/;"	v
 sample	old_generate_namelists.py	/^    from lhsmdu import sample$/;"	i
+save_to_fpath	extract_fields.py	/^                save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^                save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)$/;"	v
 save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_3km",validutc,caseutc)$/;"	v
-save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_1km",validutc,caseutc)$/;"	v
+save_to_fpath	extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_3km",validutc,caseutc)$/;"	v
+scaler	new_verif_parallel.py	/^    scaler = P['scaler']$/;"	v
 scipy	extract_fields.py	/^import scipy$/;"	i
 scipy	new_verif_parallel.py	/^import scipy$/;"	i
 scipy_method	test_kde.py	/^scipy_method = 0$/;"	v

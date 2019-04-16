@@ -129,7 +129,7 @@ N	pycode/test_kde.py	/^import numpy as N$/;"	i
 N	pycode/test_verif.py	/^import numpy as N$/;"	i
 N	pycode/verif_parallel.py	/^import numpy as N$/;"	i
 NEWGRID	pycode/_old_verif_parallel.py	/^    NEWGRID = try_load_newgrid(initstr=initstr,E=E)$/;"	v
-NICENAMES	pycode/new_verif_parallel.py	/^NICENAMES = dict("d01_3km"="EE3km",$/;"	v
+NICENAMES	pycode/new_verif_parallel.py	/^NICENAMES = {"d01_3km":"EE3km",$/;"	v
 NL	pycode/generate_namelists.py	/^NL = {n:{} for n in ensnums}$/;"	v
 NL	pycode/old_generate_namelists.py	/^NL = {}$/;"	v
 NS	pycode/generate_namelists.py	/^NS = parser.parse_args()$/;"	v
@@ -137,7 +137,7 @@ NS	pycode/old_generate_namelists.py	/^NS = parser.parse_args()$/;"	v
 OBS	pycode/_old_verif_parallel.py	/^        OBS = ST4$/;"	v
 OBS	pycode/old_verif.py	/^OBS = (ST4,RADARS)$/;"	v
 OBS_CODES	pycode/new_verif_parallel.py	/^OBS_CODES = {$/;"	v
-OBS_VRBLS	pycode/extract_fields.py	/^OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)$/;"	v
+OBS_VRBLS	pycode/extract_fields.py	/^OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 ObjectBased	pycode/_alt_verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
 ObjectBased	pycode/_old_verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
 ObjectBased	pycode/verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
@@ -170,6 +170,7 @@ ProbScores	pycode/test_crps.py	/^from evac.stats.probscores import ProbScores$/;
 ProbScores	pycode/verif_parallel.py	/^from evac.stats.probscores import ProbScores$/;"	i
 R	pycode/test_verif.py	/^            R = R_large$/;"	v
 R	pycode/test_verif.py	/^            R = R_small$/;"	v
+RADARS	pycode/extract_fields.py	/^    RADARS = ObsGroup(radardir,'radar')$/;"	v
 RADARS	pycode/old_verif.py	/^RADARS = ObsGroup(radardir,'radar')$/;"	v
 RANCOL	pycode/new_verif_parallel.py	/^RANCOL = {$/;"	v
 RESCOLS	pycode/new_verif_parallel.py	/^RESCOLS = {$/;"	v
@@ -290,6 +291,7 @@ casestr	pycode/new_verif_parallel.py	/^            casestr = utils.string_from_t
 casestr	pycode/old_verif.py	/^    casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 casestr	pycode/run_experiments.py	/^        casestr = utils.string_from_time('dir',caseutc,strlen='day')$/;"	v
 caseutc	pycode/extract_fields.py	/^                                            caseutc=caseutc)$/;"	v
+caseutc	pycode/extract_fields.py	/^                                            caseutc=caseutc,)$/;"	v
 caseutc	pycode/extract_fields.py	/^                                        caseutc=caseutc)$/;"	v
 caseutc	pycode/extract_fields.py	/^                                        caseutc=caseutc,)$/;"	v
 caseutc	pycode/extract_fields.py	/^                                    caseutc=caseutc,)$/;"	v
@@ -302,7 +304,7 @@ cf	pycode/test_kde.py	/^        cf = ax.contourf(xx,yy,rawpc,cmap=M.cm.jet,level
 cf	pycode/test_kde.py	/^    cf = ax.contourf(xx,yy,fcst_pp,cmap=M.cm.jet,levels=levels)$/;"	v
 cf	pycode/test_kde.py	/^    cf = ax.contourf(xx,yy,rawpc,cmap=M.cm.jet,levels=levels)$/;"	v
 check_before	pycode/run_experiments.py	/^check_before = False$/;"	v
-check_in_serial	pycode/extract_fields.py	/^check_in_serial = False$/;"	v
+check_in_serial	pycode/extract_fields.py	/^check_in_serial = PA.check_in_serial$/;"	v
 check_only	pycode/_old_verif_parallel.py	/^check_only = parser.parse_args().check_only$/;"	v
 check_only	pycode/verif_parallel.py	/^check_only = parser.parse_args().check_only$/;"	v
 closest	pycode/extract_fields.py	/^def closest(arr,val,return_val=False):$/;"	f
@@ -410,9 +412,9 @@ do_efss	pycode/new_verif_parallel.py	/^do_efss = False # Also includes FISS, whi
 do_fcst_interp	pycode/verif_parallel.py	/^def do_fcst_interp(nc_fpath,vrbl,npyfpaths,newlats,newlons):$/;"	f
 do_interp	pycode/_alt_verif_parallel.py	/^def do_interp(fmt,old_field,old_lats,old_lons,new_lats,new_lons):$/;"	f
 do_kde	pycode/verif_parallel.py	/^def do_kde(arr3d):$/;"	f
-do_mrms	pycode/extract_fields.py	/^    do_mrms = True$/;"	v
+do_mrms	pycode/extract_fields.py	/^    do_mrms = True if ("mrms" in vrbl) else False$/;"	v
 do_mrms_interp	pycode/verif_parallel.py	/^def do_mrms_interp(nc_fpath,npy_fpath,newlats,newlons,vrbl):$/;"	f
-do_nexrad	pycode/extract_fields.py	/^    do_nexrad = False$/;"	v
+do_nexrad	pycode/extract_fields.py	/^    do_nexrad = True if vrbl is "NEXRAD" else False$/;"	v
 do_object_cluster	pycode/new_verif_parallel.py	/^do_object_cluster = False$/;"	v
 do_object_distr	pycode/new_verif_parallel.py	/^do_object_distr = False$/;"	v
 do_object_examples	pycode/new_verif_parallel.py	/^do_object_examples = False$/;"	v
@@ -421,8 +423,9 @@ do_object_pca	pycode/new_verif_parallel.py	/^do_object_pca = False$/;"	v
 do_object_performance	pycode/new_verif_parallel.py	/^do_object_performance = False$/;"	v
 do_object_waffle	pycode/new_verif_parallel.py	/^do_object_waffle = False$/;"	v
 do_pca_plots	pycode/new_verif_parallel.py	/^def do_pca_plots(pca,PC_df,features,fmt):$/;"	f
+do_percentiles	pycode/new_verif_parallel.py	/^do_percentiles = False$/;"	v
 do_performance	pycode/new_verif_parallel.py	/^do_performance = False$/;"	v
-do_plot_test	pycode/new_verif_parallel.py	/^do_plot_test = False$/;"	v
+do_plot_test	pycode/new_verif_parallel.py	/^do_plot_test = True$/;"	v
 do_quicklooks	pycode/new_verif_parallel.py	/^do_quicklooks = not PA.no_quick$/;"	v
 do_unsparsify	pycode/_old_unsparsify.py	/^def do_unsparsify(mrms_nc,vrbl,d01_nc):$/;"	f
 do_write_diff	pycode/new_verif_parallel.py	/^    def do_write_diff(df,n,oldkey,newkey,d02,d01):$/;"	f
@@ -470,7 +473,7 @@ experiment	pycode/old_generate_namelists.py	/^        experiment = "SP"$/;"	v
 experiment	pycode/old_generate_namelists.py	/^        experiment = "SP-Stoch"$/;"	v
 experiments	pycode/old_generate_namelists.py	/^experiments = NL.keys()$/;"	v
 extract_fields	pycode/verif_parallel.py	/^def extract_fields():$/;"	f
-extractroot	pycode/new_verif_parallel.py	/^extractroot = '\/work\/john.lawson\/VSE_reso\/pp\/{}'.format(key_pp)$/;"	v
+extractroot	pycode/new_verif_parallel.py	/^extractroot = '\/Users\/john.lawson\/data\/{}'.format(key_pp)$/;"	v
 f1	pycode/test_extraction.py	/^f1 = 'REFL_comp_d01_3km_20160331_2200_2215_m01.npy'$/;"	v
 f3	pycode/test_extraction.py	/^f3 = 'REFL_comp_d02_1km_20160331_2200_2215_m01.npy'$/;"	v
 f4	pycode/test_extraction.py	/^f4 = 'REFL_comp_d02_3km_20160331_2200_2215_m01.npy'$/;"	v
@@ -818,7 +821,7 @@ objectroot	pycode/new_verif_parallel.py	/^objectroot = os.path.join(extractroot,
 obs_fmts	pycode/new_verif_parallel.py	/^    obs_fmts = ("nexrad_3km","nexrad_1km")$/;"	v
 obs_grid	pycode/_old_verif_parallel.py	/^    obs_grid = NEWGRID$/;"	v
 obs_vrbl	pycode/new_verif_parallel.py	/^    obs_vrbl = "NEXRAD"$/;"	v
-obs_vrbls	pycode/extract_fields.py	/^obs_vrbls = ("DZ",)$/;"	v
+obs_vrbls	pycode/extract_fields.py	/^obs_vrbls = ("AWS02",)$/;"	v
 obs_vrbls	pycode/new_verif_parallel.py	/^obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 og_nl_path	pycode/run_experiments.py	/^        og_nl_path = wofdir \/ 'mem1' \/ 'namelist.input'$/;"	v
 onlydo	pycode/generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
@@ -857,7 +860,7 @@ outdir	pycode/test_verif.py	/^outdir = '\/home\/john.lawson\/VSE_reso\/pyoutput\
 outfpath	pycode/test_verif.py	/^        outfpath = os.path.join(outdir,fname)$/;"	v
 outroot	pycode/_alt_verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
 outroot	pycode/_old_verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
-outroot	pycode/new_verif_parallel.py	/^outroot = "\/mnt\/jlawson\/VSE_dx\/figures\/"$/;"	v
+outroot	pycode/new_verif_parallel.py	/^outroot = "\/Users\/john.lawson\/data\/figures"$/;"	v
 outroot	pycode/old_verif.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput'$/;"	v
 outroot	pycode/test_kde.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/'$/;"	v
 outroot	pycode/verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
@@ -1019,15 +1022,17 @@ runlen	pycode/generate_namelists.py	/^runlen = 3 # Run length in hours$/;"	v
 runsec	pycode/run_experiments.py	/^            runsec = runsec,$/;"	v
 runsec	pycode/run_experiments.py	/^        runsec = utils.hr_to_sec(3)$/;"	v
 sample	pycode/old_generate_namelists.py	/^    from lhsmdu import sample$/;"	i
+save_to_fpath	pycode/extract_fields.py	/^                save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)$/;"	v
 save_to_fpath	pycode/extract_fields.py	/^                save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_5km",validutc,caseutc)$/;"	v
-save_to_fpath	pycode/extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_5km",validutc,caseutc)$/;"	v
+save_to_fpath	pycode/extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)$/;"	v
+save_to_fpath	pycode/extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)$/;"	v
 save_to_fpath	pycode/extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_1km",validutc,caseutc)$/;"	v
 save_to_fpath	pycode/extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"mrms_dz_3km",validutc,caseutc)$/;"	v
-save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_1km",validutc,caseutc)$/;"	v
-save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"mrms_aws_3km",validutc,caseutc)$/;"	v
+save_to_fpath	pycode/extract_fields.py	/^            save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)$/;"	v
 save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_1km",validutc,caseutc)$/;"	v
 save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"nexrad_3km",validutc,caseutc)$/;"	v
-save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_5km",validutc,caseutc)$/;"	v
+save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_1km",validutc,caseutc)$/;"	v
+save_to_fpath	pycode/extract_fields.py	/^        save_to_fpath = get_extraction_fpaths(vrbl,"stageiv_3km",validutc,caseutc)$/;"	v
 scaler	pycode/new_verif_parallel.py	/^    scaler = P['scaler']$/;"	v
 scipy	pycode/extract_fields.py	/^import scipy$/;"	i
 scipy	pycode/new_verif_parallel.py	/^import scipy$/;"	i
