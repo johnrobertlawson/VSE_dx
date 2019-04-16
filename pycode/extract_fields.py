@@ -61,38 +61,34 @@ radardir = '/work/john.lawson/NEXRAD_data'
 
 
 CASES = collections.OrderedDict()
-if False: # works for aws - test for others
-    CASES[datetime.datetime(2016,3,31,0,0,0)] = [
-                            datetime.datetime(2016,3,31,19,0,0),
-                            datetime.datetime(2016,3,31,20,0,0),
-                            datetime.datetime(2016,3,31,21,0,0),
-                            datetime.datetime(2016,3,31,22,0,0),
-                            datetime.datetime(2016,3,31,23,0,0),
-                            ]
-if True: # sizes messed up
-    CASES[datetime.datetime(2017,5,1,0,0,0)] = [
-                            datetime.datetime(2017,5,1,19,0,0),
-                            # datetime.datetime(2017,5,1,20,0,0),
-                            # datetime.datetime(2017,5,1,21,0,0),
-                            # datetime.datetime(2017,5,1,22,0,0),
-                            # datetime.datetime(2017,5,1,23,0,0),
-                            ]
-if False: # kernel hull issue
-    CASES[datetime.datetime(2017,5,2,0,0,0)] = [
-                            datetime.datetime(2017,5,2,23,0,0),
-                            datetime.datetime(2017,5,3,0,0,0),
-                            datetime.datetime(2017,5,3,1,0,0),
-                            datetime.datetime(2017,5,3,2,0,0),
-                            datetime.datetime(2017,5,3,3,0,0),
-                            ]
-if False: # kernel hull issue
-    CASES[datetime.datetime(2017,5,4,0,0,0)] = [
-                            datetime.datetime(2017,5,4,22,0,0),
-                            datetime.datetime(2017,5,4,23,0,0),
-                            datetime.datetime(2017,5,5,0,0,0),
-                            datetime.datetime(2017,5,5,1,0,0),
-                            datetime.datetime(2017,5,5,2,0,0),
-                            ]
+CASES[datetime.datetime(2016,3,31,0,0,0)] = [
+                        datetime.datetime(2016,3,31,19,0,0),
+                        datetime.datetime(2016,3,31,20,0,0),
+                        datetime.datetime(2016,3,31,21,0,0),
+                        datetime.datetime(2016,3,31,22,0,0),
+                        datetime.datetime(2016,3,31,23,0,0),
+                        ]
+CASES[datetime.datetime(2017,5,1,0,0,0)] = [
+                        datetime.datetime(2017,5,1,19,0,0),
+                        datetime.datetime(2017,5,1,20,0,0),
+                        datetime.datetime(2017,5,1,21,0,0),
+                        datetime.datetime(2017,5,1,22,0,0),
+                        datetime.datetime(2017,5,1,23,0,0),
+                        ]
+CASES[datetime.datetime(2017,5,2,0,0,0)] = [
+                        datetime.datetime(2017,5,2,23,0,0),
+                        datetime.datetime(2017,5,3,0,0,0),
+                        datetime.datetime(2017,5,3,1,0,0),
+                        datetime.datetime(2017,5,3,2,0,0),
+                        datetime.datetime(2017,5,3,3,0,0),
+                        ]
+CASES[datetime.datetime(2017,5,4,0,0,0)] = [
+                        datetime.datetime(2017,5,4,22,0,0),
+                        datetime.datetime(2017,5,4,23,0,0),
+                        datetime.datetime(2017,5,5,0,0,0),
+                        datetime.datetime(2017,5,5,1,0,0),
+                        datetime.datetime(2017,5,5,2,0,0),
+                        ]
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -109,11 +105,11 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 
 # "NEXRAD"
 # These are the requests variables
-fcst_vrbls = ("UH25",)
-# fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
+# fcst_vrbls = ("UH02",)
+fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
-obs_vrbls = ("AWS02",)
-# obs_vrbls = ("AWS25","AWS02","ST4","DZ")
+# obs_vrbls = ("AWS02","AWS25","DZ",)
+obs_vrbls = ("AWS25","AWS02","ST4","DZ","NEXRAD")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
@@ -593,7 +589,7 @@ def _unsparsify(mrms_nc,vrbl,d01_nc=False):
     # return unsparsify.do_unsparsify(mrms_nc,vrbl,d01_nc)
     x1,ulat,y1,ulon, varname,ref1 = readwdssii(mrms_nc)
     output = N.flipud(ref1)
-    pdb.set_trace()
+    # pdb.set_trace()
     return output
 
 
@@ -622,7 +618,7 @@ def get_mrms_rotdz_grid(caseutc=None,vrbl=None,nc=None):
     lats = -1.0 * (_x - ullat)
     lons = _y + ullon
 
-    pdb.set_trace()
+    # pdb.set_trace()
 
     return N.flipud(lats),lons
 
@@ -731,8 +727,11 @@ def lookup_mrms_metadata(caseutc,vrbl):
 
 def open_random_rotdz(caseutc,vrbl):
     FILES, utcs, _key, fdir = return_all_mrms(caseutc,vrbl)
-    t = utcs[0]
+    nt = len(utcs)
+    # t = utcs[0]
+    t = utcs[int(nt/2)]
     f = FILES[t]
+    # pdb.set_trace()
     # return f
     return Dataset(os.path.join(fdir,f))
 

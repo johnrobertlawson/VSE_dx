@@ -129,7 +129,7 @@ N	test_kde.py	/^import numpy as N$/;"	i
 N	test_verif.py	/^import numpy as N$/;"	i
 N	verif_parallel.py	/^import numpy as N$/;"	i
 NEWGRID	_old_verif_parallel.py	/^    NEWGRID = try_load_newgrid(initstr=initstr,E=E)$/;"	v
-NICENAMES	new_verif_parallel.py	/^NICENAMES = dict("d01_3km"="EE3km",$/;"	v
+NICENAMES	new_verif_parallel.py	/^NICENAMES = {"d01_3km":"EE3km",$/;"	v
 NL	generate_namelists.py	/^NL = {n:{} for n in ensnums}$/;"	v
 NL	old_generate_namelists.py	/^NL = {}$/;"	v
 NS	generate_namelists.py	/^NS = parser.parse_args()$/;"	v
@@ -137,7 +137,7 @@ NS	old_generate_namelists.py	/^NS = parser.parse_args()$/;"	v
 OBS	_old_verif_parallel.py	/^        OBS = ST4$/;"	v
 OBS	old_verif.py	/^OBS = (ST4,RADARS)$/;"	v
 OBS_CODES	new_verif_parallel.py	/^OBS_CODES = {$/;"	v
-OBS_VRBLS	extract_fields.py	/^OBS_VRBLS = ("AWS02","AWS25","DZ","ST4",)$/;"	v
+OBS_VRBLS	extract_fields.py	/^OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 ObjectBased	_alt_verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
 ObjectBased	_old_verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
 ObjectBased	verif_parallel.py	/^from evac.stats.objectbased import ObjectBased$/;"	i
@@ -170,6 +170,7 @@ ProbScores	test_crps.py	/^from evac.stats.probscores import ProbScores$/;"	i
 ProbScores	verif_parallel.py	/^from evac.stats.probscores import ProbScores$/;"	i
 R	test_verif.py	/^            R = R_large$/;"	v
 R	test_verif.py	/^            R = R_small$/;"	v
+RADARS	extract_fields.py	/^    RADARS = ObsGroup(radardir,'radar')$/;"	v
 RADARS	old_verif.py	/^RADARS = ObsGroup(radardir,'radar')$/;"	v
 RANCOL	new_verif_parallel.py	/^RANCOL = {$/;"	v
 RESCOLS	new_verif_parallel.py	/^RESCOLS = {$/;"	v
@@ -422,6 +423,7 @@ do_object_pca	new_verif_parallel.py	/^do_object_pca = False$/;"	v
 do_object_performance	new_verif_parallel.py	/^do_object_performance = False$/;"	v
 do_object_waffle	new_verif_parallel.py	/^do_object_waffle = False$/;"	v
 do_pca_plots	new_verif_parallel.py	/^def do_pca_plots(pca,PC_df,features,fmt):$/;"	f
+do_percentiles	new_verif_parallel.py	/^do_percentiles = False$/;"	v
 do_performance	new_verif_parallel.py	/^do_performance = False$/;"	v
 do_plot_test	new_verif_parallel.py	/^do_plot_test = False$/;"	v
 do_quicklooks	new_verif_parallel.py	/^do_quicklooks = not PA.no_quick$/;"	v
@@ -471,7 +473,7 @@ experiment	old_generate_namelists.py	/^        experiment = "SP"$/;"	v
 experiment	old_generate_namelists.py	/^        experiment = "SP-Stoch"$/;"	v
 experiments	old_generate_namelists.py	/^experiments = NL.keys()$/;"	v
 extract_fields	verif_parallel.py	/^def extract_fields():$/;"	f
-extractroot	new_verif_parallel.py	/^extractroot = '\/work\/john.lawson\/VSE_reso\/pp\/{}'.format(key_pp)$/;"	v
+extractroot	new_verif_parallel.py	/^extractroot = '\/Users\/john.lawson\/data\/{}'.format(key_pp)$/;"	v
 f1	test_extraction.py	/^f1 = 'REFL_comp_d01_3km_20160331_2200_2215_m01.npy'$/;"	v
 f3	test_extraction.py	/^f3 = 'REFL_comp_d02_1km_20160331_2200_2215_m01.npy'$/;"	v
 f4	test_extraction.py	/^f4 = 'REFL_comp_d02_3km_20160331_2200_2215_m01.npy'$/;"	v
@@ -499,7 +501,7 @@ fcst_pp	test_kde.py	/^    fcst_pp = N.empty([nlat,nlon])$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^                    fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp" $/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "REFL_comp"$/;"	v
 fcst_vrbl	new_verif_parallel.py	/^    fcst_vrbl = "UH25"$/;"	v
-fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("UH25",)$/;"	v
+fcst_vrbls	extract_fields.py	/^fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")$/;"	v
 fcst_vrbls	new_verif_parallel.py	/^fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")$/;"	v
 fcstmins	_alt_verif_parallel.py	/^fcstmins = N.arange(0,185,5)$/;"	v
 fcstmins	_test_newruns.py	/^fcstmins = range(30,210,30)$/;"	v
@@ -819,7 +821,7 @@ objectroot	new_verif_parallel.py	/^objectroot = os.path.join(extractroot,'object
 obs_fmts	new_verif_parallel.py	/^    obs_fmts = ("nexrad_3km","nexrad_1km")$/;"	v
 obs_grid	_old_verif_parallel.py	/^    obs_grid = NEWGRID$/;"	v
 obs_vrbl	new_verif_parallel.py	/^    obs_vrbl = "NEXRAD"$/;"	v
-obs_vrbls	extract_fields.py	/^obs_vrbls = ("AWS25",)$/;"	v
+obs_vrbls	extract_fields.py	/^obs_vrbls = ("AWS25","AWS02","ST4","DZ","NEXRAD")$/;"	v
 obs_vrbls	new_verif_parallel.py	/^obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")$/;"	v
 og_nl_path	run_experiments.py	/^        og_nl_path = wofdir \/ 'mem1' \/ 'namelist.input'$/;"	v
 onlydo	generate_namelists.py	/^onlydo = NS.onlydo $/;"	v
@@ -858,7 +860,7 @@ outdir	test_verif.py	/^outdir = '\/home\/john.lawson\/VSE_reso\/pyoutput\/test2'
 outfpath	test_verif.py	/^        outfpath = os.path.join(outdir,fname)$/;"	v
 outroot	_alt_verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
 outroot	_old_verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
-outroot	new_verif_parallel.py	/^outroot = "\/mnt\/jlawson\/VSE_dx\/figures\/"$/;"	v
+outroot	new_verif_parallel.py	/^outroot = "\/Users\/john.lawson\/data\/figures"$/;"	v
 outroot	old_verif.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput'$/;"	v
 outroot	test_kde.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/'$/;"	v
 outroot	verif_parallel.py	/^outroot = '\/home\/john.lawson\/VSE_reso\/pyoutput\/{}'.format(key_plot)$/;"	v
