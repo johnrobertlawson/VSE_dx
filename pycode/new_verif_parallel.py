@@ -49,9 +49,11 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
-do_plot_test = False
+do_plot_test = True
 
 do_domains = False
+do_percentiles = False
+
 do_performance = False
 do_efss = False # Also includes FISS, which is broken?
 
@@ -72,46 +74,48 @@ do_object_cluster = False
 
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
-                        # datetime.datetime(2016,3,31,19,0,0),
-                        # datetime.datetime(2016,3,31,20,0,0),
+                        datetime.datetime(2016,3,31,19,0,0),
+                        datetime.datetime(2016,3,31,20,0,0),
                         datetime.datetime(2016,3,31,21,0,0),
-                        # datetime.datetime(2016,3,31,22,0,0),
-                        # datetime.datetime(2016,3,31,23,0,0),
+                        datetime.datetime(2016,3,31,22,0,0),
+                        datetime.datetime(2016,3,31,23,0,0),
                         ]
-CASES[datetime.datetime(2017,5,1,0,0,0)] = [
+# CASES[datetime.datetime(2017,5,1,0,0,0)] = [
                         # datetime.datetime(2017,5,1,19,0,0),
                         # datetime.datetime(2017,5,1,20,0,0),
-                        datetime.datetime(2017,5,1,21,0,0),
+                        # datetime.datetime(2017,5,1,21,0,0),
                         # datetime.datetime(2017,5,1,22,0,0),
                         # datetime.datetime(2017,5,1,23,0,0),
-                        ]
-CASES[datetime.datetime(2017,5,2,0,0,0)] = [
+                        # ]
+# CASES[datetime.datetime(2017,5,2,0,0,0)] = [
                         # datetime.datetime(2017,5,2,23,0,0),
                         # datetime.datetime(2017,5,3,0,0,0),
-                        datetime.datetime(2017,5,3,1,0,0),
+                        # datetime.datetime(2017,5,3,1,0,0),
                         # datetime.datetime(2017,5,3,2,0,0),
                         # datetime.datetime(2017,5,3,3,0,0),
-                        ]
-CASES[datetime.datetime(2017,5,4,0,0,0)] = [
+                        # ]
+# CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                         # datetime.datetime(2017,5,4,22,0,0),
                         # datetime.datetime(2017,5,4,23,0,0),
-                        datetime.datetime(2017,5,5,0,0,0),
+                        # datetime.datetime(2017,5,5,0,0,0),
                         # datetime.datetime(2017,5,5,1,0,0),
                         # datetime.datetime(2017,5,5,2,0,0),
-                        ]
+                        # ]
 # To do - 20180429 (texas panhandle)
 # CASES[datetime.datetime(2018,4,29,0,0,0)] = []
 
 ### DIRECTORIES ###
 # extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
 key_pp = 'AprilFool'
-extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
+#extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
+extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 
 objectroot = os.path.join(extractroot,'object_instances')
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
-outroot = "/mnt/jlawson/VSE_dx/figures/"
+# outroot = "/mnt/jlawson/VSE_dx/figures/"
+outroot = "/Users/john.lawson/data/figures"
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -127,11 +131,11 @@ all_fcstmins = N.arange(5,185,5)
 # fcst_fmts = ("d01_3km","d02_1km","d02_3km")
 fcst_fmts =  ("d01_3km","d02_1km")
 
-NICENAMES = dict("d01_3km"="EE3km",
-                    "d01_raw"="EE3km",
-                    "d02_raw"="EE1km",
-                    "d02_1km"="EE1km",
-                    "d02_3km"="EE1km-i",)
+NICENAMES = {"d01_3km":"EE3km",
+                    "d01_raw":"EE3km",
+                    "d02_raw":"EE1km",
+                    "d02_1km":"EE1km",
+                    "d02_3km":"EE1km-i",}
 
 #### FOR DEBUGGING ####
 CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
@@ -1016,7 +1020,16 @@ if do_domains:
         D.plot_domains()
     print("Domains plot saved to",fpath)
 
+if do_percentiles:
+    pass
+    # JRL: create cdfs of cref, qpf, az-shear in EE3, EE1, and obs.
+    # Evaluate everything at "key" percentiles, e.g. 90, 95, 99% for extreme stuff
 
+    # Later, we can compute debiased differences for matched objects?
+
+    # TODO: should object ID be based on percentiles too? Or should a storm
+    # always be >?? dBZ? Maybe show how different the location of e.g. 45 dBZ is
+    # on the two distributions. If they are close, use the same mask threshold.
 
 if do_performance:
     print(stars,"DOING PERFORMANCE",stars)
