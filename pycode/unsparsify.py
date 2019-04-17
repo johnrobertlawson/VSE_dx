@@ -47,6 +47,7 @@ def sparseFull(a):
         else:
             b[x,y:(y + z)] = w
 
+    # pdb.set_trace()
     return b
 
 
