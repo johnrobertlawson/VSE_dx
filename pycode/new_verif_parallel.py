@@ -11,6 +11,7 @@ import multiprocessing
 import argparse
 import time
 import itertools
+import random
 
 import numpy as N
 import matplotlib as M
@@ -52,7 +53,7 @@ do_quicklooks = not PA.no_quick
 do_plot_test = False
 
 do_domains = False
-do_percentiles = False
+do_percentiles = True
 
 do_performance = False
 do_efss = False # Also includes FISS, which is broken?
@@ -80,27 +81,27 @@ CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                         datetime.datetime(2016,3,31,22,0,0),
                         datetime.datetime(2016,3,31,23,0,0),
                         ]
-# CASES[datetime.datetime(2017,5,1,0,0,0)] = [
-                        # datetime.datetime(2017,5,1,19,0,0),
-                        # datetime.datetime(2017,5,1,20,0,0),
-                        # datetime.datetime(2017,5,1,21,0,0),
-                        # datetime.datetime(2017,5,1,22,0,0),
-                        # datetime.datetime(2017,5,1,23,0,0),
-                        # ]
-# CASES[datetime.datetime(2017,5,2,0,0,0)] = [
-                        # datetime.datetime(2017,5,2,23,0,0),
-                        # datetime.datetime(2017,5,3,0,0,0),
-                        # datetime.datetime(2017,5,3,1,0,0),
-                        # datetime.datetime(2017,5,3,2,0,0),
-                        # datetime.datetime(2017,5,3,3,0,0),
-                        # ]
-# CASES[datetime.datetime(2017,5,4,0,0,0)] = [
-                        # datetime.datetime(2017,5,4,22,0,0),
-                        # datetime.datetime(2017,5,4,23,0,0),
-                        # datetime.datetime(2017,5,5,0,0,0),
-                        # datetime.datetime(2017,5,5,1,0,0),
-                        # datetime.datetime(2017,5,5,2,0,0),
-                        # ]
+CASES[datetime.datetime(2017,5,1,0,0,0)] = [
+                        datetime.datetime(2017,5,1,19,0,0),
+                        datetime.datetime(2017,5,1,20,0,0),
+                        datetime.datetime(2017,5,1,21,0,0),
+                        datetime.datetime(2017,5,1,22,0,0),
+                        datetime.datetime(2017,5,1,23,0,0),
+                        ]
+CASES[datetime.datetime(2017,5,2,0,0,0)] = [
+                        datetime.datetime(2017,5,2,23,0,0),
+                        datetime.datetime(2017,5,3,0,0,0),
+                        datetime.datetime(2017,5,3,1,0,0),
+                        datetime.datetime(2017,5,3,2,0,0),
+                        datetime.datetime(2017,5,3,3,0,0),
+                        ]
+CASES[datetime.datetime(2017,5,4,0,0,0)] = [
+                        datetime.datetime(2017,5,4,22,0,0),
+                        datetime.datetime(2017,5,4,23,0,0),
+                        datetime.datetime(2017,5,5,0,0,0),
+                        datetime.datetime(2017,5,5,1,0,0),
+                        datetime.datetime(2017,5,5,2,0,0),
+                        ]
 # To do - 20180429 (texas panhandle)
 # CASES[datetime.datetime(2018,4,29,0,0,0)] = []
 
@@ -138,7 +139,7 @@ NICENAMES = {"d01_3km":"EE3km",
                     "d02_3km":"EE1km-i",}
 
 #### FOR DEBUGGING ####
-CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
+#CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], }
 
 # fcst_vrbls = ("REFL_comp",)
 # fcst_vrbls = ("Wmax",)
@@ -154,8 +155,8 @@ CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0
 ########################
 
 VRBL_CODES = {
-                # "REFL_comp":"NEXRAD",
-                "REFL_comp":"DZ",
+                "REFL_comp":"NEXRAD",
+                # "REFL_comp":"DZ",
                 "UH02":"AWS02",
                 "UH25":"AWS25",
                 "accum_precip":"ST4",
@@ -163,7 +164,7 @@ VRBL_CODES = {
 VRBL_CODES2 = {v:k for k,v in VRBL_CODES.items()}
 OBS_CODES = {
                 'NEXRAD':'nexrad',
-                "AWS02": 'mrms_dz',
+                "AWS02": 'mrms_aws',
                 "AWS25":'mrms_aws',
                 "ST4":'stageiv',
                 "DZ":"mrms_dz",
@@ -868,7 +869,7 @@ def get_color(fmt,mem):
                 4:"#A80441",
                 5:"#850031",
                 6:"#650025",}}
-            
+
     mem_no = int(mem[1:])
     assert 0 < mem_no < 37
     mem_combo = (mem_no % 6)+1
@@ -876,6 +877,10 @@ def get_color(fmt,mem):
     # d01 or EE3km is #1A85FF or (26,133,255)
     # d02 or EE1km is #D41159 or (212,17,89)
     return CCC[fmt][mem_combo]
+
+def shuffled_copy(seq):
+    l = list(seq)
+    return random.sample(l,len(l))
 
 ###############################################################################
 ############################### END OF FUNCTIONS ##############################
@@ -935,62 +940,78 @@ PROD = {
 ### PROCEDURE ###
 
 if do_plot_test:
-    print(stars,"TESTS",stars)
+    fcst_vrbl_1 = "UH02"
+    fcst_vrbl_2 = "REFL_comp"
 
-    fcst_vrbl = "UH25"
-    # for fcst_fmt in ("d02_1km","d01_3km"):
-    for fcst_fmt in ("d01_3km","d02_1km"):
-    # fcst_fmt = "d02_1km"
+    def gen_4panel(v1,v2):
+        for fcst_fmt in ("d01_3km","d02_1km"):
+            for caseutc,initutcs in CASES.items():
+                for initutc in shuffled_copy(initutcs):
+                    for fm in shuffled_copy(all_fcstmins):
+                        yield fcst_fmt, caseutc, initutc, fm, v1, v2
+
+    def make_4panel(i):
+        fcst_fmt, caseutc, initutc, fm, fcst_vrbl_1, fcst_vrbl_2 = i
         kmstr = "1km" if "1km" in fcst_fmt else "3km"
+        fname = "test_{}_{}_{:03d}min_{}.png".format(fcst_vrbl_1,fcst_vrbl_2,
+                                            int(fm),kmstr)
 
-        for caseutc,initutcs in CASES.items():
-            initutc = initutcs[0]
-            for fm in all_fcstmins:
-            # for fm in (30,80,85,90,95,100,180):
-            # for fm in (5,10,15):
-                fname = "test_UH_AWS_{:03d}min_{}.png".format(int(fm),kmstr)
-                fpath = os.path.join(outroot,fname)
+        casestr = utils.string_from_time('dir',caseutc,strlen='day')
+        initstr = utils.string_from_time('dir',initutc,strlen='hour')
+        fpath = os.path.join(outroot,'quicklooks_{}_{}'.format(fcst_vrbl_1,fcst_vrbl_2),
+                                casestr,initstr,fname)
 
-                validutc = initutc+datetime.timedelta(seconds=60*int(fm))
-                # fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
-                            # validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
-                lats, lons = load_latlons(fcst_fmt,caseutc)
+        if os.path.exists(fpath):
+            print("Already plotted this. Skipping.")
+            return
 
-                fig,axes = plt.subplots(nrows=2,ncols=2,figsize=(8,5))
+        validutc = initutc+datetime.timedelta(seconds=60*int(fm))
+        # fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
+                    # validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
+        lats, lons = load_latlons(fcst_fmt,caseutc)
 
-                # left figure: obs
-                for nax, ax in enumerate(axes.flat):
-                    fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp" 
-                    fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
-                            validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
-                    bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
-                                        llcrnrlat=lats.min(),llcrnrlon=lons.min(),
-                                        ax=ax,proj="merc")
-                    # bmap.drawcounties()
-                    bmap.drawstates()
-                    x,y = bmap(lons,lats)
+        fig,axes = plt.subplots(nrows=2,ncols=2,figsize=(8,5))
 
-                    S = Scales('cref')
-                    if nax in (0,1):
-                        kw = dict(alpha=0.5,levels=N.arange(0.001,0.50,0.001))
-                    else:
-                        kw = dict(levels=N.arange(5,95),cmap=S.cm)
+        # left figure: obs
+        for nax, ax in enumerate(axes.flat):
+            fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp"
+            fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
+                    validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
+            bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
+                                llcrnrlat=lats.min(),llcrnrlon=lons.min(),
+                                ax=ax,proj="merc")
+            # bmap.drawcounties()
+            bmap.drawstates()
+            x,y = bmap(lons,lats)
 
-                    if nax in (0,2):
-                        cf = bmap.contourf(x,y,obs_data,**kw)
-                        ax.set_title("Obs")
-                    else:
-                        cf = bmap.contourf(x,y,fcst_data,**kw)
-                        ax.set_title("Fcst")
-                
-                fig.tight_layout()
-                utils.trycreate(fpath)
-                fig.savefig(fpath)
-                print("saved to",fpath)
-                plt.close(fig)
-                # pdb.set_trace()
-                pass
+            S = Scales('cref')
+            if nax in (0,1):
+                kw = dict(alpha=0.5,levels=N.arange(0.001,0.50,0.001))
+            else:
+                kw = dict(levels=N.arange(5,95),cmap=S.cm)
 
+            if nax in (0,2):
+                cf = bmap.contourf(x,y,obs_data,**kw)
+                ax.set_title("Obs")
+            else:
+                cf = bmap.contourf(x,y,fcst_data,**kw)
+                ax.set_title("Fcst")
+
+        fig.tight_layout()
+        utils.trycreate(fpath)
+        fig.savefig(fpath)
+        print("saved to",fpath)
+        plt.close(fig)
+        # pdb.set_trace()
+        pass
+
+    fvs = (fcst_vrbl_1,fcst_vrbl_2)
+    if ncpus > 1:
+        with multiprocessing.Pool(ncpus) as pool:
+            results = pool.map(make_4panel,gen_4panel(*fvs))
+    else:
+        for i in gen_4panel(*fvs):
+            make_4panel(i)
 
 if do_domains:
     print(stars,"DOING DOMAINS",stars)
@@ -1101,7 +1122,7 @@ if do_performance:
                 YYY[fmt]["POD"][casestr][mem].append(_pod)
                 YYY[fmt]["FAR"][casestr][mem].append(_far)
 
-    
+
         # pdb.set_trace()
         for casestr in casestrs:
             fname1 = "perfdiag_{}_{}th_{}min_{}".format(vrbl,thresh,fcstmin,casestr)
@@ -1222,7 +1243,7 @@ if do_performance:
 
         PD3.save()
     PD0.save()
-    
+
 if do_efss:
     print(stars,"DOING EFSS",stars)
     def compute_efss(i,threshs,spatial_windows,temporal_window):
@@ -1236,8 +1257,8 @@ if do_efss:
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return efss.results
 
-    # JRL TODO: change eFSS/FISS threshold variable so it is 
-    # independent (obs/fcst) and can be used to do a 
+    # JRL TODO: change eFSS/FISS threshold variable so it is
+    # independent (obs/fcst) and can be used to do a
     # percentile evaluation, for instance
 
     #threshs = (10,20,30,35,40,45,50,55)
@@ -1540,14 +1561,14 @@ if object_switch:
     # Do combined PCA
     fname = "pca_all_fcst_objs.pickle"
     fpath = os.path.join(objectroot,fname)
-    
+
     all_features = ['area','eccentricity','extent','max_intensity',
                     'mean_intensity','perimeter','longaxis_km',
                     # JRL TODO: more features to discriminate
                     # between the two domains
                     'max_updraught','ud_distance_from_centroid',
                     'mean_updraught',
-                    # JRL TODO: az shear! QPF! 
+                    # JRL TODO: az shear! QPF!
                     # Will have to hack the megaframe more
                     ]
     if (not os.path.exists(fpath)) or overwrite_pp:
