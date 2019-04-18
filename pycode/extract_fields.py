@@ -363,7 +363,7 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
     # if N.ma.is_masked(data):
         # data = data.data
 
-    pdb.set_trace()
+    # pdb.set_trace()
     _save(arr=data,file=data_fpath)
 
     if load_latlons:
