@@ -121,7 +121,7 @@ debug_mode = False
 # maxsec = 60*60*3
 
 #### FOR DEBUGGING ####
-# CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
+# CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], }
 
 # fcstmins = N.arange(0,20,5)
 # maxsec = 60*60*0.25
@@ -363,6 +363,7 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
     # if N.ma.is_masked(data):
         # data = data.data
 
+    pdb.set_trace()
     _save(arr=data,file=data_fpath)
 
     if load_latlons:
@@ -381,7 +382,7 @@ def get_random_d01(caseutc):
     d01_fname = get_wrfout_fname(initutc,1)
     d01_fpath = os.path.join(m01dir,d01_fname)
     d01_nc = Dataset(d01_fpath)
-     
+
     return d01_nc
 
 def _load_data(nc_fpath,vrbl,npyfpaths):
@@ -1002,7 +1003,7 @@ for caseutc, initutcs in CASES.items():
             nexrad_lats = RADARS.lats.astype("float32")
             nexrad_lons = RADARS.lons.astype("float32")
             assert nexrad_lats.ndim == 2
-            
+
             utils.trycreate(nexrad_latf,debug=False)
             _save(arr=nexrad_lats,file=nexrad_latf)
             _save(arr=nexrad_lons,file=nexrad_lonf)
@@ -1223,4 +1224,3 @@ else:
         # pool.map(interpolate,commands)
         # pool.map(interpolate,itr)
         pool.map(submit_interp,itr)
-
