@@ -20,6 +20,7 @@ import scipy
 import pandas
 from mpl_toolkits.basemap import Basemap
 from netCDF4 import Dataset
+from scipy.stats import rv_histogram
 
 import evac.utils as utils
 from evac.datafiles.wrfout import WRFOut
@@ -50,7 +51,7 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
-do_plot_test = False
+do_plot_quicklooks = False
 
 do_domains = False
 do_percentiles = True
@@ -117,6 +118,7 @@ objectroot = os.path.join(extractroot,'object_instances')
 #outroot = "/work/john.lawson/VSE_dx/figures"
 # outroot = "/mnt/jlawson/VSE_dx/figures/"
 outroot = "/Users/john.lawson/data/figures"
+tempdir = "/Users/john.lawson/data/intermediate_files"
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -291,6 +293,14 @@ def ob2fc(obs_vrbl,obs_fmt):
     return fcst_vrbl, fcst_fmt
     # fcst_vrbl, fcst_fmt = ob2fc(obs_vrbl,obs_fmt)
 
+def convert_fmt(fcst_fmt=None,obs_fmt=None,fcst_vrbl=None,obs_vrbl=None):
+    if fcst_fmt and obs_vrbl:
+        *_, dx = fcst_fmt.split("_")
+        obs_fmt = "_".join((OBS_CODES[obs_vrbl],dx))
+        return obs_fmt
+    else:
+        raise Exception
+
 def loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,members):
     for mem in members:
         for fcstmin in fcstmins:
@@ -348,31 +358,18 @@ def loop_perf(vrbl,thresh,fcstmin=None,fcst_fmt=None):
                         yield vrbl, caseutc, initutc, mem, fmt, validutc, thresh
 
 def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
-        if mem == "all":
-            for midx, mem in enumerate(member_names):
-                fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
-                        validutc=validutc,caseutc=caseutc,initutc=initutc,
-                        mem=mem)
-                temp_data = N.load(fcst_fpath)
-                if midx == 0:
-                    fcst_data = N.zeros([len(member_names),*temp_data.shape])
-                fcst_data[midx,:,:] = temp_data
-        else:
-            fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
-                    validutc=validutc,caseutc=caseutc,initutc=initutc,
-                    mem=mem)
-            fcst_data = N.load(fcst_fpath)
+    fcst_data = load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,
+                                mem,return_ll=False)
 
-        # These are the corresponding obs formats/data
-        obs_vrbl, obs_fmt = fc2ob(fcst_vrbl,fcst_fmt)
-        obs_fpath = get_extraction_fpaths(vrbl=obs_vrbl,fmt=obs_fmt,
-                        validutc=validutc,caseutc=caseutc)
-        obs_data = N.load(obs_fpath)
-        # pdb.set_trace()
+    # These are the corresponding obs formats/data
+    obs_vrbl, obs_fmt = fc2ob(fcst_vrbl,fcst_fmt)
+    obs_data = load_obs_dll(validutc,caseutc,obs_vrbl=obs_vrbl,
+                            obs_fmt=obs_fmt,return_ll=False)
+    # pdb.set_trace()
 
-        return fcst_data, obs_data
+    return fcst_data, obs_data
 
-def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
+def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem,return_ll=True):
     if mem == "all":
         for midx, mem in enumerate(member_names):
             fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
@@ -388,11 +385,19 @@ def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
                 mem=mem)
         fcst_data = N.load(fcst_fpath)
 
-    fcst_lats, fcst_lons = load_latlons(fcst_fmt,caseutc)
-    return fcst_data, fcst_lats, fcst_lons
+    ######### JRL: ALL FCST DATA EDITING GOES ON HERE ##########
+    if fcst_vrbl in ("UH02","UH25"):
+        fcst_data[fcst_data<0.0] = N.nan
+    ############################################################
+
+    if return_ll:
+        fcst_lats, fcst_lons = load_latlons(fcst_fmt,caseutc)
+        return fcst_data, fcst_lats, fcst_lons
+    else:
+        return fcst_data
 
 def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
-                    fcst_fmt=None,):
+                    fcst_fmt=None,return_ll=True):
     if (obs_vrbl is None) and (obs_fmt is None):
         obs_vrbl, obs_fmt = fc2ob(fcst_vrbl,fcst_fmt)
     elif (fcst_vrbl is None) and (fcst_fmt is None):
@@ -405,9 +410,16 @@ def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
                     validutc=validutc,caseutc=caseutc)
     obs_data = N.load(obs_fpath)
 
-    obs_lats, obs_lons = load_latlons(fcst_fmt,caseutc)
-    return obs_data, obs_lats, obs_lons
+    ######### JRL: ALL OBS DATA EDITING GOES ON HERE ##########
+    if obs_vrbl in ("AWS02","AWS25"):
+        obs_data[obs_data<0.0] = N.nan
+    ############################################################
 
+    if return_ll:
+        obs_lats, obs_lons = load_latlons(fcst_fmt,caseutc)
+        return obs_data, obs_lats, obs_lons
+    else:
+        return obs_data
 
 def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='all'):
     nt = window
@@ -439,11 +451,11 @@ def load_latlons(fmt,caseutc):
     if fmt == "d02_1km":
         fmt = "d02_raw"
     elif fmt == "d01_raw":
-        print("Loading raw (uncut?) d01 lat/lons")
+        pass
+        # print("Loading raw (uncut?) d01 lat/lons")
     elif fmt == "d01_3km":
-        print("Loading raw (3km) d01 lat/lons")
-    # elif fmt == "d01_3km":
-        # fmt = "d01_raw"
+        pass
+        # print("Loading raw (3km) d01 lat/lons")
     else:
         raise Exception
 
@@ -936,10 +948,49 @@ PROD = {
         "nexrad_1km":4,
         }
 
+# These used for percentile plots
+LIMS = {
+    "REFL_comp":[20,90],
+    "NEXRAD":[20,90],
+    "UH25":[0,400],
+    "UH02":[0,100],
+    "AWS25":[0.0,0.02],
+    "AWS02":[0.0,0.02],
+    }
+
+UNITS = {
+    # (multiplier, units)
+    "REFL_comp":(1,"dBZ"),
+    "NEXRAD":(1,"dBZ"),
+    "AWS25":(1000,"10e^{-3} s^{-1}"),
+    "AWS02":(1000,"10e^{-3} s^{-1}"),
+    "UH25":(1,"m^2 s^{-2}"),
+    "UH02":(1,"m^2 s^{-2}"),
+    }
+
+MINMAX = {
+        "NEXRAD":(-32.0,90.0),
+        "REFL_comp":(-35.0,90.0),
+        "UH25":(0.0,400.0),
+        "UH02":(0.0,100.0),
+        "AWS25":(0.0,0.02),
+        "AWS02":(0.0,0.02),
+        }
+
+"""PERCENTILES:
+    * AWS02 is approx the same on 1km and 3km grids. Can use mean percentiles
+    * AWS25 is (ditto)
+    * Note that AWS maybe should be split into years, but actually my
+        three 2017 cases were done "like 2016" (before mid-May?)
+    * UH02 is
+NEXRAD 1km:
+
+"""
+
 ###############################################################################
 ### PROCEDURE ###
 
-if do_plot_test:
+if do_plot_quicklooks:
     fcst_vrbl_1 = "UH02"
     fcst_vrbl_2 = "REFL_comp"
 
@@ -1054,6 +1105,131 @@ if do_percentiles:
 
     # Do 10,001-bin cdf/pdf of each time for obs (3km and 1km) and fcst (EE3, EE1).
     # Compute in parallel then sum over each category to produce four hists:
+
+    def gen_pc_loop(v,kmstr):
+        if kmstr == "3km":
+            fcst_fmt = "d01_3km"
+        elif kmstr == "1km":
+            fcst_fmt = "d02_1km"
+        else:
+            raise Exception
+
+
+        mem_list = list()
+        # if it's a fcst vrbl, yield a list of member names, else tuple("obs").
+        if v in fcst_vrbls:
+            mem_list = member_names
+            fmt = fcst_fmt
+        elif v in obs_vrbls:
+            obs_fmt = convert_fmt(fcst_fmt=fcst_fmt,obs_vrbl=v)
+            mem_list = ("obs",)
+            fmt = obs_fmt
+
+        for caseutc,initutcs in CASES.items():
+            for initutc in shuffled_copy(initutcs):
+                for fm in shuffled_copy(all_fcstmins):
+                    for mem in mem_list:
+                        yield fmt, caseutc, initutc, fm, v, mem
+
+    def pc_func(i):
+        fmt, caseutc, initutc, fm, v, mem = i
+        validutc = initutc + datetime.timedelta(seconds=60*int(fm))
+
+        if mem == 'obs':
+            data, *_ = load_obs_dll(validutc,caseutc,obs_vrbl=v,obs_fmt=fmt)
+        elif mem.startswith("m"):
+            data, *_ = load_fcst_dll(v,fmt,validutc,caseutc,initutc,mem)
+        else:
+            raise Exception
+
+        nbins = 10001
+        hist = N.histogram(data,bins=nbins,range=MINMAX[v],)
+        pdb.set_trace()
+        return hist
+
+    def plot_quantiles(RVH,ax,quantiles,mul_units,pad=0.08):
+        multiplier, units = mul_units
+        ymax = dir(RVH)
+
+        for q in quantiles:
+            col = "red" if q in (0.5,0.7,0.9,0.99,0.999) else "black"
+            xval = RVH.ppf(q)
+            ax.axvline(xval,color=col)
+            if col == "red":
+                xval_mul = xval * multiplier
+                # ax.annotate("{:.2f}".format(q),xy=(xval,1+pad),color=col,**kws)
+                #txt = "{:.1f}%\n{:.1f}{}".format(q*100,xval_mul,units),
+                txt = "\n".join((r"${:.1f}\%$".format(q*100),
+                            r"${:.1f}$".format(xval_mul)))
+                ax.annotate(txt,xy=(xval,1+pad),annotation_clip=False,
+                                fontsize=7,fontstyle="italic",color="brown",)
+        return ax
+
+    #_vrbls = ("NEXRAD","REFL_comp","AWS02","AWS25","UH02","UH25")
+    _vrbls = ("UH02","UH25")
+
+    for _vrbl in _vrbls:
+        for kmstr in ('3km','1km'):
+            pcroot = os.path.join(outroot,"pc_distr",_vrbl,kmstr)
+
+            fname_npy = "pc_distr_{}_{}.npy".format(_vrbl,kmstr)
+            fpath_npy = os.path.join(outroot,tempdir,"pc_distr",fname_npy)
+            if not os.path.exists(fpath_npy) or overwrite_pp:
+                if ncpus > 1:
+                    with multiprocessing.Pool(ncpus) as pool:
+                        results = pool.map(pc_func,gen_pc_loop(_vrbl,kmstr))
+                else:
+                    for i in gen_pc_loop(_vrbl,kmstr):
+                        pc_func(i)
+                # Do merged histogram
+                results = N.array(results)
+                utils.trycreate(fpath_npy,isdir=False)
+                N.save(file=fpath_npy,arr=results)
+            else:
+                results = N.load(fpath_npy)
+
+            hist = N.sum(results[:,0],axis=0)
+
+            # JRL: not sure why there is a 10001/10002 mismatch in pc bins
+            old_bins = results[0,1]
+            RVH = rv_histogram((hist,old_bins))
+
+            print(_vrbl,kmstr,N.sum(hist),"points counted/sorted.")
+
+            bins = N.linspace(old_bins.min(),old_bins.max(),num=hist.shape[0])
+            #q1 = N.arange(0.1,1.0,0.1)
+            #q2 = N.array([0.95,0.99,0.995,0.999,0.9999])
+            #quantiles = N.concatenate([q1,q2])
+            quantiles = (0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95,
+                                0.99,0.995,0.999,0.9999)
+            # RVH.cdf(x=quantiles)
+
+            dw = (bins[1] - bins[0])*0.8
+            # JRL: shouldn't fit anything - just read off different percentiles
+            fname_fig = "pc_histbar_{}_{}.png".format(_vrbl,kmstr)
+            fpath_fig = os.path.join(pcroot,fname_fig)
+            fig,ax = plt.subplots(1)
+            ax.bar(x=bins,height=hist,width=dw,color='green',alpha=0.8)
+            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl])
+            #ax.set_xticks(bins[::1000])
+            #ax.set_xticklabels(["{:.3f}".format(x) for x in bins[::1000]])
+            #ax.set_xlim([bins.min(),bins.max()])
+            utils.trycreate(fpath_fig,isdir=False)
+            fig.savefig(fpath_fig)
+            plt.close(fig)
+
+            fname_fig = "pc_cdf_{}_{}.png".format(_vrbl,kmstr)
+            fpath_fig = os.path.join(pcroot,fname_fig)
+            fpath_fig2 = fpath_fig.replace("_cdf_","_cdfzoom_")
+
+            fig,ax = plt.subplots(1)
+            ax.plot(bins,RVH.cdf(bins))
+            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl])
+            fig.savefig(fpath_fig)
+            ax.set_xlim(LIMS[_vrbl])
+            # ax.set_ylim([RVH.ppf(50)])
+            fig.savefig(fpath_fig2)
+            pass
 
 
 if do_performance:
