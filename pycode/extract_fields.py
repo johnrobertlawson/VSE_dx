@@ -93,7 +93,7 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 ##### OTHER STUFF #####
 
 #### FOR DEBUGGING ####
-CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
+#CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], }
 ########################
 
 stars = "*"*10
@@ -110,7 +110,7 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 
 # "NEXRAD"
 # These are the requests variables
-fcst_vrbls = ("UH02",)
+fcst_vrbls = ("UH02","UH25")
 # fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
 obs_vrbls = ("DZ",)
