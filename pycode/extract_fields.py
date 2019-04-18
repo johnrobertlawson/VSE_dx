@@ -91,6 +91,11 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                         ]
 
 ##### OTHER STUFF #####
+
+#### FOR DEBUGGING ####
+CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
+########################
+
 stars = "*"*10
 dom_names = ("d01","d02")
 member_names = ['m{:02d}'.format(n) for n in range(1,37)]
@@ -105,11 +110,11 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 
 # "NEXRAD"
 # These are the requests variables
-# fcst_vrbls = ("UH02",)
-fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
+fcst_vrbls = ("UH02",)
+# fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
-# obs_vrbls = ("AWS02","AWS25","DZ",)
-obs_vrbls = ("AWS25","AWS02","ST4","DZ","NEXRAD")
+obs_vrbls = ("DZ",)
+# obs_vrbls = ("AWS25","AWS02","ST4","DZ","NEXRAD")
 
 # Don't allow computation without both fcst and obs data requested
 # The WRF files are needed for lat/lon for interp.
@@ -120,8 +125,6 @@ debug_mode = False
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
-#### FOR DEBUGGING ####
-# CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], } 
 
 # fcstmins = N.arange(0,20,5)
 # maxsec = 60*60*0.25
