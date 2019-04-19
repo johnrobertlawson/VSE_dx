@@ -51,10 +51,10 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
-do_plot_quicklooks = False
+do_plot_quicklooks = True
 
 do_domains = False
-do_percentiles = True
+do_percentiles = False
 
 do_performance = False
 do_efss = False # Also includes FISS, which is broken?
@@ -1024,8 +1024,20 @@ if do_plot_quicklooks:
         fig,axes = plt.subplots(nrows=2,ncols=2,figsize=(8,5))
 
         # left figure: obs
-        for nax, ax in enumerate(axes.flat):
-            fcst_vrbl = "UH25" if nax in (0,1) else "REFL_comp"
+        for nax, ax in zip(range(4),axes.flat):
+            if nax == 0:
+                ax.set_title("Obs (AWS)")
+                fcst_vrbl = fcst_vrbl_1
+            elif nax == 1:
+                ax.set_title("Fcst (UH)")
+                fcst_vrbl = fcst_vrbl_1
+            elif nax == 2:
+                ax.set_title("Obs (NEXRAD)")
+                fcst_vrbl = fcst_vrbl_2
+            elif nax == 3:
+                ax.set_title("Fcst (REFL_comp)")
+                fcst_vrbl = fcst_vrbl_2
+
             fcst_data, obs_data = load_both_data(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt,
                     validutc=validutc,caseutc=caseutc,initutc=initutc,mem="m01")
             bmap = create_bmap(urcrnrlat=lats.max(),urcrnrlon=lons.max(),
@@ -1036,17 +1048,20 @@ if do_plot_quicklooks:
             x,y = bmap(lons,lats)
 
             S = Scales('cref')
-            if nax in (0,1):
-                kw = dict(alpha=0.5,levels=N.arange(0.001,0.50,0.001))
+            if nax == 0:
+                kw = dict(alpha=0.9,levels=N.arange(0.0005,0.0105,0.0005))
+            elif nax == 1:
+                if fcst_vrbl == "UH25":
+                    kw = dict(alpha=0.9,levels=N.arange(0.2,100.2,0.2))
+                elif fcst_vrbl == "UH02":
+                    kw = dict(alpha=0.9,levels=N.arange(0.25,400.25,0.25))
             else:
                 kw = dict(levels=N.arange(5,95),cmap=S.cm)
 
             if nax in (0,2):
                 cf = bmap.contourf(x,y,obs_data,**kw)
-                ax.set_title("Obs")
             else:
                 cf = bmap.contourf(x,y,fcst_data,**kw)
-                ax.set_title("Fcst")
 
         fig.tight_layout()
         utils.trycreate(fpath)
