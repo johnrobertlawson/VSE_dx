@@ -51,13 +51,13 @@ overwrite_pp = PA.overwrite_pp
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
-do_plot_quicklooks = True
+do_plot_quicklooks = False
 
 do_domains = False
 do_percentiles = False
 
 do_performance = False
-do_efss = False # Also includes FISS, which is broken?
+do_efss = True # Also includes FISS, which is broken?
 
 object_switch = False
 do_object_pca = False
@@ -894,6 +894,71 @@ def shuffled_copy(seq):
     l = list(seq)
     return random.sample(l,len(l))
 
+class Threshs:
+    def __init__(self,):
+        self.threshs = self.get_dict()
+
+    def get_dict(self,):
+        lookup = {
+                    "REFL_comp":{
+                        "3km": (15.0,23.5,34.7,41.9,52.0,63.5),
+                        "1km": (15.8,24.8,36.2,43.4,53.7,65.7),
+                        },
+                    "NEXRAD":{
+                        "3km": (14.9,23.5,32.9,38.7,49.0,57.3),
+                        "1km": (14.5,23.4,32.8,38.6,49.1,57.5),
+                        },
+                }
+        return lookup
+
+    def get_val(vrbl,fmt,pc=None,qt=None):
+        assert pc or qt
+        dx = self.ensure_fmt(fmt)
+        pcidx = self.get_pc_idx(vrbl,pc=pc,qt=qt)
+        return self.threshs[vrbl][dx][pcidx]
+
+    def ensure_fmt(self,fmt):
+        if fmt in ("d01_3km","d01","3km","lo-res"):
+            return "3km"
+        elif fmt in ("d02","d02_raw","d02_1km","1km","hi-res"):
+            return "1km"
+        else:
+            raise Exception
+
+    def get_pc_idx(self,vrbl,pc=None,qt=None):
+        if qt:
+            assert 0.0 <= qt <= 1.0
+        elif pc:
+            assert 0.0 <= pc <= 100.0
+            raise NotImplementedError
+        else:
+            raise Exception
+
+        try:
+            x = self.quantiles(vrbl).index(qt)
+        except:
+            print("Maybe a rounding error with floating points")
+        finally:
+            return x
+
+    def _get_percentiles(self,vrbl):
+        print("Warning: may have rounding error that I need to fix.")
+        pc = self.get_quartiles(vrbl) * 100.0
+        return pc
+
+    def get_quantiles(self,vrbl):
+        # Percentiles used for paper and scoring
+        if vrbl in ("AWS02","AWS25","UH02","UH25"):
+            return (0.9, 0.99, 0.999,0.9999)
+        elif (vrbl in ("REFL_comp","NEXRAD")) or (vrbl.endswith("cut")):
+            return (0.7,0.8,0.9,0.95,0.99,0.999)
+        else:
+            raise Exception
+
+    def get_threshs(self,vrbl,fmt):
+        dx = self.ensure_fmt(fmt)
+        return self.threshs[vrbl][dx]
+
 ###############################################################################
 ############################### END OF FUNCTIONS ##############################
 ###############################################################################
@@ -950,10 +1015,13 @@ PROD = {
 
 # These used for percentile plots
 LIMS = {
-    "REFL_comp":[20,90],
-    "NEXRAD":[20,90],
-    "UH25":[0,400],
-    "UH02":[0,100],
+    "REFL_comp":[0,75],
+    "NEXRAD":[0,75],
+    "REFL_comp_cut":[0,75],
+    "NEXRAD_cut":[0,75],
+    #"UH25":[0,400],
+    "UH25":[0,150],
+    "UH02":[0,60],
     "AWS25":[0.0,0.02],
     "AWS02":[0.0,0.02],
     }
@@ -962,6 +1030,8 @@ UNITS = {
     # (multiplier, units)
     "REFL_comp":(1,"dBZ"),
     "NEXRAD":(1,"dBZ"),
+    "REFL_comp_cut":(1,"dBZ"),
+    "NEXRAD_cut":(1,"dBZ"),
     "AWS25":(1000,"10e^{-3} s^{-1}"),
     "AWS02":(1000,"10e^{-3} s^{-1}"),
     "UH25":(1,"m^2 s^{-2}"),
@@ -971,6 +1041,8 @@ UNITS = {
 MINMAX = {
         "NEXRAD":(-32.0,90.0),
         "REFL_comp":(-35.0,90.0),
+        "NEXRAD_cut":(0.0,90.0),
+        "REFL_comp_cut":(0.0,90.0),
         "UH25":(0.0,400.0),
         "UH02":(0.0,100.0),
         "AWS25":(0.0,0.02),
@@ -978,17 +1050,35 @@ MINMAX = {
         }
 
 """PERCENTILES:
-    * AWS02 is approx the same on 1km and 3km grids. Can use mean percentiles
-    * AWS25 is (ditto)
-    * Note that AWS maybe should be split into years, but actually my
-        three 2017 cases were done "like 2016" (before mid-May?)
-    * UH02 is
-NEXRAD 1km:
+    * AWS02 1km: 90% (1.7e-3), 99% (4.1e-3), 99.9% (7.8e-3), 99.99% (13.8e-3)
+    * AWS02 3km: 90% (1.7e-3), 99% (4.0e-3), 99.9% (7.7e-3), 99.99% (13.2e-3)
+    * AWS25 1km: 90% (1.9e-3), 99% (4.4e-3), 99.9% (8.1e-3), 99.99% (13.5e-1)
+    * AWS25 3km: 90% (1.9e-3), 99% (4.3e-3), 99.9% (7.9e-3), 99.99% (13.2e-1)
+
+    * UH02 1km: 90% (0.5), 99% (4.2), 99.9% (21.7), 99.99% (59.0)
+    * UH02 3km: 90% (0.2), 99% (1.5), 99.9% (8.1), 99.99% (21.1)
+    * UH25 1km: 90% (0.8), 99% (9.9), 99.9% (52.7), 99.99% (143.3)
+    * UH25 3km: 90% (0.3), 99% (3.2), 99.9% (15.4), 99.99% (37.7)
+
+    * NEXRAD 1km: 70% (14.5), 80% (23.4), 90% (32.8), 95% (38.6), 99% (49.1), 99.9 (57.5)
+    * NEXRAD 3km: 70% (14.9), 80% (23.5), 90% (32.9), 95% (38.7). 99% (49.0), 99.9 (57.3)
+    * REFL_comp 1km: 70% (15.8), 80% (24.8), 90% (36.2), 95% (43.4), 99% (53.7), 99.9 (65.7)
+    * REFL_comp 3km: 70% (15.0), 80% (23.5), 90% (34.7), 95% (41.9), 99% (52.0), 99.9 (63.5)
+
+    * NEXRAD_cut, REFL_comp (identical to above)
+
+    # JRL: QPF - needs RAIN-H creating/pc computation first
+    * ST4 1km
+    * ST4 3km
+    * RAIN-H 1km
+    * RAIN-H 3km
+
 
 """
 
 ###############################################################################
 ### PROCEDURE ###
+PC_Thresh = Threshs()
 
 if do_plot_quicklooks:
     fcst_vrbl_1 = "UH02"
@@ -1132,11 +1222,18 @@ if do_percentiles:
 
         mem_list = list()
         # if it's a fcst vrbl, yield a list of member names, else tuple("obs").
-        if v in fcst_vrbls:
+
+        # v_og here is the variable, raw, with no processing (e.g. cutting at 0)
+        if v.endswith("cut"):
+            v_og = v.replace("_cut","")
+        else:
+            v_og = v
+
+        if v_og in fcst_vrbls:
             mem_list = member_names
             fmt = fcst_fmt
-        elif v in obs_vrbls:
-            obs_fmt = convert_fmt(fcst_fmt=fcst_fmt,obs_vrbl=v)
+        elif v_og in obs_vrbls:
+            obs_fmt = convert_fmt(fcst_fmt=fcst_fmt,obs_vrbl=v_og)
             mem_list = ("obs",)
             fmt = obs_fmt
 
@@ -1150,24 +1247,33 @@ if do_percentiles:
         fmt, caseutc, initutc, fm, v, mem = i
         validutc = initutc + datetime.timedelta(seconds=60*int(fm))
 
+        # v_og here is the variable, raw, with no processing (e.g. v has cutting at 0)
+        if v.endswith("cut"):
+            v_og = v.replace("_cut","")
+        else:
+            v_og = v
+
         if mem == 'obs':
-            data, *_ = load_obs_dll(validutc,caseutc,obs_vrbl=v,obs_fmt=fmt)
+            data, *_ = load_obs_dll(validutc,caseutc,obs_vrbl=v_og,obs_fmt=fmt)
         elif mem.startswith("m"):
-            data, *_ = load_fcst_dll(v,fmt,validutc,caseutc,initutc,mem)
+            data, *_ = load_fcst_dll(v_og,fmt,validutc,caseutc,initutc,mem)
         else:
             raise Exception
 
+        data[data<0.0] = 0.0
         nbins = 10001
         hist = N.histogram(data,bins=nbins,range=MINMAX[v],)
-        pdb.set_trace()
+        # pdb.set_trace()
         return hist
 
-    def plot_quantiles(RVH,ax,quantiles,mul_units,pad=0.08):
+    def plot_quantiles(RVH,ax,quantiles,mul_units,pad=0.08,vrbl=None):
         multiplier, units = mul_units
         ymax = dir(RVH)
 
+        red_pc = PC_Thresh(vrbl)
+
         for q in quantiles:
-            col = "red" if q in (0.5,0.7,0.9,0.99,0.999) else "black"
+            col = "red" if q in red_pc else "black"
             xval = RVH.ppf(q)
             ax.axvline(xval,color=col)
             if col == "red":
@@ -1180,8 +1286,12 @@ if do_percentiles:
                                 fontsize=7,fontstyle="italic",color="brown",)
         return ax
 
+    # JRL: generate RAIN-H (hourly RAINNC) to compare with ST4
+    # Don't do percentiles, because it's likely over-fitting (only 60 verif times)
     #_vrbls = ("NEXRAD","REFL_comp","AWS02","AWS25","UH02","UH25")
-    _vrbls = ("UH02","UH25")
+    #_vrbls = ("UH02","UH25","AWS02","AWS25")
+    #_vrbls = ["NEXRAD","REFL_comp"]
+    _vrbls = ["NEXRAD_cut","REFL_comp_cut"]
 
     for _vrbl in _vrbls:
         for kmstr in ('3km','1km'):
@@ -1225,7 +1335,7 @@ if do_percentiles:
             fpath_fig = os.path.join(pcroot,fname_fig)
             fig,ax = plt.subplots(1)
             ax.bar(x=bins,height=hist,width=dw,color='green',alpha=0.8)
-            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl])
+            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
             #ax.set_xticks(bins[::1000])
             #ax.set_xticklabels(["{:.3f}".format(x) for x in bins[::1000]])
             #ax.set_xlim([bins.min(),bins.max()])
@@ -1239,7 +1349,7 @@ if do_percentiles:
 
             fig,ax = plt.subplots(1)
             ax.plot(bins,RVH.cdf(bins))
-            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl])
+            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
             fig.savefig(fpath_fig)
             ax.set_xlim(LIMS[_vrbl])
             # ax.set_ylim([RVH.ppf(50)])
@@ -1437,14 +1547,18 @@ if do_performance:
 
 if do_efss:
     print(stars,"DOING EFSS",stars)
-    def compute_efss(i,threshs,spatial_windows,temporal_window):
+    def compute_efss(i,spatial_windows,temporal_window):
         fcst_vrbl, caseutc, initutc, fcst_fmt, validutc, = i
-        fcst_data, obs_data = load_timewindow_both_data(vrbl=fcst_vrbl,fmt=fcst_fmt,
-                        validutc=validutc,caseutc=caseutc,initutc=initutc,
-                        mem='all',window=temporal_window)
-        efss = FISS(xfs=fcst_data,xa=obs_data,thresholds=threshs,ncpus=ncpus,
-                        neighborhoods=spatial_windows,temporal_window=temporal_window,
-                        efss=True)
+        threshs_fcst = PC_Thresh.get_threshs(fcst_vrbl,fmt)
+        obs_vrbl, _obs_fmt = fc2ob(fcst_vrbl=fcst_vrbl,fcst_fmt=fcst_fmt)
+        threshs_obs = PC_Thresh.get_threshs(obs_vrbl,fmt)
+        fcst_data, obs_data = load_timewindow_both_data(vrbl=fcst_vrbl,
+                        fmt=fcst_fmt,validutc=validutc,caseutc=caseutc,
+                        initutc=initutc,mem='all',window=temporal_window)
+        efss = FISS(xfs=fcst_data,xa=obs_data,thresholds_obs=threshs_obs,
+                        thresholds_fcst=threshs_fcst,ncpus=ncpus,efss=True,
+                        neighborhoods=spatial_windows,
+                        temporal_window=temporal_window,)
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return efss.results
 
@@ -1453,7 +1567,10 @@ if do_efss:
     # percentile evaluation, for instance
 
     #threshs = (10,20,30,35,40,45,50,55)
-    threshs = (10,20,30,40,45,50)
+    #threshs = (10,20,30,40,45,50)
+
+    # do i also need fcst_qts?
+
     spatial_windows = {
                         # "d01_3km":(1,3,5,7,9,11,13),
                         "d01_3km":(1,3,5,7,9,),
@@ -1475,9 +1592,14 @@ if do_efss:
     fssdir = os.path.join(extractroot,"efss_fiss")
     utils.trycreate(fssdir,isdir=True)
 
+    obs_qts = PC_Thresh.get_quantiles(vrbl)
 
-    for fcstmin, temporal_window in itertools.product(fcstmins,temporal_windows):
-        print("Doing {} min, {} tw.".format(fcstmin, temporal_window))
+    for fcstmin, temporal_window,caseutc, in itertools.product(
+                fcstmins,temporal_windows,CASES.keys()):
+        casestr = utils.string_from_time('dir',caseutc,strlen='day')
+
+        print("Doing {} min, {} tw, for case {}.".format(
+            fcstmin, temporal_window, casestr))
         efss_data = {}
         fiss_data = {}
         e_npy0_f = "d01_3km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
@@ -1497,11 +1619,13 @@ if do_efss:
             fiss_data['d02_1km'] = N.load(f_npy1)
         else:
             for fmt in ("d01_3km","d02_1km"):
-                itr = loop_efss(vrbl=vrbl,fcstmin=fcstmin,fmt=fmt)
+                threshs_fcst = PC_Thresh.get_threshs(vrbl,fmt)
+                threshs_obs = PC_Thresh.get_threshs(vrbl,fmt)
+                itr = loop_efss(caseutc,vrbl=vrbl,fcstmin=fcstmin,fmt=fmt)
 
                 efss = []
                 for i in list(itr):
-                    efss.append(compute_efss(i,threshs,spatial_windows[fmt],temporal_window))
+                    efss.append(compute_efss(i,spatial_windows[fmt],temporal_window))
 
                 #for vrbl, fmt, fcstmin in itertools.product(_vs,fcst_fmts,_fcms):
                 # fname = "fss_{}_{}min".format(vrbl,fcstmin)
@@ -1512,7 +1636,7 @@ if do_efss:
 
                 # [spatial x thresh x all dates]
                 nsw = len(spatial_windows[fmt])
-                nth = len(threshs)
+                nth = len(obs_qts)
                 # TODO: this is hard coded for the 4 initutcs used for prelim results
                 nt = len(fcstmins) * 4
 
@@ -1520,7 +1644,7 @@ if do_efss:
                 efss_data[fmt] = N.zeros([nsw,nth])
                 fiss_data[fmt] = N.zeros([nsw,nth])
 
-                for (thidx,th),(nhidx,nh) in itertools.product(enumerate(threshs),
+                for (thidx,th),(nhidx,nh) in itertools.product(enumerate(obs_qts),
                                     enumerate(spatial_windows[fmt])):
                     tw = temporal_window
                     efss_load = []
@@ -1541,15 +1665,17 @@ if do_efss:
         fpath = os.path.join(outroot,"efss",fname)
         utils.trycreate(fpath)
         # Plotted in terms of diameter (3 = 3 grid spaces diameter = 9km for d01)
-        for thidx, thresh in enumerate(threshs):
-            label = "d02 (1km, raw) {} dBZ".format(thresh)
+        for thidx, thresh in enumerate(obs_qts):
+            label = "EE1km, ${:.1f}^{th}$ percentile".format(thresh*100)
             ax.plot(spatial_windows["d02_1km"],efss_data["d02_1km"][:,thidx],
-                    color=COLORS["d02_1km"],label=label,alpha=ALPHAS[thresh])
+                    color=COLORS["d02_1km"],label=label,)
+                    # alpha=ALPHAS[thresh])
         sw3 = [3*s for s in spatial_windows['d01_3km']]
-        for thidx, thresh in enumerate(threshs):
-            label = "d01 (3km, raw) {} dBZ".format(thresh)
+        for thidx, thresh in enumerate(obs_qts):
+            label = "EE3km, ${:.1f}^{th}$ percentile".format(thresh*100)
             ax.plot(sw3,efss_data["d01_3km"][:,thidx],
-                    color=COLORS["d01_3km"],label=label,alpha=ALPHAS[thresh])
+                    color=COLORS["d01_3km"],label=label,)
+                    # alpha=ALPHAS[thresh])
         ax.set_xlim([0,30])
         ax.set_ylim([0,1])
         ax.set_xlabel("Neighborhood diameter (km)")
@@ -1565,15 +1691,17 @@ if do_efss:
         fpath = os.path.join(outroot,"fiss",fname)
         utils.trycreate(fpath)
         # Plotted in terms of diameter (3 = 3 grid spaces diameter = 9km for d01)
-        for thidx, thresh in enumerate(threshs):
-            label = "d02 (1km, raw) {} dBZ".format(thresh)
+        for thidx, thresh in enumerate(obs_qts):
+            label = "EE1km, ${:.1f}^{th}$ percentile".format(thresh*100)
             ax.plot(spatial_windows["d02_1km"],fiss_data["d02_1km"][:,thidx],
-                    color=COLORS["d02_1km"],label=label,alpha=ALPHAS[thresh])
+                    color=COLORS["d02_1km"],label=label)
+                    # alpha=ALPHAS[thresh])
         sw3 = [3*s for s in spatial_windows['d01_3km']]
-        for thidx, thresh in enumerate(threshs):
-            label = "d01 (3km, raw) {} dBZ".format(thresh)
+        for thidx, thresh in enumerate(obs_qts):
+            label = "EE3km, ${:.1f}^{th}$ percentile".format(thresh*100)
             ax.plot(sw3,fiss_data["d01_3km"][:,thidx],
-                    color=COLORS["d01_3km"],label=label,alpha=ALPHAS[thresh])
+                    color=COLORS["d01_3km"],label=label)
+                    #,alpha=ALPHAS[thresh])
         ax.set_xlim([0,30])
         ax.set_ylim([-1,1])
         ax.set_xlabel("Neighborhood diameter (km)")
