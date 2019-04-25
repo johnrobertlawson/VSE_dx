@@ -57,9 +57,9 @@ do_domains = False
 do_percentiles = False
 
 do_performance = False
-do_efss = True # Also includes FISS, which is broken?
+do_efss = False # Also includes FISS, which is broken?
 
-object_switch = False
+object_switch = True
 do_object_pca = False
 do_object_performance = False
 do_object_distr = False
@@ -112,13 +112,15 @@ key_pp = 'AprilFool'
 #extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 
-objectroot = os.path.join(extractroot,'object_instances')
+#objectroot = os.path.join(extractroot,'object_instances')
+objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
 # outroot = "/mnt/jlawson/VSE_dx/figures/"
 outroot = "/Users/john.lawson/data/figures"
-tempdir = "/Users/john.lawson/data/intermediate_files"
+#tempdir = "/Users/john.lawson/data/intermediate_files"
+tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files"
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -301,13 +303,18 @@ def convert_fmt(fcst_fmt=None,obs_fmt=None,fcst_vrbl=None,obs_vrbl=None):
     else:
         raise Exception
 
-def loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,members):
-    for mem in members:
-        for fcstmin in fcstmins:
+def loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,members,load=None,shuffle=True):
+    if shuffle is True:
+        f = shuffled_copy
+    else:
+        f = list
+
+    for mem in f(members):
+        for fcstmin in f(fcstmins):
             for caseutc, initutcs in CASES.items():
-                for initutc in initutcs:
+                for initutc in f(initutcs):
                     validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
-                    yield fcst_vrbl, fcst_fmt, validutc, caseutc, initutc, mem
+                    yield fcst_vrbl, fcst_fmt, validutc, caseutc, initutc, mem, load
 
 def loop_obj_obs(obs_vrbl,all_times=True):
     if all_times is True:
@@ -334,11 +341,11 @@ def loop_obj_obs(obs_vrbl,all_times=True):
         assert case is not None
         yield obs_vrbl, obs_fmt, t, case
 
-def loop_efss(vrbl,fcstmin,fmt):
-    for caseutc, initutcs in CASES.items():
-        for initutc in initutcs:
-            validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
-            yield vrbl, caseutc, initutc, fmt, validutc
+def loop_efss(caseutc,vrbl,fcstmin,fmt):
+    # for caseutc, initutcs in CASES.items():
+    for initutc in CASES[caseutc]:
+        validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
+        yield vrbl, caseutc, initutc, fmt, validutc
 
 
 def loop_perf(vrbl,thresh,fcstmin=None,fcst_fmt=None):
@@ -908,10 +915,26 @@ class Threshs:
                         "3km": (14.9,23.5,32.9,38.7,49.0,57.3),
                         "1km": (14.5,23.4,32.8,38.6,49.1,57.5),
                         },
+                    "UH02":{
+                        "3km": (0.2,1.5,8.1,21.1),
+                        "1km": (0.5,4.2,21.7,59.0),
+                        },
+                    "AWS02":{
+                        "1km": (1.7E-3,4.1E-3,7.8E-3,13.8E-3),
+                        "3km": (1.7E-3,4.0E-3,7.7E-3,13.2E-3),
+                        },
+                    "UH25":{
+                        "1km": (0.8,9.9,52.7,143.3),
+                        "3km": (0.3,3.2,15.4,37.7),
+                        },
+                    "AWS25":{
+                        "1km": (1.9E-3,4.4E-3,8.1E-3,13.5E-3),
+                        "3km": (1.9E-3,4.3E-3,7.9E-3,13.2E-3),
+                        },
                 }
         return lookup
 
-    def get_val(vrbl,fmt,pc=None,qt=None):
+    def get_val(self,vrbl,fmt,pc=None,qt=None):
         assert pc or qt
         dx = self.ensure_fmt(fmt)
         pcidx = self.get_pc_idx(vrbl,pc=pc,qt=qt)
@@ -935,11 +958,13 @@ class Threshs:
             raise Exception
 
         try:
-            x = self.quantiles(vrbl).index(qt)
+            x = self.get_quantiles(vrbl).index(qt)
         except:
             print("Maybe a rounding error with floating points")
-        finally:
-            return x
+            x = utils.closest(arr=self.get_quantiles(vrbl),val=qt)
+            print("Using",f"{x:.2f}","to represent",qt)
+            raise Exception
+        return x
 
     def _get_percentiles(self,vrbl):
         print("Warning: may have rounding error that I need to fix.")
@@ -1005,6 +1030,60 @@ size = 20
 for fmt in fcst_fmts:
     SIZES[fmt] = size
     ALPHAS[fmt] = alpha
+
+### COLORBAR
+lawson_cm = {'red':  ((0.0, 0.0, 0.0),
+                   (0.5, 0.8, 1.0),
+                   (1.0, 0.4, 1.0)),
+         'green': ((0.0, 0.0, 0.0),
+                   (0.5, 0.9, 0.9),
+                   (1.0, 0.0, 0.0)),
+         'blue':  ((0.0, 0.0, 0.4),
+                   (0.5, 1.0, 0.8),
+                   (1.0, 0.0, 0.0)),
+        'alpha': ((0.0, 1.0, 1.0),
+                   (0.5, 0.3, 0.3),
+                   (1.0, 1.0, 1.0))
+                }       
+
+
+cmap_vse = {'red': (
+                (0.0, 26/255, 26/255),
+                # (0.25, 26/255, 26/255),
+                (0.25, 20/255, 20/255),
+                # (0.5, 0.0, 0.0),
+                (0.5, 0.5, 0.5),
+                # (0.75, 212/255, 212/255),
+                (0.75, 170/255, 170/255),
+                (1.0, 212/255, 212/255)),
+            'green': (
+                (0.0, 133/255, 133/255),
+                # (0.25, 133/255, 133/255),
+                (0.25, 90/255, 90/255),
+                # (0.5, 0.0, 0.0),
+                (0.5, 0.5, 0.5),
+                # (0.75, 17/255, 17/255),
+                (0.75, 12/255, 12/255),
+                (1.0, 17/255, 17/255)),
+            'blue': (
+                (0.0, 1.0, 1.0),
+                # (0.25, 1.0, 1.0),
+                (0.25, 0.75, 0.75),
+                # (0.5, 0.0, 0.0),
+                (0.5, 0.5, 0.5),
+                # (0.75, 89/255, 89/255),
+                (0.75, 65/255, 65/255),
+                (1.0, 89/255, 89/255)),
+            'alpha': (
+                (0.0, 1.0, 1.0),
+                (0.5, 0.2, 0.2),
+                # (0.5, 0.4, 0.4),
+                (1.0, 1.0, 1.0)),
+            }
+
+
+# plt.register_cmap(name="vse_diverg",data=lawson_cm)
+plt.register_cmap(name="vse_diverg",data=cmap_vse)
 
 PROD = {
         "d01_3km":1,
@@ -1588,8 +1667,9 @@ if do_efss:
     # vrbl = "accum_precip"
     # vrbl = "UH02"
     # vrbl = "UH25"
-    vrbl = "REFL_comp"
-    fssdir = os.path.join(extractroot,"efss_fiss")
+    # vrbl = "REFL_comp"
+    vrbl = "UH25"
+    fssdir = os.path.join(extractroot,"efss_fiss",vrbl)
     utils.trycreate(fssdir,isdir=True)
 
     obs_qts = PC_Thresh.get_quantiles(vrbl)
@@ -1602,10 +1682,10 @@ if do_efss:
             fcstmin, temporal_window, casestr))
         efss_data = {}
         fiss_data = {}
-        e_npy0_f = "d01_3km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
-        e_npy1_f = "d02_1km_efss_{}tw_{}min.npy".format(temporal_window,fcstmin)
-        f_npy0_f = "d01_3km_fiss_{}tw_{}min.npy".format(temporal_window,fcstmin)
-        f_npy1_f = "d02_1km_fiss_{}tw_{}min.npy".format(temporal_window,fcstmin)
+        e_npy0_f = "d01_3km_efss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
+        e_npy1_f = "d02_1km_efss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
+        f_npy0_f = "d01_3km_fiss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
+        f_npy1_f = "d02_1km_fiss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
 
         e_npy0 = os.path.join(fssdir,e_npy0_f)
         e_npy1 = os.path.join(fssdir,e_npy1_f)
@@ -1644,11 +1724,13 @@ if do_efss:
                 efss_data[fmt] = N.zeros([nsw,nth])
                 fiss_data[fmt] = N.zeros([nsw,nth])
 
-                for (thidx,th),(nhidx,nh) in itertools.product(enumerate(obs_qts),
+                for (thidx,qt),(nhidx,nh) in itertools.product(enumerate(obs_qts),
                                     enumerate(spatial_windows[fmt])):
                     tw = temporal_window
                     efss_load = []
                     fiss_load = []
+                    # def get_val(vrbl,fmt,pc=None,qt=None):
+                    th = PC_Thresh.get_val(qt=qt,fmt=fmt,vrbl=vrbl)
                     for eidx,e in enumerate(efss):
                         efss_load.append(e[th][nh][tw]["eFSS"])
                         fiss_load.append(e[th][nh][tw]["FISS"])
@@ -1661,21 +1743,40 @@ if do_efss:
             N.save(file=f_npy1,arr=fiss_data['d02_1km'])
 
         fig,ax = plt.subplots(1)
-        fname = "efss_{}min_{}tw.png".format(fcstmin,temporal_window)
-        fpath = os.path.join(outroot,"efss",fname)
+        fname = "efss_{}_{}min_{}tw.png".format(casestr,fcstmin,temporal_window)
+        fpath = os.path.join(outroot,"efss",vrbl,fname)
         utils.trycreate(fpath)
         # Plotted in terms of diameter (3 = 3 grid spaces diameter = 9km for d01)
-        for thidx, thresh in enumerate(obs_qts):
-            label = "EE1km, ${:.1f}^{th}$ percentile".format(thresh*100)
+        def efss_subloop(vrbl,fmt,obs_qts=obs_qts):
+            # Get alpha, which is darker for higher percentiles
+            if vrbl in ("REFL_comp",):
+                alphas = (0.25,0.40,0.55,0.70,0.85,1.00)
+                unit = 'dBZ'
+            elif vrbl in ("UH02","UH25"):
+                alphas = (0.25,0.50,0.75,1.00)
+                unit = 'm2/s2'
+            else:
+                raise Exception
+
+            count = 0
+            for th,al in zip(sorted(obs_qts),alphas):
+                fcst_val = PC_Thresh.get_val(qt=th,vrbl=vrbl,fmt=fmt)
+                obs_vrbl, obs_fmt = fc2ob(vrbl,fmt)
+                # obs_val = PC_Thresh.get_val(qt=th,vrbl=obs_vrbl,fmt=obs_fmt)
+                obs_val = PC_Thresh.get_val(qt=th,vrbl=obs_vrbl,fmt=fmt)
+                labroot = ": {:.1f} pc: ({}/{} {})".format(th*100,fcst_val,obs_val,unit)
+                yield count, th, labroot,al
+                count += 1
+
+        for thidx, thresh, labroot,alp in efss_subloop(vrbl,"d02_1km"):
+            label = "EE1km"+labroot
             ax.plot(spatial_windows["d02_1km"],efss_data["d02_1km"][:,thidx],
-                    color=COLORS["d02_1km"],label=label,)
-                    # alpha=ALPHAS[thresh])
+                    color=COLORS["d02_1km"],label=label,alpha=alp)
         sw3 = [3*s for s in spatial_windows['d01_3km']]
-        for thidx, thresh in enumerate(obs_qts):
-            label = "EE3km, ${:.1f}^{th}$ percentile".format(thresh*100)
+        for thidx, thresh, labroot,alp in efss_subloop(vrbl,"d01_3km"):
+            label = "EE3km"+labroot
             ax.plot(sw3,efss_data["d01_3km"][:,thidx],
-                    color=COLORS["d01_3km"],label=label,)
-                    # alpha=ALPHAS[thresh])
+                    color=COLORS["d01_3km"],label=label,alpha=alp)
         ax.set_xlim([0,30])
         ax.set_ylim([0,1])
         ax.set_xlabel("Neighborhood diameter (km)")
@@ -1687,31 +1788,99 @@ if do_efss:
         plt.close(fig)
 
         fig,ax = plt.subplots(1)
-        fname = "fiss_{}min_{}tw.png".format(fcstmin,temporal_window)
-        fpath = os.path.join(outroot,"fiss",fname)
+        fname = "fiss_{}_{}min_{}tw.png".format(casestr,fcstmin,temporal_window)
+        fpath = os.path.join(outroot,"fiss",vrbl,fname)
         utils.trycreate(fpath)
         # Plotted in terms of diameter (3 = 3 grid spaces diameter = 9km for d01)
-        for thidx, thresh in enumerate(obs_qts):
-            label = "EE1km, ${:.1f}^{th}$ percentile".format(thresh*100)
+        for thidx, thresh, labroot, alp in efss_subloop(vrbl,"d02_1km"):
+            label = "EE1km"+labroot
             ax.plot(spatial_windows["d02_1km"],fiss_data["d02_1km"][:,thidx],
-                    color=COLORS["d02_1km"],label=label)
-                    # alpha=ALPHAS[thresh])
+                    color=COLORS["d02_1km"],label=label,alpha=alp)
         sw3 = [3*s for s in spatial_windows['d01_3km']]
-        for thidx, thresh in enumerate(obs_qts):
-            label = "EE3km, ${:.1f}^{th}$ percentile".format(thresh*100)
+        for thidx, thresh,labroot,alp in efss_subloop(vrbl,"d01_3km"):
+            label = "EE3km"+labroot
             ax.plot(sw3,fiss_data["d01_3km"][:,thidx],
-                    color=COLORS["d01_3km"],label=label)
-                    #,alpha=ALPHAS[thresh])
+                    color=COLORS["d01_3km"],label=label,alpha=alp)
         ax.set_xlim([0,30])
-        ax.set_ylim([-1,1])
+        ax.set_ylim([-2,1])
         ax.set_xlabel("Neighborhood diameter (km)")
         ax.set_ylabel("Fractional Ignorance Skill Score")
-        ax.axhline(0)
-        ax.legend(prop=dict(size=8),bbox_to_anchor=(1.05,1),
+        ax.axhline(0,color='k')
+        ax.legend(prop=dict(size=6),bbox_to_anchor=(1.05,1),
                     loc="upper left",borderaxespad=0.0)
         fig.tight_layout()
         fig.savefig(fpath)
         plt.close(fig)
+
+        # Do heatmap-style plots here showing diffs per percentile
+        # Use functions, and replace above with functions
+
+        # The darker the square/pixel, the more that EE was better
+        # Normalised by entire paper
+        # Split by case
+        # Show with and without time window
+
+        # Show for REFL_comp and az shear. Maybe QPF
+
+        ### EFSS DIFFS HEATMAP ###
+        # 6 percentiles
+        # 6 spatial thresholds (one just for 1km; others lining up like 9 <-> 27)
+        # 2 time windows (separate subplots)
+        # Custom colour bar, normalised by differences across all, mirrored at 0 (white)
+        # lawson_cm
+
+        for score in ("efss","fiss"):
+            fname = "{}-diffs_{}_{}min_{}tw.png".format(score,casestr,fcstmin,temporal_window)
+            fpath = os.path.join(outroot,"{}-diffs".format(score),vrbl,fname)
+            utils.trycreate(fpath,isdir=False)
+
+            fig,ax = plt.subplots(1)
+
+            # y-axis is obs_qts
+            # x-axis is neighbourhoods
+
+            if score == "efss":
+                _diffs = efss_data['d02_1km'][1:,:] - efss_data['d01_3km']
+                kw = dict(vmin=-0.1,vmax=0.1)
+            elif score == "fiss":
+                _diffs = fiss_data['d02_1km'][1:,:] - fiss_data['d01_3km']
+                kw = dict(vmin=-_diffs.max(), vmax=_diffs.max())
+                
+            diffs = _diffs.T
+            im = ax.imshow(diffs,cmap='vse_diverg', **kw)
+
+            nx,ny = diffs.shape
+            ax.set_yticks(N.arange(nx))
+            ax.set_xticks(N.arange(ny))
+
+            neigh_ticks = spatial_windows['d02_1km'][1:]
+            ax.set_xticklabels(neigh_ticks)
+            ax.set_xlabel("Neighborhood diameter (km)")
+
+            if vrbl == "REFL_comp":
+                qt_labs = ("0.7","0.8","0.9","0.95","0.99","0.999")
+            elif vrbl in ("UH02","UH25"):
+                qt_labs = ("0.9","0.99","0.999","0.9999")
+            else:
+                raise Exception
+            ax.set_yticklabels(qt_labs)
+            ax.set_ylabel("Quantile to exceed")
+
+            plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+                    rotation_mode="anchor")
+            
+            for i,j in itertools.product(range(nx),range(ny)):
+                t = "{:.2f}".format(diffs[i,j])
+                text = ax.text(j,i,t,ha="center",va="center",color="k",size=7,
+                                    fontweight="bold")
+            plt.colorbar(im,ax=ax)
+            fig.tight_layout()
+
+            fig.savefig(fpath)
+            # pdb.set_trace()
+        # pdb.set_trace()
+        pass
+    pass
 
 
 
@@ -1726,7 +1895,7 @@ if object_switch:
     plot_what = "pca"; plot_dir = "pca_check"
 
     def compute_obj_fcst(i):
-        fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem = i
+        fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem, load = i
 
         #if validutc == initutc:
             # Forecast is just zeros.
@@ -1737,13 +1906,13 @@ if object_switch:
                                         initutc=initutc,mem=mem)
         print(stars,"FCST DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
 
+        if "3km" in fcst_fmt:
+            dx = 3.0
+        elif "1km" in fcst_fmt:
+            dx = 1.0
+        else:
+            raise Exception
         if (not os.path.exists(pk_fpath)) or overwrite_pp:
-            if "3km" in fcst_fmt:
-                dx = 3.0
-            elif "1km" in fcst_fmt:
-                dx = 1.0
-            else:
-                raise Exception
 
             fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
                                     validutc,caseutc,initutc,mem)
@@ -1752,9 +1921,24 @@ if object_switch:
             obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
             utils.save_pickle(obj=obj,fpath=pk_fpath)
             # print("Object instance newly created.")
+        elif (load is False):
+            return
         else:
             # print("Object instance already created.")
+
+            # JRL TODO: if this keeps breaking, check for a return of
+            # a string of "ERROR"? And then delete that file,
+            # and it gets recomputed (i.e. go back to above)
             obj = utils.load_pickle(pk_fpath)
+
+            if obj == "ERROR":
+                print("Overwriting",pk_fpath)
+                fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
+                                        validutc,caseutc,initutc,mem)
+
+                kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,fpath=pk_fpath)
+                obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
+                utils.save_pickle(obj=obj,fpath=pk_fpath)
 
         # QUICK LOOKS
         fcstmin = int(((validutc-initutc).seconds)/60)
@@ -1829,19 +2013,32 @@ if object_switch:
         print("Now calculating objects for all forecasts on",fcst_fmt)
         fcst_fname = "all_obj_dataframes_{}.pickle".format(fcst_fmt)
         fcst_fpath = os.path.join(objectroot,fcst_fname)
+
         if (not os.path.exists(fcst_fpath)) or overwrite_pp or overwrite_output:
-            itr_fcst = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names)
+            # First, check all have been created - don't load if not
+            # itr_fcst_1 = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names,load=False,shuffle=False)
+            # if ncpus > 1:
+                # with multiprocessing.Pool(ncpus) as pool:
+                    # results_fcst = pool.map(compute_obj_fcst,itr_fcst_1)
+            # else:
+                # for i in itr_fcst_1:
+                    # compute_obj_fcst(i)
+            # utils.save_pickle(obj=results_fcst,fpath=fcst_fpath)
+
+            # Then, load.
+            itr_fcst_2 = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names,load=True)
             if ncpus > 1:
                 with multiprocessing.Pool(ncpus) as pool:
-                    results_fcst = pool.map(compute_obj_fcst,itr_fcst)
+                    results_fcst = pool.map(compute_obj_fcst,itr_fcst_2)
             else:
-                for i in itr_fcst:
+                for i in itr_fcst_2:
                     compute_obj_fcst(i)
             utils.save_pickle(obj=results_fcst,fpath=fcst_fpath)
         else:
             results_fcst = utils.load_pickle(fcst_fpath)
 
 
+        # pdb.set_trace()
         fname = "pca_model_{}.pickle".format(fcst_fmt)
         fpath = os.path.join(objectroot,fname)
         if (not os.path.exists(fpath)) or overwrite_pp:
@@ -1878,8 +2075,13 @@ if object_switch:
             utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
     # Do combined PCA
-    fname = "pca_all_fcst_objs.pickle"
-    fpath = os.path.join(objectroot,fname)
+
+    # Get data
+    fname = {}
+    fpath = {}
+
+    fname['new'] = "pca_all_fcst_objs.pickle"
+    fpath['new'] = os.path.join(objectroot,fname['new'])
 
     all_features = ['area','eccentricity','extent','max_intensity',
                     'mean_intensity','perimeter','longaxis_km',
@@ -1890,11 +2092,26 @@ if object_switch:
                     # JRL TODO: az shear! QPF!
                     # Will have to hack the megaframe more
                     ]
-    if (not os.path.exists(fpath)) or overwrite_pp:
-        allobj_df = pandas.concat(fcst_dfs,ignore_index=True)
-        CAT = Catalogue(allobj_df,tempdir=objectroot,ncpus=ncpus)
+    if (not os.path.exists(fpath['new'])) or overwrite_pp:
+        # fname['1km'] = "pca_model_d02_1km.pickle"
+        fname['1km'] = "all_obj_dataframes_d02_1km.pickle"
+        fpath['1km'] = os.path.join(objectroot,fname['1km'])
+
+        fname['3km'] = "all_obj_dataframes_d01_3km.pickle"
+        fpath['3km'] = os.path.join(objectroot,fname['3km'])
+
+        results = []
+        for k in ('1km','3km'):
+            data = utils.load_pickle(fpath[k])
+            pdb.set_trace()
+            data2 = pandas.concat(data,ignore_index=True)
+            results.append(data2)
+
+        # allobj_df = pandas.concat(fcst_dfs,ignore_index=True)
+        all_fcst_obj_df = pandas.concat(results,ignore_index=True)
+        CAT = Catalogue(all_fcst_obj_df,tempdir=objectroot,ncpus=ncpus)
         pca, PC_df, features, scaler = CAT.do_pca(all_features)
-        utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+        utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath['new'])
 
 if do_object_pca:
     print(stars,"DOING PCA",stars)
