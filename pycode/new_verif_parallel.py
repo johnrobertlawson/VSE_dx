@@ -59,10 +59,14 @@ do_percentiles = False
 do_performance = False
 do_efss = False # Also includes FISS, which is broken?
 
-object_switch = True
+
+# From scratch, do object_switch, do_object_pca, then delete the object dfs
+# and re-run object_switch to do the MDI of each cell
+
+object_switch = False
 do_object_pca = False
 do_object_performance = False
-do_object_distr = False
+do_object_distr = True
 do_object_matching = False
 do_object_examples = False
 do_object_waffle = False
@@ -598,7 +602,7 @@ def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     # print(fcstmin)
     return kw
 
-def load_megaframe(fmts,add_ens=True,add_W=True):
+def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     # Overwrite fmts...
     del fmts
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
@@ -613,10 +617,13 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
     # w adds on updraught information
 
     if os.path.exists(mega_fpath):
+        print("Megaframe loaded.")
         return utils.load_pickle(mega_fpath)
+    print("Creating megaframe.") 
 
     df_list = []
     for fmt in all_fmts:
+        print("Loading objects from:",fmt)
         fname = "all_obj_dataframes_{}.pickle".format(fmt)
         fpath = os.path.join(objectroot,fname)
         results = utils.load_pickle(fpath)
@@ -637,6 +644,11 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
 
     # pdb.set_trace()
 
+    # JRL TODO: these should be parallelised, but I'm
+    # scared of mixing up the order of things
+    # TODO: also saves the .pickle files (like
+    # W and ens dataframes below) to speed up
+    # creating new dfs to hack into the megaframe
     DTYPES = {"resolution":"object"}
     diff_df = utils.do_new_df(DTYPES,len(df_og))
     for oidx,o in enumerate(df_og.itertuples()):
@@ -647,7 +659,6 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
         diff_df.loc[oidx,"resolution"] = res
     df_og = pandas.concat((df_og,diff_df),axis=1)
     print("Megaframe hacked: resolution added")
-
 
     DTYPES = {"conv_mode":"object"}
     mode_df = utils.do_new_df(DTYPES,len(df_og))
@@ -662,16 +673,30 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
     df_og = pandas.concat((df_og,mode_df),axis=1)
     print("Megaframe hacked: convective mode added")
 
+    ########################
+    ########################
+
     # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
+    ## ##
+    #####
+    # Persistent nearby updraft helicity:
+    # Az Shear or AWS - is object within x km of 0.99 quantile
+    # for x min in a row? Yes/no
 
     ########################
     ########################
+
+    if add_uh_aws:
+        uh_df = load_uh_df()
+        df_og = concat_uh_df(df_og,uh_df)
+        print("Megaframe hacked: UH stats added.")
 
     if add_ens:
         ens_df = load_ens_df(df_og)
         # pdb.set_trace()
         df_og = pandas.concat((df_og,ens_df),axis=1)
         # Now we have megaframe_idx!
+        print("Megaframe hacked: other ensemble stats added.")
 
     # Add on W
     if add_W:
@@ -682,11 +707,13 @@ def load_megaframe(fmts,add_ens=True,add_W=True):
         # pdb.set_trace()
         # df_og = pandas.concat((df_og,W_df),axis=1)
         df_og = concat_W_df(df_og,W_df)
+        print("Megaframe hacked: updraught stats added.")
 
     print("Megaframe created.")
 
     # Save pickle
     df_og.to_pickle(mega_fpath)
+    print("Megaframe saved to disk.")
     # pdb.set_trace()
     return df_og
 
@@ -2115,7 +2142,10 @@ if object_switch:
 
 if do_object_pca:
     print(stars,"DOING PCA",stars)
-    for fmt in all_fmts.append("all"):
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts) #+ ['all',]
+    for fmt in all_fmts:
         if fmt == "all":
             fname = "pca_all_fcst_objs.pickle"
         else:
@@ -2160,6 +2190,7 @@ if do_object_distr:
     obs_fmts = ("nexrad_3km","nexrad_1km")
     all_fmts = list(fcst_fmts) + list(obs_fmts)
     megaframe = load_megaframe(fmts=all_fmts)
+    # pdb.set_trace()
     # max_updraught
     # mean_updraught
     # distance_from_centroid
@@ -2168,7 +2199,7 @@ if do_object_distr:
     # updraught_area_km
     attrs = ("max_updraught",)
 
-    if False:
+    if True:
         # Data from objects and updraught data
         df_fcst = megaframe[(megaframe['member'] != "obs")]
 
