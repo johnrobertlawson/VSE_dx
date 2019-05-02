@@ -12,6 +12,17 @@ import argparse
 import time
 import itertools
 import random
+import warnings
+
+
+# JRL: hack to stop the bloody annoying scikit warnings
+# Others might be surpressed too... not always a good idea.
+# however, TODO, the warning is, for example:
+# https://github.com/scikit-image/scikit-image/issues/3667
+
+def warn(*args, **kwargs):
+    pass
+warnings.warn = warn
 
 import numpy as N
 import matplotlib as M
@@ -60,10 +71,11 @@ do_performance = False
 do_efss = False # Also includes FISS, which is broken?
 
 
-# From scratch, do object_switch, do_object_pca, then delete the object dfs
+# From scratch, do object_switch, do_object_pca, then
+# delete the object dfs (in subdirs too), and
 # and re-run object_switch to do the MDI of each cell
 
-object_switch = False
+object_switch = True
 do_object_pca = False
 do_object_performance = False
 do_object_distr = True
@@ -574,13 +586,17 @@ def get_all_initutcs():
 def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     pca_fname = "pca_model_{}.pickle".format(prodfmt)
     pca_fpath = os.path.join(objectroot,pca_fname)
+    # print("Determining kw arguments for Object ID...")
     if os.path.exists(pca_fpath):
+        # print("Returning a lot of PCA keywords for Object ID")
         P = utils.load_pickle(fpath=pca_fpath)
         kw = dict(classify=True,pca=P['pca'],features=P['features'],
                         scaler=P['scaler'])
     else:
+        # print("No classification of mode will be performed")
         kw = dict()
 
+    # pdb.set_trace()
     if mem is None:
         prod = '_'.join((prodfmt,"obs"))
     else:
@@ -619,7 +635,7 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     if os.path.exists(mega_fpath):
         print("Megaframe loaded.")
         return utils.load_pickle(mega_fpath)
-    print("Creating megaframe.") 
+    print("Creating megaframe.")
 
     df_list = []
     for fmt in all_fmts:
@@ -627,6 +643,9 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
         fname = "all_obj_dataframes_{}.pickle".format(fmt)
         fpath = os.path.join(objectroot,fname)
         results = utils.load_pickle(fpath)
+        if results == "ERROR":
+            print("ERROR!")
+            pdb.set_trace()
         df_list.append(pandas.concat(results,ignore_index=True))
         del fname, fpath, results
     df_og = pandas.concat(df_list,ignore_index=True)
@@ -649,29 +668,11 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     # TODO: also saves the .pickle files (like
     # W and ens dataframes below) to speed up
     # creating new dfs to hack into the megaframe
-    DTYPES = {"resolution":"object"}
-    diff_df = utils.do_new_df(DTYPES,len(df_og))
-    for oidx,o in enumerate(df_og.itertuples()):
-        if int(o.nlats) > 200:
-            res = "hi-res"
-        else:
-            res = "lo-res"
-        diff_df.loc[oidx,"resolution"] = res
-    df_og = pandas.concat((df_og,diff_df),axis=1)
-    print("Megaframe hacked: resolution added")
+    if add_resolution:
+        df_og = add_res_to_df(df_og)
 
-    DTYPES = {"conv_mode":"object"}
-    mode_df = utils.do_new_df(DTYPES,len(df_og))
-    for oidx,o in enumerate(df_og.itertuples()):
-        if o.qlcsness < -0.5:
-            conv_mode = "cellular"
-        elif o.qlcsness > 0.5:
-            conv_mode = "linear"
-        else:
-            conv_mode = "ambiguous"
-        mode_df.loc[oidx,"conv_mode"] = conv_mode
-    df_og = pandas.concat((df_og,mode_df),axis=1)
-    print("Megaframe hacked: convective mode added")
+    if add_mode:
+        df_og = add_mode_to_df(df_og)
 
     ########################
     ########################
@@ -686,9 +687,15 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     ########################
     ########################
 
+    if add_W or add_uh_aws:
+        CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+
     if add_uh_aws:
-        uh_df = load_uh_df()
-        df_og = concat_uh_df(df_og,uh_df)
+        # JRL TODO: what is this below? I'm mimicking grammar from add_W
+        UH_lookup = load_UH_lookup(fcst_fmts)
+        uh_df = load_uh_df(W_lookup,CAT)
+        #df_og = concat_uh_df(df_og,uh_df)
+        df_og = concat_W_df(df_og,uh_df)
         print("Megaframe hacked: UH stats added.")
 
     if add_ens:
@@ -700,12 +707,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
 
     # Add on W
     if add_W:
-        CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
         W_lookup = load_W_lookup(fcst_fmts)#fmts)
         W_df = load_W_df(W_lookup,CAT)
-        # ens_df = create_ens_df(df_og)
-        # pdb.set_trace()
-        # df_og = pandas.concat((df_og,W_df),axis=1)
         df_og = concat_W_df(df_og,W_df)
         print("Megaframe hacked: updraught stats added.")
 
@@ -718,6 +721,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     return df_og
 
 def concat_W_df(df_og,W_df):
+    # TODO: rename, as it can be used for any concatenation, not just W
+
     # df_og.set_index('megaframe_idx').join(other.set_index('megaframe_idx_test'))
     new_df = df_og.join(W_df.set_index('megaframe_idx_test'),on='megaframe_idx')
 
@@ -805,6 +810,18 @@ def load_ens_df(df_og):
         print("Ensemble metadata DataFrame loaded from",fpath)
     return ens_df
 
+def load_uh_df(df_og):
+    fname = "uh_df.pickle"
+    fpath = os.path.join(objectroot,fname)
+    if not os.path.exists(fpath):
+        uh_df = create_uh_df(df_og)
+        utils.save_pickle(obj=uh_df,fpath=fpath)
+        print("UH DF Saved to",fpath)
+    else:
+        uh_df = utils.load_pickle(fpath=fpath)
+        print("UH metadata DataFrame loaded from",fpath)
+    return uh_df
+
 def create_ens_df(megaframe):
     # TODO: parallelise
     def get_case_code(utc):
@@ -886,18 +903,54 @@ def create_ens_df(megaframe):
 
     return ens_df
 
-def sync_dataframes(fmts=None,attr_df=None):
-    """
-    Merge two dataframes along row, such that an object now has new
-    attributes (e.g., updraught max) that can be accessed when sliced.
+def create_uh_df(megaframe):
+    # TODO: parallelise
+    DTYPES = {
+            "member":"object",
+            # This allows lookup with megaframe on top level.
+            "megaframe_idx":"i4"
+            }
 
-    megaframe_idx might help for this
-    """
-    # Sort attr_df by megaframe_idx
+    uh_df = utils.do_new_df(DTYPES,len(megaframe))
+    print("Creating DataFrame for UH/AWS object metadata.")
 
-    # Join at rows
+    for o in megaframe.itertuples():
+        oidx = o.Index
 
-    return
+        # ens_df.loc[oidx,"case_code"] = get_case_code(o.time)
+
+        utils.print_progress(total=len(megaframe),idx=oidx,every=500)
+    return ens_df
+
+def add_res_to_df(df_og):
+    DTYPES = {"resolution":"object"}
+    diff_df = utils.do_new_df(DTYPES,len(df_og))
+    for oidx,o in enumerate(df_og.itertuples()):
+        if int(o.nlats) > 200:
+            res = "EE1km"
+        else:
+            res = "EE3km"
+        diff_df.loc[oidx,"resolution"] = res
+        # pdb.set_trace()
+    df_og = pandas.concat((df_og,diff_df),axis=1)
+    print("Megaframe hacked: resolution added")
+    return df_og
+
+def add_mode_to_df(df_og):
+    DTYPES = {"conv_mode":"object"}
+    mode_df = utils.do_new_df(DTYPES,len(df_og))
+    for oidx,o in enumerate(df_og.itertuples()):
+        if o.qlcsness < -0.5:
+            conv_mode = "cellular"
+        elif o.qlcsness > 0.5:
+            conv_mode = "linear"
+        else:
+            conv_mode = "ambiguous"
+        mode_df.loc[oidx,"conv_mode"] = conv_mode
+        pdb.set_trace()
+    df_og = pandas.concat((df_og,mode_df),axis=1)
+    print("Megaframe hacked: convective mode added")
+    return df_og
 
 def get_color(fmt,mem):
 
@@ -1071,7 +1124,7 @@ lawson_cm = {'red':  ((0.0, 0.0, 0.0),
         'alpha': ((0.0, 1.0, 1.0),
                    (0.5, 0.3, 0.3),
                    (1.0, 1.0, 1.0))
-                }       
+                }
 
 
 cmap_vse = {'red': (
@@ -1872,7 +1925,7 @@ if do_efss:
             elif score == "fiss":
                 _diffs = fiss_data['d02_1km'][1:,:] - fiss_data['d01_3km']
                 kw = dict(vmin=-_diffs.max(), vmax=_diffs.max())
-                
+
             diffs = _diffs.T
             im = ax.imshow(diffs,cmap='vse_diverg', **kw)
 
@@ -1895,7 +1948,7 @@ if do_efss:
 
             plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
                     rotation_mode="anchor")
-            
+
             for i,j in itertools.product(range(nx),range(ny)):
                 t = "{:.2f}".format(diffs[i,j])
                 text = ax.text(j,i,t,ha="center",va="center",color="k",size=7,
