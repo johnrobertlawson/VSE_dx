@@ -32,6 +32,7 @@ import pandas
 from mpl_toolkits.basemap import Basemap
 from netCDF4 import Dataset
 from scipy.stats import rv_histogram
+import seaborn as sns
 
 import evac.utils as utils
 from evac.datafiles.wrfout import WRFOut
@@ -75,11 +76,11 @@ do_efss = False # Also includes FISS, which is broken?
 # delete the object dfs (in subdirs too), and
 # and re-run object_switch to do the MDI of each cell
 
-object_switch = True
+object_switch = False
 do_object_pca = False
 do_object_performance = False
-do_object_distr = True
-do_object_matching = False
+do_object_distr = False
+do_object_matching = True
 do_object_examples = False
 do_object_waffle = False
 do_object_cluster = False
@@ -128,8 +129,8 @@ key_pp = 'AprilFool'
 #extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 
-#objectroot = os.path.join(extractroot,'object_instances')
-objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
+objectroot = os.path.join(extractroot,'object_instances')
+#objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
@@ -196,6 +197,98 @@ OBS_CODES = {
 ###############################################################################
 def get_nice(fmt):
     return NICENAMES[fmt]
+
+#from quantile_lookup import PC_LKUP
+#def get_list_pc(vrbl,fmt):
+#    pcs = sorted(PC_LKUP[vrbl][fmt].keys())
+#    vals = (PC_LKUP[vrbl][fmt][p] for p in pcs)
+#    return vals
+
+class Threshs:
+    def __init__(self,):
+        self.threshs = self.get_dict()
+
+    def get_dict(self,):
+        lookup = {
+                    "REFL_comp":{
+                        "3km": (15.0,23.5,34.7,41.9,52.0,63.5),
+                        "1km": (15.8,24.8,36.2,43.4,53.7,65.7),
+                        },
+                    "NEXRAD":{
+                        "3km": (14.9,23.5,32.9,38.7,49.0,57.3),
+                        "1km": (14.5,23.4,32.8,38.6,49.1,57.5),
+                        },
+                    "UH02":{
+                        "3km": (0.2,1.5,8.1,21.1),
+                        "1km": (0.5,4.2,21.7,59.0),
+                        },
+                    "AWS02":{
+                        "1km": (1.7E-3,4.1E-3,7.8E-3,13.8E-3),
+                        "3km": (1.7E-3,4.0E-3,7.7E-3,13.2E-3),
+                        },
+                    "UH25":{
+                        "1km": (0.8,9.9,52.7,143.3),
+                        "3km": (0.3,3.2,15.4,37.7),
+                        },
+                    "AWS25":{
+                        "1km": (1.9E-3,4.4E-3,8.1E-3,13.5E-3),
+                        "3km": (1.9E-3,4.3E-3,7.9E-3,13.2E-3),
+                        },
+                }
+        return lookup
+
+    def get_val(self,vrbl,fmt,pc=None,qt=None):
+        assert pc or qt
+        dx = self.ensure_fmt(fmt)
+        pcidx = self.get_pc_idx(vrbl,pc=pc,qt=qt)
+        return self.threshs[vrbl][dx][pcidx]
+
+    def ensure_fmt(self,fmt):
+        if fmt in ("d01_3km","d01","3km","lo-res"):
+            return "3km"
+        elif fmt in ("d02","d02_raw","d02_1km","1km","hi-res"):
+            return "1km"
+        else:
+            raise Exception
+
+    def get_pc_idx(self,vrbl,pc=None,qt=None):
+        if qt:
+            assert 0.0 <= qt <= 1.0
+        elif pc:
+            assert 0.0 <= pc <= 100.0
+            raise NotImplementedError
+        else:
+            raise Exception
+
+        try:
+            x = self.get_quantiles(vrbl).index(qt)
+        except:
+            print("Maybe a rounding error with floating points")
+            x = utils.closest(arr=self.get_quantiles(vrbl),val=qt)
+            print("Using",f"{x:.2f}","to represent",qt)
+            raise Exception
+        return x
+
+    def _get_percentiles(self,vrbl):
+        print("Warning: may have rounding error that I need to fix.")
+        pc = self.get_quartiles(vrbl) * 100.0
+        return pc
+
+    def get_quantiles(self,vrbl):
+        # Percentiles used for paper and scoring
+        if vrbl in ("AWS02","AWS25","UH02","UH25"):
+            return (0.9, 0.99, 0.999,0.9999)
+        elif (vrbl in ("REFL_comp","NEXRAD")) or (vrbl.endswith("cut")):
+            return (0.7,0.8,0.9,0.95,0.99,0.999)
+        else:
+            raise Exception
+
+    def get_threshs(self,vrbl,fmt):
+        dx = self.ensure_fmt(fmt)
+        return self.threshs[vrbl][dx]
+
+# We need to do percentiles here, as we need the info everywhere!
+PC_Thresh = Threshs()
 
 def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     """ Return the file path for the .npy of an interpolated field.
@@ -618,7 +711,9 @@ def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     # print(fcstmin)
     return kw
 
-def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
+def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
+                    add_resolution=True,add_mode=True,
+                    debug_before_uh=False):
     # Overwrite fmts...
     del fmts
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
@@ -635,83 +730,90 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     if os.path.exists(mega_fpath):
         print("Megaframe loaded.")
         return utils.load_pickle(mega_fpath)
-    print("Creating megaframe.")
 
-    df_list = []
-    for fmt in all_fmts:
-        print("Loading objects from:",fmt)
-        fname = "all_obj_dataframes_{}.pickle".format(fmt)
-        fpath = os.path.join(objectroot,fname)
-        results = utils.load_pickle(fpath)
-        if results == "ERROR":
-            print("ERROR!")
-            pdb.set_trace()
-        df_list.append(pandas.concat(results,ignore_index=True))
-        del fname, fpath, results
+    bypass_compute = False
+    if debug_before_uh:
+        mega_fname = "test.megaframe"
+        mega_fpath = os.path.join(objectroot,mega_fname)
+        if os.path.exists(mega_fpath):
+            df_og = utils.load_pickle(mega_fpath)
+            bypass_compute = True
+
+    if not bypass_compute:
+        print("Creating megaframe.")
+
+        df_list = []
+        for fmt in all_fmts:
+            print("Loading objects from:",fmt)
+            fname = "all_obj_dataframes_{}.pickle".format(fmt)
+            fpath = os.path.join(objectroot,fname)
+            results = utils.load_pickle(fpath)
+            if results == "ERROR":
+                print("ERROR!")
+                pdb.set_trace()
+            #df_list.append(pandas.concat(results,ignore_index=True))
+            df_og = pandas.concat(results,ignore_index=True)
+            # del fname, fpath, results
+
+            #### HACKS #####
+            print("Adding/modifying megaframe...")
+
+            # JRL TODO: these should be parallelised, but I'm
+            # scared of mixing up the order of things
+
+            # These also save the .pickle files (like
+            # W and ens dataframes below) to speed up
+            # creating new dfs to hack into the megaframe
+
+            if add_resolution:
+                df_og = add_res_to_df(df_og,fmt=fmt)
+
+            if add_mode:
+                df_og = add_mode_to_df(df_og,fmt=fmt)
+
+            if add_ens:
+                ens_df = load_ens_df(df_og,fmt=fmt)
+                # pdb.set_trace()
+                df_og = pandas.concat((df_og,ens_df),axis=1)
+                # Now we have megaframe_idx!
+                print("Megaframe hacked: other ensemble stats added.")
+
+            #if debug_before_uh:
+            #    # save this half-baked megaframe.
+            #    df_og.to_pickle(mega_fpath)
+
+            # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
+            if add_uh_aws:
+                """
+                We want exceedence yes/nos for four UH/AWS "standard" values and
+                    four percentile values that will vary for:
+
+                    * UH02 v UH25
+                    * EE3km v EE1km v AWS (both obs dx sizes using same value regardless)
+                """
+                for layer in ("UH02","UH25"):
+                    CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+                    print("Created/updated dataframe Catalogue object.")
+
+                    lookup = load_lookup((fmt,),vrbl=layer)
+                    uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=fmt)
+                    #df_og = concat_uh_df(df_og,uh_df)
+                    df_og = concat_W_df(df_og,uh_df,fmt=fmt)
+                    print("Megaframe hacked: UH stats added.")
+
+            # Add on W
+            if add_W:
+                CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+                print("Created/updated dataframe Catalogue object.")
+                W_lookup = load_lookup(fcst_fmts,vrbl="Wmax",fmt=fmt)#fmts)
+                W_df = load_W_df(W_lookup,CAT,fmt=fmt)
+                df_og = concat_W_df(df_og,W_df,fmt=fmt)
+                print("Megaframe hacked: updraught stats added.")
+
+        df_list.append(df_og)
+
     df_og = pandas.concat(df_list,ignore_index=True)
-
     # At this point, the megaframe indices are set in stone!
-
-    #### HACKS #####
-    print("Adding/modifying megaframe...")
-    # Remove these later!
-    #df_og.area *= df_og.dx
-    #print("Megaframe hacked: area changed to km")
-
-    #df_og.perimeter *= df_og.dx
-    #print("Megaframe hacked: perimeter changed to km")
-
-    # pdb.set_trace()
-
-    # JRL TODO: these should be parallelised, but I'm
-    # scared of mixing up the order of things
-    # TODO: also saves the .pickle files (like
-    # W and ens dataframes below) to speed up
-    # creating new dfs to hack into the megaframe
-    if add_resolution:
-        df_og = add_res_to_df(df_og)
-
-    if add_mode:
-        df_og = add_mode_to_df(df_og)
-
-    ########################
-    ########################
-
-    # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
-    ## ##
-    #####
-    # Persistent nearby updraft helicity:
-    # Az Shear or AWS - is object within x km of 0.99 quantile
-    # for x min in a row? Yes/no
-
-    ########################
-    ########################
-
-    if add_W or add_uh_aws:
-        CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
-
-    if add_uh_aws:
-        # JRL TODO: what is this below? I'm mimicking grammar from add_W
-        UH_lookup = load_UH_lookup(fcst_fmts)
-        uh_df = load_uh_df(W_lookup,CAT)
-        #df_og = concat_uh_df(df_og,uh_df)
-        df_og = concat_W_df(df_og,uh_df)
-        print("Megaframe hacked: UH stats added.")
-
-    if add_ens:
-        ens_df = load_ens_df(df_og)
-        # pdb.set_trace()
-        df_og = pandas.concat((df_og,ens_df),axis=1)
-        # Now we have megaframe_idx!
-        print("Megaframe hacked: other ensemble stats added.")
-
-    # Add on W
-    if add_W:
-        W_lookup = load_W_lookup(fcst_fmts)#fmts)
-        W_df = load_W_df(W_lookup,CAT)
-        df_og = concat_W_df(df_og,W_df)
-        print("Megaframe hacked: updraught stats added.")
-
     print("Megaframe created.")
 
     # Save pickle
@@ -720,23 +822,43 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=False):
     # pdb.set_trace()
     return df_og
 
-def concat_W_df(df_og,W_df):
-    # TODO: rename, as it can be used for any concatenation, not just W
+def load_uh_df(lookup,CAT,layer,fmt):
+    # layer determines the lookup of percentile values and absolute values
+    assert layer in ("UH02","UH25")
 
-    # df_og.set_index('megaframe_idx').join(other.set_index('megaframe_idx_test'))
-    new_df = df_og.join(W_df.set_index('megaframe_idx_test'),on='megaframe_idx')
+    # fmt determines which of the four datasets the rotation data is from, and
+    # hence percentiles
+    #assert fmt in all_fmts
 
-    #for oidx,obj in enumerate(df_og.itertuples()):
-    #    Ix = obj.megaframe_idx
-    #    new_df.loc[oidx,"megaframe_idx_test"] = Ix
-    # pdb.set_trace()
-    return new_df
-
-def load_W_df(W_lookup,CAT):
-    fname = "W_df.pickle"
+    fname = f"{layer}_df.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
-        W_df = W_df = CAT.compute_new_attributes(W_lookup)
+        # uh_df = create_uh_df(df_og)
+        # rot_exceed_vals = get_rot_exceed_vals(fmt,layer)
+        # rot_exceed_vals = get_list_pc(vrbl,ensure_fmt(fmt))
+        rot_exceed_vals = PC_Thresh # Pass in the class!
+        sfx = f"_{layer}_{fmt}"
+        uh_df = CAT.compute_new_attributes(lookup,do_suite=layer,
+                                            rot_exceed_vals=rot_exceed_vals,
+                                            suffix=sfx)
+        utils.save_pickle(obj=uh_df,fpath=fpath)
+        print("UH DF Saved to",fpath)
+    else:
+        uh_df = utils.load_pickle(fpath=fpath)
+        print("UH metadata DataFrame loaded from",fpath)
+    return uh_df
+
+def concat_W_df(df_og,W_df,fmt):
+    # TODO: rename, as it can be used for any concatenation, not just W
+    new_df = df_og.join(W_df.set_index('megaframe_idx_test'),on='megaframe_idx')
+    return new_df
+
+def load_W_df(W_lookup,CAT,fmt):
+    fname = f"W_df_{fmt}.pickle"
+    fpath = os.path.join(objectroot,fname)
+    if not os.path.exists(fpath):
+        sfx = f"_W_{fmt}"
+        W_df = CAT.compute_new_attributes(W_lookup,do_suite="W",suffix=sfx)
         utils.save_pickle(obj=W_df,fpath=fpath)
         print("Saved to",fpath)
     else:
@@ -744,20 +866,20 @@ def load_W_df(W_lookup,CAT):
         print("W_df loaded from",fpath)
     return W_df
 
-def load_W_lookup(fcst_fmts):#fmts):
-    fname = "W_lookup.pickle"
+def load_lookup(fcst_fmts,vrbl):#fmts):
+    fname = f"{vrbl}_lookup.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
-        W_lookup = create_W_lookup(fcst_fmts)
-        utils.save_pickle(obj=W_lookup,fpath=fpath)
+        lookup = create_lookup(fcst_fmts,vrbl=vrbl)
+        utils.save_pickle(obj=lookup,fpath=fpath)
         print("Saved to",fpath)
     else:
-        W_lookup = utils.load_pickle(fpath=fpath)
-        print("W_lookup loaded from",fpath)
-    return W_lookup
+        lookup = utils.load_pickle(fpath=fpath)
+        print(vrbl,"lookup loaded from",fpath)
+    return lookup
 
 def loop_ens_data(fcst_vrbl,fcst_fmts):
-    """ Generates the path to numpy W data
+    """ Generates the path to numpy fcst data
     columns: fcst_vrbl, valid_time, fcst_min, prod_code, path_to_pickle
     """
     #for vrbl in ("REFL_comp",):
@@ -771,12 +893,16 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                                     fmt=fcst_fmt,validutc=validutc,
                                     caseutc=caseutc,initutc=initutc,mem=mem)
                         prod_code = "_".join((fcst_fmt, mem))
+                        # JRL TODO: here, you'll want to generalise this to
+                        # allow obs loading too, for obs verification/matching
+                        # with fcst objects, not just 3-to-1km.
+                        #if fcst_vrbl.startswith("UH"):
                         yield dict(fcst_vrbl=fcst_vrbl, valid_time=validutc,
                                 fcst_min=validmin, prod_code=prod_code,
                                 path_to_pickle=path_to_pickle,fcst_fmt=fcst_fmt)
 
-def create_W_lookup(fcst_fmts):
-    itr = list(loop_ens_data(fcst_vrbl="Wmax",fcst_fmts=fcst_fmts))
+def create_lookup(fcst_fmts,vrbl):
+    itr = list(loop_ens_data(fcst_vrbl=vrbl,fcst_fmts=fcst_fmts))
     nobjs = len(itr)
 
     DTYPES = {
@@ -790,7 +916,7 @@ def create_W_lookup(fcst_fmts):
 
     new_df = utils.do_new_df(DTYPES,nobjs)
 
-    print("Creating W_lookup.")
+    print(f"Creating {vrbl} lookup.")
     for n,d in enumerate(itr):
         utils.print_progress(total=nobjs,idx=n,every=500)
         for key in DTYPES.keys():
@@ -798,8 +924,8 @@ def create_W_lookup(fcst_fmts):
 
     return new_df
 
-def load_ens_df(df_og):
-    fname = "ens_df.pickle"
+def load_ens_df(df_og,fmt):
+    fname = f"ens_df_{fmt}.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
         ens_df = create_ens_df(df_og)
@@ -809,18 +935,6 @@ def load_ens_df(df_og):
         ens_df = utils.load_pickle(fpath=fpath)
         print("Ensemble metadata DataFrame loaded from",fpath)
     return ens_df
-
-def load_uh_df(df_og):
-    fname = "uh_df.pickle"
-    fpath = os.path.join(objectroot,fname)
-    if not os.path.exists(fpath):
-        uh_df = create_uh_df(df_og)
-        utils.save_pickle(obj=uh_df,fpath=fpath)
-        print("UH DF Saved to",fpath)
-    else:
-        uh_df = utils.load_pickle(fpath=fpath)
-        print("UH metadata DataFrame loaded from",fpath)
-    return uh_df
 
 def create_ens_df(megaframe):
     # TODO: parallelise
@@ -922,34 +1036,57 @@ def create_uh_df(megaframe):
         utils.print_progress(total=len(megaframe),idx=oidx,every=500)
     return ens_df
 
-def add_res_to_df(df_og):
-    DTYPES = {"resolution":"object"}
-    diff_df = utils.do_new_df(DTYPES,len(df_og))
-    for oidx,o in enumerate(df_og.itertuples()):
-        if int(o.nlats) > 200:
-            res = "EE1km"
-        else:
-            res = "EE3km"
-        diff_df.loc[oidx,"resolution"] = res
-        # pdb.set_trace()
-    df_og = pandas.concat((df_og,diff_df),axis=1)
+def add_res_to_df(df_og,fmt):
+    def compute_res(df_og):
+        DTYPES = {"resolution":"object"}
+        res_df = utils.do_new_df(DTYPES,len(df_og))
+        for oidx,o in enumerate(df_og.itertuples()):
+            if int(o.nlats) > 200:
+                res = "EE1km"
+            else:
+                res = "EE3km"
+            res_df.loc[oidx,"resolution"] = res
+            # pdb.set_trace()
+        return res_df
+
+    fpath = os.path.join(objectroot,f"res_df_{fmt}.pickle")
+    if not os.path.exists(fpath):
+        res_df = compute_res(df_og)
+        utils.save_pickle(obj=res_df,fpath=fpath)
+        print("Saved to",fpath)
+    else:
+        res_df = utils.load_pickle(fpath=fpath)
+        print("Resolution metadata DataFrame loaded from",fpath)
+
+    df_og = pandas.concat((df_og,res_df),axis=1)
     print("Megaframe hacked: resolution added")
     return df_og
 
-def add_mode_to_df(df_og):
-    DTYPES = {"conv_mode":"object"}
-    mode_df = utils.do_new_df(DTYPES,len(df_og))
-    for oidx,o in enumerate(df_og.itertuples()):
-        if o.qlcsness < -0.5:
-            conv_mode = "cellular"
-        elif o.qlcsness > 0.5:
-            conv_mode = "linear"
-        else:
-            conv_mode = "ambiguous"
-        mode_df.loc[oidx,"conv_mode"] = conv_mode
-        pdb.set_trace()
+def add_mode_to_df(df_og,fmt):
+    def compute_mode(df_og):
+        DTYPES = {"conv_mode":"object"}
+        mode_df = utils.do_new_df(DTYPES,len(df_og))
+        for oidx,o in enumerate(df_og.itertuples()):
+            if o.qlcsness < -0.5:
+                conv_mode = "cellular"
+            elif o.qlcsness > 0.5:
+                conv_mode = "linear"
+            else:
+                conv_mode = "ambiguous"
+            mode_df.loc[oidx,"conv_mode"] = conv_mode
+        return mode_df
+
+    fpath = os.path.join(objectroot,f"mode_df_{fmt}.pickle")
+    if not os.path.exists(fpath):
+        mode_df = compute_mode(df_og)
+        utils.save_pickle(obj=mode_df,fpath=fpath)
+        print("Saved to",fpath)
+    else:
+        mode_df = utils.load_pickle(fpath=fpath)
+        print("Mode metadata DataFrame loaded from",fpath)
+
     df_og = pandas.concat((df_og,mode_df),axis=1)
-    print("Megaframe hacked: convective mode added")
+    print("Megaframe hacked: mode info added")
     return df_og
 
 def get_color(fmt,mem):
@@ -981,88 +1118,7 @@ def shuffled_copy(seq):
     l = list(seq)
     return random.sample(l,len(l))
 
-class Threshs:
-    def __init__(self,):
-        self.threshs = self.get_dict()
 
-    def get_dict(self,):
-        lookup = {
-                    "REFL_comp":{
-                        "3km": (15.0,23.5,34.7,41.9,52.0,63.5),
-                        "1km": (15.8,24.8,36.2,43.4,53.7,65.7),
-                        },
-                    "NEXRAD":{
-                        "3km": (14.9,23.5,32.9,38.7,49.0,57.3),
-                        "1km": (14.5,23.4,32.8,38.6,49.1,57.5),
-                        },
-                    "UH02":{
-                        "3km": (0.2,1.5,8.1,21.1),
-                        "1km": (0.5,4.2,21.7,59.0),
-                        },
-                    "AWS02":{
-                        "1km": (1.7E-3,4.1E-3,7.8E-3,13.8E-3),
-                        "3km": (1.7E-3,4.0E-3,7.7E-3,13.2E-3),
-                        },
-                    "UH25":{
-                        "1km": (0.8,9.9,52.7,143.3),
-                        "3km": (0.3,3.2,15.4,37.7),
-                        },
-                    "AWS25":{
-                        "1km": (1.9E-3,4.4E-3,8.1E-3,13.5E-3),
-                        "3km": (1.9E-3,4.3E-3,7.9E-3,13.2E-3),
-                        },
-                }
-        return lookup
-
-    def get_val(self,vrbl,fmt,pc=None,qt=None):
-        assert pc or qt
-        dx = self.ensure_fmt(fmt)
-        pcidx = self.get_pc_idx(vrbl,pc=pc,qt=qt)
-        return self.threshs[vrbl][dx][pcidx]
-
-    def ensure_fmt(self,fmt):
-        if fmt in ("d01_3km","d01","3km","lo-res"):
-            return "3km"
-        elif fmt in ("d02","d02_raw","d02_1km","1km","hi-res"):
-            return "1km"
-        else:
-            raise Exception
-
-    def get_pc_idx(self,vrbl,pc=None,qt=None):
-        if qt:
-            assert 0.0 <= qt <= 1.0
-        elif pc:
-            assert 0.0 <= pc <= 100.0
-            raise NotImplementedError
-        else:
-            raise Exception
-
-        try:
-            x = self.get_quantiles(vrbl).index(qt)
-        except:
-            print("Maybe a rounding error with floating points")
-            x = utils.closest(arr=self.get_quantiles(vrbl),val=qt)
-            print("Using",f"{x:.2f}","to represent",qt)
-            raise Exception
-        return x
-
-    def _get_percentiles(self,vrbl):
-        print("Warning: may have rounding error that I need to fix.")
-        pc = self.get_quartiles(vrbl) * 100.0
-        return pc
-
-    def get_quantiles(self,vrbl):
-        # Percentiles used for paper and scoring
-        if vrbl in ("AWS02","AWS25","UH02","UH25"):
-            return (0.9, 0.99, 0.999,0.9999)
-        elif (vrbl in ("REFL_comp","NEXRAD")) or (vrbl.endswith("cut")):
-            return (0.7,0.8,0.9,0.95,0.99,0.999)
-        else:
-            raise Exception
-
-    def get_threshs(self,vrbl,fmt):
-        dx = self.ensure_fmt(fmt)
-        return self.threshs[vrbl][dx]
 
 ###############################################################################
 ############################### END OF FUNCTIONS ##############################
@@ -1081,8 +1137,10 @@ COLORS = {
         }
 
 RESCOLS = {
-        "lo-res":"#1A85FF",
-        "hi-res":"#D41159",
+        #"lo-res":"#1A85FF",
+        #"hi-res":"#D41159",
+        "EE3km":"#1A85FF",
+        "EE1km":"#D41159",
         }
 
 RANCOL = {
@@ -1208,11 +1266,73 @@ MINMAX = {
         "AWS02":(0.0,0.02),
         }
 
+
+
+PC_LKUP = {
+            "AWS02":{
+                "1km":{
+                    0.9:1.7e-3,
+                    0.99:4.1e-3,
+                    0.999:7.8e-3,
+                    0.9999:13.8e-3,
+                },
+                "3km":{
+                    0.9:1.7e-3,
+                    0.99:4.0e-3,
+                    0.999:7.7e-3,
+                    0.9999:13.2e-3,
+                }
+            },
+            "AWS25":{
+                "1km":{
+                    0.9:1.9e-3,
+                    0.99:4.4e-3,
+                    0.999:8.1e-3,
+                    0.9999:13.5e-3,
+                },
+                "3km":{
+                    0.9:1.9e-3,
+                    0.99:4.3e-3,
+                    0.999:7.9e-3,
+                    0.9999:13.2e-3,
+                }
+            },
+            "UH02":{
+                "1km":{
+                    0.9:0.5,
+                    0.99:4.2,
+                    0.999:21.7,
+                    0.9999:59.0,
+                },
+                "3km":{
+                    0.9:0.2,
+                    0.99:1.5,
+                    0.999:8.1,
+                    0.9999:21.1,
+                }
+            },
+            "UH25":{
+                "1km":{
+                    0.9:0.8,
+                    0.99:9.9,
+                    0.999:52.7,
+                    0.9999:143.3,
+                },
+                "3km":{
+                    0.9:0.3,
+                    0.99:3.2,
+                    0.999:15.4,
+                    0.9999:37.7,
+                }
+            }
+        } # END!
+
 """PERCENTILES:
+    * Representative AWS02 values:
     * AWS02 1km: 90% (1.7e-3), 99% (4.1e-3), 99.9% (7.8e-3), 99.99% (13.8e-3)
     * AWS02 3km: 90% (1.7e-3), 99% (4.0e-3), 99.9% (7.7e-3), 99.99% (13.2e-3)
-    * AWS25 1km: 90% (1.9e-3), 99% (4.4e-3), 99.9% (8.1e-3), 99.99% (13.5e-1)
-    * AWS25 3km: 90% (1.9e-3), 99% (4.3e-3), 99.9% (7.9e-3), 99.99% (13.2e-1)
+    * AWS25 1km: 90% (1.9e-3), 99% (4.4e-3), 99.9% (8.1e-3), 99.99% (13.5e-3)
+    * AWS25 3km: 90% (1.9e-3), 99% (4.3e-3), 99.9% (7.9e-3), 99.99% (13.2e-3)
 
     * UH02 1km: 90% (0.5), 99% (4.2), 99.9% (21.7), 99.99% (59.0)
     * UH02 3km: 90% (0.2), 99% (1.5), 99.9% (8.1), 99.99% (21.1)
@@ -1237,8 +1357,6 @@ MINMAX = {
 
 ###############################################################################
 ### PROCEDURE ###
-PC_Thresh = Threshs()
-
 if do_plot_quicklooks:
     fcst_vrbl_1 = "UH02"
     fcst_vrbl_2 = "REFL_comp"
@@ -2154,44 +2272,45 @@ if object_switch:
             pca, PC_df, features, scaler = CAT.do_pca()
             utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
-    # Do combined PCA
+    # Do combined PCA - JRL TODO FIX!
+    do_combined = False
+    if do_combined:
+        # Get data
+        fname = {}
+        fpath = {}
 
-    # Get data
-    fname = {}
-    fpath = {}
+        fname['new'] = "pca_all_fcst_objs.pickle"
+        fpath['new'] = os.path.join(objectroot,fname['new'])
 
-    fname['new'] = "pca_all_fcst_objs.pickle"
-    fpath['new'] = os.path.join(objectroot,fname['new'])
+        all_features = ['area','eccentricity','extent','max_intensity',
+                        'mean_intensity','perimeter','longaxis_km',
+                        # JRL TODO: more features to discriminate
+                        # between the two domains
+                        'max_updraught','ud_distance_from_centroid',
+                        'mean_updraught',
+                        # JRL TODO: az shear! QPF!
+                        # Will have to hack the megaframe more
+                        ]
+        if (not os.path.exists(fpath['new'])) or overwrite_pp:
+            # fname['1km'] = "pca_model_d02_1km.pickle"
+            fname['1km'] = "all_obj_dataframes_d02_1km.pickle"
+            fpath['1km'] = os.path.join(objectroot,fname['1km'])
 
-    all_features = ['area','eccentricity','extent','max_intensity',
-                    'mean_intensity','perimeter','longaxis_km',
-                    # JRL TODO: more features to discriminate
-                    # between the two domains
-                    'max_updraught','ud_distance_from_centroid',
-                    'mean_updraught',
-                    # JRL TODO: az shear! QPF!
-                    # Will have to hack the megaframe more
-                    ]
-    if (not os.path.exists(fpath['new'])) or overwrite_pp:
-        # fname['1km'] = "pca_model_d02_1km.pickle"
-        fname['1km'] = "all_obj_dataframes_d02_1km.pickle"
-        fpath['1km'] = os.path.join(objectroot,fname['1km'])
+            fname['3km'] = "all_obj_dataframes_d01_3km.pickle"
+            fpath['3km'] = os.path.join(objectroot,fname['3km'])
 
-        fname['3km'] = "all_obj_dataframes_d01_3km.pickle"
-        fpath['3km'] = os.path.join(objectroot,fname['3km'])
+            results = []
+            for k in ('1km','3km'):
+                data = utils.load_pickle(fpath[k])
+                # pdb.set_trace()
+                data2 = pandas.concat(data,ignore_index=True)
+                results.append(data2)
 
-        results = []
-        for k in ('1km','3km'):
-            data = utils.load_pickle(fpath[k])
-            pdb.set_trace()
-            data2 = pandas.concat(data,ignore_index=True)
-            results.append(data2)
-
-        # allobj_df = pandas.concat(fcst_dfs,ignore_index=True)
-        all_fcst_obj_df = pandas.concat(results,ignore_index=True)
-        CAT = Catalogue(all_fcst_obj_df,tempdir=objectroot,ncpus=ncpus)
-        pca, PC_df, features, scaler = CAT.do_pca(all_features)
-        utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath['new'])
+            # allobj_df = pandas.concat(fcst_dfs,ignore_index=True)
+            all_fcst_obj_df = pandas.concat(results,ignore_index=True)
+            CAT = Catalogue(all_fcst_obj_df,tempdir=objectroot,ncpus=ncpus)
+            pca, PC_df, features, scaler = CAT.do_pca(all_features)
+            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath['new'])
 
 if do_object_pca:
     print(stars,"DOING PCA",stars)
@@ -2411,13 +2530,23 @@ if do_object_matching:
                 "ratio_diff":"f4",
                 "longaxis_km_diff":"f4",
                 "qlcsness_diff":"f4",
+
+                # Updraught props
                 "max_updraught_diff":"f4",
                 "mean_updraught_diff":"f4",
                 "min_updraught_diff":"f4",
 
+
+                # rotation diffs
+                "max_rotation_diff":"f4",
+                "mean_rotation_diff":"f4",
+                # soemething like updraught ones above
+                # "rot_exceed_ID_0":"f4"
+
                 # non-straight-forward diffs
                 "centroid_gap_km":"f4",
                 # "ud_centroid_diff_km":"f4",
+                # JRL TODO: need something for wind rose?
                 }
 
     prop_names = []
@@ -2439,14 +2568,16 @@ if do_object_matching:
                     d01.centroid_lon.values[0])/1000.0
         write_row(diff_df,nm,"centroid_gap_km",cd)
 
-        # Do distance between updraught max?
-        # Modify above.
+        # Do complicated differences in UH/AWS
 
+        # Persistent 0-2 or 2-5 rotation signals within object bbox
+
+        # Simple differences
         props = ("area","eccentricity","equivalent_diameter","extent",
                         "max_intensity","mean_intensity","perimeter",
                         "ratio","longaxis_km","qlcsness",
                         "max_updraught","mean_updraught",
-                        "min_updraught")
+                        "max_rotation","mean_rotation")
         prop_diffs = [p + '_diff' for p in props]
         for prop, prop_diff in zip(props,prop_diffs):
             do_write_diff(diff_df,nm,prop,prop_diff,d02,d01)
