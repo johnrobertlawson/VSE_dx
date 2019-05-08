@@ -244,9 +244,9 @@ class Threshs:
         return self.threshs[vrbl][dx][pcidx]
 
     def ensure_fmt(self,fmt):
-        if fmt in ("d01_3km","d01","3km","lo-res"):
+        if fmt in ("d01_3km","d01","3km","lo-res","EE3km",3,"3"):
             return "3km"
-        elif fmt in ("d02","d02_raw","d02_1km","1km","hi-res"):
+        elif fmt in ("d02","d02_raw","d02_1km","1km","hi-res","EE1km",1,"1"):
             return "1km"
         else:
             raise Exception
@@ -805,7 +805,7 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
             if add_W:
                 CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
                 print("Created/updated dataframe Catalogue object.")
-                W_lookup = load_lookup(fcst_fmts,vrbl="Wmax",fmt=fmt)#fmts)
+                W_lookup = load_lookup((fmt,),vrbl="Wmax",)#fmts)
                 W_df = load_W_df(W_lookup,CAT,fmt=fmt)
                 df_og = concat_W_df(df_og,W_df,fmt=fmt)
                 print("Megaframe hacked: updraught stats added.")
@@ -830,14 +830,14 @@ def load_uh_df(lookup,CAT,layer,fmt):
     # hence percentiles
     #assert fmt in all_fmts
 
-    fname = f"{layer}_df.pickle"
+    sfx = f"_{layer}_{fmt}"
+    fname = f"{layer}_df_{fmt}.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
         # uh_df = create_uh_df(df_og)
         # rot_exceed_vals = get_rot_exceed_vals(fmt,layer)
         # rot_exceed_vals = get_list_pc(vrbl,ensure_fmt(fmt))
         rot_exceed_vals = PC_Thresh # Pass in the class!
-        sfx = f"_{layer}_{fmt}"
         uh_df = CAT.compute_new_attributes(lookup,do_suite=layer,
                                             rot_exceed_vals=rot_exceed_vals,
                                             suffix=sfx)
@@ -867,7 +867,10 @@ def load_W_df(W_lookup,CAT,fmt):
     return W_df
 
 def load_lookup(fcst_fmts,vrbl):#fmts):
-    fname = f"{vrbl}_lookup.pickle"
+    if len(fcst_fmts) == 1:
+        fname = f"{vrbl}_lookup_{fcst_fmts[0]}.pickle"
+    else:
+        fname = f"{vrbl}_lookup.pickle"
     fpath = os.path.join(objectroot,fname)
     if not os.path.exists(fpath):
         lookup = create_lookup(fcst_fmts,vrbl=vrbl)
@@ -882,11 +885,15 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
     """ Generates the path to numpy fcst data
     columns: fcst_vrbl, valid_time, fcst_min, prod_code, path_to_pickle
     """
+    
     #for vrbl in ("REFL_comp",):
     for caseutc, initutcs in CASES.items():
         for initutc in initutcs:
             for mem in member_names:
                 for fcst_fmt in fcst_fmts:
+                    if (not fcst_fmt.startswith("d0")) and fcst_vrbl.startswith("UH"):
+                        fcst_vrbl = fcst_vrbl.replace("UH","AWS")
+                    # pdb.set_trace()
                     for validmin in all_fcstmins:
                         validutc = initutc+datetime.timedelta(seconds=60*int(validmin))
                         path_to_pickle = get_extraction_fpaths(vrbl=fcst_vrbl,
