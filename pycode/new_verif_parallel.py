@@ -857,6 +857,9 @@ def load_uh_df(lookup,CAT,layer,fmt):
     return uh_df
 
 def concat_W_df(df_og,W_df,fmt):
+    if W_df is None:
+        print("No items in new dataframe, so just returning old one.")
+        return df_og
     # TODO: rename, as it can be used for any concatenation, not just W
     new_df = df_og.join(W_df.set_index('megaframe_idx_test'),on='megaframe_idx')
     return new_df
