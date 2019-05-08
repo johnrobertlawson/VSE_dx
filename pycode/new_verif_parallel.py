@@ -885,21 +885,26 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
     """ Generates the path to numpy fcst data
     columns: fcst_vrbl, valid_time, fcst_min, prod_code, path_to_pickle
     """
-    
+
     #for vrbl in ("REFL_comp",):
     for caseutc, initutcs in CASES.items():
         for initutc in initutcs:
             for mem in member_names:
                 for fcst_fmt in fcst_fmts:
-                    if (not fcst_fmt.startswith("d0")) and fcst_vrbl.startswith("UH"):
-                        fcst_vrbl = fcst_vrbl.replace("UH","AWS")
+                    if (not fcst_fmt.startswith("d0")):
+                        # OBS
+                        if fcst_vrbl.startswith("UH"):
+                            fcst_vrbl = fcst_vrbl.replace("UH","AWS")
+                        prod_code = "_".join((fcst_fmt, "obs"))
+                    else:
+                        # FCST
+                        prod_code = "_".join((fcst_fmt, mem))
                     # pdb.set_trace()
                     for validmin in all_fcstmins:
                         validutc = initutc+datetime.timedelta(seconds=60*int(validmin))
                         path_to_pickle = get_extraction_fpaths(vrbl=fcst_vrbl,
                                     fmt=fcst_fmt,validutc=validutc,
                                     caseutc=caseutc,initutc=initutc,mem=mem)
-                        prod_code = "_".join((fcst_fmt, mem))
                         # JRL TODO: here, you'll want to generalise this to
                         # allow obs loading too, for obs verification/matching
                         # with fcst objects, not just 3-to-1km.
