@@ -898,16 +898,26 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                     fcst = False
                     if fcst_vrbl.startswith("UH"):
                         fcst_vrbl = fcst_vrbl.replace("UH","AWS")
+<<<<<<< HEAD
                     mns = ('obs',)
+=======
+                    member_names = ('obs',)
+>>>>>>> b4589f8d5789648ac44535222c119f619c05bd7a
                     fcmns = (0,)
                 else:
                     obs = False
                     fcst = True
                     # FCST
+<<<<<<< HEAD
                     mns = member_names
                     fcmns = all_fcstmins
                 # pdb.set_trace()
                 for mem in mns:
+=======
+                    fcmns = all_fcstmins
+                # pdb.set_trace()
+                for mem in member_names:
+>>>>>>> b4589f8d5789648ac44535222c119f619c05bd7a
                     if obs:
                         prod_code = "_".join((fcst_fmt, "obs"))
                     elif fcst:
