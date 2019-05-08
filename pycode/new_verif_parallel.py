@@ -783,29 +783,6 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
             #    df_og.to_pickle(mega_fpath)
 
             # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
-            if add_uh_aws:
-                """
-                We want exceedence yes/nos for four UH/AWS "standard" values and
-                    four percentile values that will vary for:
-
-                    * UH02 v UH25
-                    * EE3km v EE1km v AWS (both obs dx sizes using same value regardless)
-                """
-                if "nexrad" in fmt:
-                    _fmt = fmt.replace('nexrad','mrms_aws')
-                else:
-                    _fmt = fmt
-
-                for layer in ("UH02","UH25"):
-                    CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
-                    print("Created/updated dataframe Catalogue object.")
-
-                    lookup = load_lookup((_fmt,),vrbl=layer)
-                    uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
-                    #df_og = concat_uh_df(df_og,uh_df)
-                    df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
-                    print("Megaframe hacked: UH stats added.")
-
             # Add on W
             if add_W:
                 if fmt.startswith("d0"):
@@ -818,8 +795,35 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                 else:
                     print("Skipping W stats for obs objects.")
 
-        df_list.append(df_og)
+            if add_uh_aws:
+                """
+                We want exceedence yes/nos for four UH/AWS "standard" values and
+                    four percentile values that will vary for:
 
+                    * UH02 v UH25
+                    * EE3km v EE1km v AWS (both obs dx sizes using same value regardless)
+                """
+                # JRL: quick hack to test just fcst objects
+                if fmt.startswith("d0"):
+                    if "nexrad" in fmt:
+                        _fmt = fmt.replace('nexrad','mrms_aws')
+                    else:
+                        _fmt = fmt
+
+                    for layer in ("UH02","UH25"):
+                        CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+                        print("Created/updated dataframe Catalogue object.")
+
+                        lookup = load_lookup((_fmt,),vrbl=layer)
+                        uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
+                        #df_og = concat_uh_df(df_og,uh_df)
+                        df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
+                        print("Megaframe hacked: UH stats added.")
+
+            df_list.append(df_og)
+        # df_list.append(df_og)
+
+    # pdb.set_trace()
     df_og = pandas.concat(df_list,ignore_index=True)
     # At this point, the megaframe indices are set in stone!
     print("Megaframe created.")
@@ -827,7 +831,6 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
     # Save pickle
     df_og.to_pickle(mega_fpath)
     print("Megaframe saved to disk.")
-    # pdb.set_trace()
     return df_og
 
 def load_uh_df(lookup,CAT,layer,fmt):
@@ -2611,7 +2614,8 @@ if do_object_matching:
                         "max_intensity","mean_intensity","perimeter",
                         "ratio","longaxis_km","qlcsness",
                         "max_updraught","mean_updraught",
-                        "max_rotation","mean_rotation")
+                        "max_lowrot", "max_midrot",
+                        )
         prop_diffs = [p + '_diff' for p in props]
         for prop, prop_diff in zip(props,prop_diffs):
             do_write_diff(diff_df,nm,prop,prop_diff,d02,d01)
