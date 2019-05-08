@@ -792,7 +792,7 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     * EE3km v EE1km v AWS (both obs dx sizes using same value regardless)
                 """
                 if "nexrad" in fmt:
-                    _fmt = old_fmt.replace('nexrad','mrms_aws')
+                    _fmt = fmt.replace('nexrad','mrms_aws')
                 else:
                     _fmt = fmt
 
