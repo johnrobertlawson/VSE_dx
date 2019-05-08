@@ -914,7 +914,7 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                         prod_code = "_".join((fcst_fmt, mem))
                     else:
                         raise Exception
-                    for validmin in fcms:
+                    for validmin in fcmns:
                         validutc = initutc+datetime.timedelta(seconds=60*int(validmin))
                         path_to_pickle = get_extraction_fpaths(vrbl=fcst_vrbl,
                                     fmt=fcst_fmt,validutc=validutc,
