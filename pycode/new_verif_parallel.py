@@ -791,14 +791,19 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     * UH02 v UH25
                     * EE3km v EE1km v AWS (both obs dx sizes using same value regardless)
                 """
+                if "nexrad" in fmt:
+                    _fmt = old_fmt.replace('nexrad','mrms_aws')
+                else:
+                    _fmt = fmt
+
                 for layer in ("UH02","UH25"):
                     CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
                     print("Created/updated dataframe Catalogue object.")
 
-                    lookup = load_lookup((fmt,),vrbl=layer)
-                    uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=fmt)
+                    lookup = load_lookup((_fmt,),vrbl=layer)
+                    uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
                     #df_og = concat_uh_df(df_og,uh_df)
-                    df_og = concat_W_df(df_og,uh_df,fmt=fmt)
+                    df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
                     print("Megaframe hacked: UH stats added.")
 
             # Add on W
