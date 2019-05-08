@@ -803,12 +803,15 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
 
             # Add on W
             if add_W:
-                CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
-                print("Created/updated dataframe Catalogue object.")
-                W_lookup = load_lookup((fmt,),vrbl="Wmax",)#fmts)
-                W_df = load_W_df(W_lookup,CAT,fmt=fmt)
-                df_og = concat_W_df(df_og,W_df,fmt=fmt)
-                print("Megaframe hacked: updraught stats added.")
+                if fmt.startswith("d0"):
+                    CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+                    print("Created/updated dataframe Catalogue object.")
+                    W_lookup = load_lookup((fmt,),vrbl="Wmax",)#fmts)
+                    W_df = load_W_df(W_lookup,CAT,fmt=fmt)
+                    df_og = concat_W_df(df_og,W_df,fmt=fmt)
+                    print("Megaframe hacked: updraught stats added.")
+                else:
+                    print("Skipping W stats for obs objects.")
 
         df_list.append(df_og)
 
@@ -896,12 +899,14 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                         fcst_vrbl = fcst_vrbl.replace("UH","AWS")
                     prod_code = "_".join((fcst_fmt, "obs"))
                     member_names = ('obs',)
+                    fcmns = (0,)
                 else:
                     # FCST
                     prod_code = "_".join((fcst_fmt, mem))
+                    fcmns = all_fcstmins
                 # pdb.set_trace()
                 for mem in member_names:
-                    for validmin in all_fcstmins:
+                    for validmin in fcms:
                         validutc = initutc+datetime.timedelta(seconds=60*int(validmin))
                         path_to_pickle = get_extraction_fpaths(vrbl=fcst_vrbl,
                                     fmt=fcst_fmt,validutc=validutc,
