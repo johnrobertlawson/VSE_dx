@@ -78,12 +78,13 @@ do_efss = False # Also includes FISS, which is broken?
 
 object_switch = False
 do_object_pca = False
-do_object_performance = False
+do_object_performance = True
 do_object_distr = False
 do_object_matching = True
 do_object_examples = False
 do_object_waffle = False
 do_object_cluster = False
+do_object_brier_uh = True
                 #max(do_object_performance,do_object_distr,
                 #    do_object_pca,do_object_lda,do_object_matching,)
 
@@ -145,6 +146,9 @@ stars = "*"*10
 dom_names = ("d01","d02")
 domnos = (1,2)
 member_names = ['m{:02d}'.format(n) for n in range(1,37)]
+half_member_names = ['m{:02d}'.format(n) for n in range(1,19)]
+test_member_names = ['m{:02d}'.format(n) for n in range(1,6)]
+
 # doms = (1,2)
 # RAINNC
 fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")
@@ -456,6 +460,14 @@ def loop_efss(caseutc,vrbl,fcstmin,fmt):
         validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
         yield vrbl, caseutc, initutc, fmt, validutc
 
+def get_initutcs_strs():
+    for caseutc, initutcs in CASES.items():
+        for initutc in CASES[caseutc]:
+            casestr = f"{caseutc.year:04d}{caseutc.month:02d}{caseutc.day:02d}"
+            initstr = f"{initutc.hour:02d}{initutc.minute:02d}"
+            # the_str = "_".join(casestr,initstr)
+            yield initutc, casestr, initstr
+            # validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
 
 def loop_perf(vrbl,thresh,fcstmin=None,fcst_fmt=None):
     if fcstmin:
@@ -713,7 +725,7 @@ def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
 
 def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     add_resolution=True,add_mode=True,
-                    debug_before_uh=False):
+                    debug_before_uh=False,add_init=True):
     # Overwrite fmts...
     del fmts
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
@@ -803,22 +815,23 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     * UH02 v UH25
                     * EE3km v EE1km v AWS (both obs dx sizes using same value regardless)
                 """
-                # JRL: quick hack to test just fcst objects
-                if fmt.startswith("d0"):
-                    if "nexrad" in fmt:
-                        _fmt = fmt.replace('nexrad','mrms_aws')
-                    else:
-                        _fmt = fmt
+                if "nexrad" in fmt:
+                    _fmt = fmt.replace('nexrad','mrms_aws')
+                else:
+                    _fmt = fmt
 
-                    for layer in ("UH02","UH25"):
-                        CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
-                        print("Created/updated dataframe Catalogue object.")
+                for layer in ("UH02","UH25"):
+                    CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+                    print("Created/updated dataframe Catalogue object.")
 
-                        lookup = load_lookup((_fmt,),vrbl=layer)
-                        uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
-                        #df_og = concat_uh_df(df_og,uh_df)
-                        df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
-                        print("Megaframe hacked: UH stats added.")
+                    lookup = load_lookup((_fmt,),vrbl=layer)
+                    uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
+                    #df_og = concat_uh_df(df_og,uh_df)
+                    df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
+                    print("Megaframe hacked: UH stats added.")
+
+            if add_init:
+                df_og = add_initutc_to_df(df_og,fmt=fmt)
 
             df_list.append(df_og)
         # df_list.append(df_og)
@@ -1097,6 +1110,34 @@ def add_res_to_df(df_og,fmt):
 
     df_og = pandas.concat((df_og,res_df),axis=1)
     print("Megaframe hacked: resolution added")
+    return df_og
+
+def add_initutc_to_df(df_og,fmt):
+    """ Use HHMM for init time."""
+    def compute_init(df_og):
+        DTYPES = {"init_code":"object"}
+        new_df = utils.do_new_df(DTYPES,len(df_og))
+        for oidx,o in enumerate(df_og.itertuples()):
+            if o.member == "obs":
+                ic = None
+            else:
+                dt = o.time - datetime.timedelta(seconds=60*o.lead_time)
+                ic = f"{dt.hour:02d}{dt.minute:02d}"
+            new_df.loc[oidx,"init_code"] = ic
+            # pdb.set_trace()
+        return new_df
+
+    fpath = os.path.join(objectroot,f"init_df_{fmt}.pickle")
+    if not os.path.exists(fpath):
+        init_df = compute_init(df_og)
+        utils.save_pickle(obj=init_df,fpath=fpath)
+        print("Saved to",fpath)
+    else:
+        init_df = utils.load_pickle(fpath=fpath)
+        print("Init code metadata DataFrame loaded from",fpath)
+
+    df_og = pandas.concat((df_og,init_df),axis=1)
+    print("Megaframe hacked: init code added")
     return df_og
 
 def add_mode_to_df(df_og,fmt):
@@ -2152,7 +2193,8 @@ if object_switch:
             fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
                                     validutc,caseutc,initutc,mem)
 
-            kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,fpath=pk_fpath)
+            kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,
+                        initutc=initutc,fpath=pk_fpath)
             obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
             utils.save_pickle(obj=obj,fpath=pk_fpath)
             # print("Object instance newly created.")
@@ -2171,7 +2213,8 @@ if object_switch:
                 fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
                                         validutc,caseutc,initutc,mem)
 
-                kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,fpath=pk_fpath)
+                kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,
+                            fpath=pk_fpath)
                 obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
                 utils.save_pickle(obj=obj,fpath=pk_fpath)
 
@@ -2383,13 +2426,89 @@ if do_object_performance:
 
     # megaframe = load_megaframe()
 
-    # Match objects
+    # Match objects between domains (EE3 <-> verif at 3km, etc)
+    # Build big contigency table (need time, case, domain, etc)
 
-    for dom in ('d01','d02'):
-        verif_domain = 'nexrad'
-        matches = CAT.match_verif(members=member_names,initutcs=get_all_initutcs(),
-                            leadtimes=all_fcstmins,domain=dom,
-                            verif_domain=verif_domain)
+    # Calculate eFSS at all four UH levels + pc'iles, again for dBZ
+    # This enables a probabilistic evaluation despite different thresholds etc
+    # Also enables us to evaluate at certain times with a time window
+    # This avoids any logic with persistent UH
+    # We could also go through each member by time, and ID persistent UH swaths
+    # Has the issue of time - it is all lost/bunched together
+    # Instead can do eFSS w/ 1, 3, 5 time windows and small-ish spatial windows
+
+    # Also plot performance diagram for same data
+
+    # Also test OFV?
+
+    #######################
+
+    # To start, get all matched object pairs (3-to-1).
+    # For each matched pair, try to connect obs to the respective grids
+    # Once this is done, we can go through all "paired pairs"
+
+    # Also, go through all fcst objects, paired or not, and match to obs
+    # Then do the same for obs objects, and match to fcst
+    # Can then build a contingency table - see Skinner 2018 also.
+
+    # pdb.set_trace()
+
+    MATCH = {}
+    # Create pickle of matches
+    # for dom_code in ('d01_3km','d02_1km'):
+    mns = half_member_names
+    for member in mns:
+        for dom_code in ('d02_1km','d01_3km'):
+            if member == mns[0]:
+                MATCH[dom_code] = {}
+            dom, res = dom_code.split('_')
+            obs_prod_code = f"nexrad_{res}_obs"
+            #for member in member_names:
+            MATCH[dom_code][member] = {}
+            print("Now verifying objects for",member,dom_code)
+            for initutc, casestr, initstr in get_initutcs_strs():
+                MATCH[dom_code][member][casestr] = {}
+                MATCH[dom_code][member][casestr][initstr] = {}
+                fname = f"{dom}_{member}-verif_{casestr}_{initstr}.pickle"
+                fpath = os.path.join(objectroot,"verif_match_tuples",casestr,initstr,fname)
+                fpath2 = os.path.join(objectroot,"verif_match_2x2",casestr,initstr,fname)
+                if not os.path.exists(fpath):
+                    fcst_prod_code = '_'.join((dom_code,member))
+                    dictA = {"prod_code":fcst_prod_code,"member":member,
+                                    "case_code":casestr,"init_code":initstr}
+                    dictB = {"prod_code":obs_prod_code,"case_code":casestr}
+                    print("About to parallelise matching for:\n",casestr,initstr)
+                    matches, _2x2 = CAT.match_two_groups(
+                                        dictA,dictB,do_contingency=True,)
+                    print("=== RESULTS FOR",dom_code,member,casestr,
+                        initstr,"===")
+
+                    if _2x2 is None:
+                        print("No objects - skipping.")
+                    else:
+                        qquad = '    '
+                        bias = _2x2.get("BIAS")
+                        pod = _2x2.get("POD")
+                        far = _2x2.get("FAR")
+                        csi = _2x2.get("CSI")
+                        print(f"BIAS: {bias:.2f}",qquad,f"POD: {pod:.2f}",qquad,
+                                f"FAR: {far:.2f}",qquad,f"CSI: {csi:.2f}")
+                        print(f"a = {_2x2.a}",qquad,f"b = {_2x2.b}",qquad,
+                                f"c = {_2x2.c}")
+                    utils.save_pickle(obj=matches, fpath=fpath)
+                    utils.save_pickle(obj=_2x2, fpath=fpath2)
+                    print("Data saved.")
+                else:
+                    matches = utils.load_pickle(fpath=fpath)
+                    _2x2 = utils.load_pickle(fpath=fpath2)
+                    print("Data loaded.")
+
+                # Keep in memory
+                MATCH[dom_code][member][casestr][initstr]['2x2'] = _2x2
+                MATCH[dom_code][member][casestr][initstr]['matches'] = matches
+
+    # Plot performance diagrams for each case - can't separate by lead time...
+
 
 if do_object_distr:
     print(stars,"DOING OBJ DISTRIBUTIONS",stars)
@@ -2448,25 +2567,25 @@ if do_object_distr:
             fpath = os.path.join(outroot,"pairplots","pairmode_1_{}min.png".format(fcstmin))
             utils.trycreate(fpath)
             PP = PairPlot(fpath)
-            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars,palette="husl")
+            PP.plot(miniframe.sample(frac=0.4),color_name="conv_mode",vars=vars,palette="husl")
 
             miniframe.sort_values(axis=0,by="resolution",inplace=True)
             fpath2 = os.path.join(outroot,"pairplots","pairdx_1_{}min.png".format(fcstmin))
             PP2 = PairPlot(fpath2)
-            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars,palette=RESCOLS)
+            PP2.plot(miniframe.sample(frac=0.4),color_name="resolution",vars=vars,palette=RESCOLS)
 
-            vars = ["max_updraught","eccentricity","longaxis_km","qlcsness"]
+            vars = ["max_updraught","max_lowrot","longaxis_km","qlcsness"]
 
             miniframe.sort_values(axis=0,by="conv_mode",inplace=True)
             fpath = os.path.join(outroot,"pairplots","pairmode_2_{}min.png".format(fcstmin))
             utils.trycreate(fpath)
             PP = PairPlot(fpath)
-            PP.plot(miniframe.sample(frac=0.2),color_name="conv_mode",vars=vars,palette="Set2")
+            PP.plot(miniframe.sample(frac=0.4),color_name="conv_mode",vars=vars,palette="Set2")
 
             miniframe.sort_values(axis=0,by="resolution",inplace=True)
             fpath2 = os.path.join(outroot,"pairplots","pairdx_2_{}min.png".format(fcstmin))
             PP2 = PairPlot(fpath2)
-            PP2.plot(miniframe.sample(frac=0.2),color_name="resolution",vars=vars,palette=RESCOLS)
+            PP2.plot(miniframe.sample(frac=0.4),color_name="resolution",vars=vars,palette=RESCOLS)
 
     if True:
         # Plot updraught's distance from centroid against max intensity
@@ -2477,7 +2596,7 @@ if do_object_distr:
         fpath = os.path.join(outroot,"kdeplots","ud_distance_v_intensity.png")
         utils.trycreate(fpath)
 
-        f, axes = plt.subplots(2,4,figsize=(10,7),sharex=True,sharey=True)
+        f, axes = plt.subplots(2,4,figsize=(10,7),)#sharex=True,sharey=True)
 
         def ax_gen(axes):
             for n,ax in enumerate(axes.flat):
@@ -2516,14 +2635,15 @@ if do_object_matching:
     all_fmts = list(fcst_fmts) + list(obs_fmts)
     megaframe_all = load_megaframe(fmts=all_fmts)
     # For testing
-    megaframe = megaframe_all[(megaframe_all['case_code'] == '20160331') &
-                                (megaframe_all['lead_time'] > 150)
-                                ]
+    #megaframe = megaframe_all[(megaframe_all['case_code'] == '20160331') &
+    #                            (megaframe_all['lead_time'] > 150)]
+    megaframe = megaframe_all
     CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
 
     # megaframe = load_megaframe()
 
     # Match objects
+    # JRL TODO: need to redo this and loop over member to member?
     fname = "object-matches_d01-d02.pickle"
     fpath = os.path.join(objectroot,fname)
     if (not os.path.exists(fpath)):
@@ -2534,6 +2654,8 @@ if do_object_matching:
     else:
         matches = utils.load_pickle(fpath=fpath)
 
+
+    ### DIFFS ###
 
     # Do differences beteen difference domains/products
     # Positive diffs means d02 is higher.
@@ -2772,4 +2894,22 @@ if do_object_cluster:
     # Dendrogram?
 
     # What about that cool dendrogram heatmap/matrix on seaborn?
+    pass
+
+if do_object_brier_uh:
+    # Load megaframe and verification matches
+
+    # Below: try for cellular objects only too?
+
+    # for each domain, for each case, for each init time:
+    # for each time from 30 min to 150 min, list all observed objects
+    # for each object, for each percentile, compute BS of exceeding that pc
+    # decompose at the earliest point
+    # compute RPS here too
+    # Now append to a massive array/list
+
+    # Below: do for each case, and do all cases on same
+    # Create waffle plot of all BS scores/components/RPS - ordered by fcst min
+
+    # Brier score: UH for 4 levels for matched objects
     pass
