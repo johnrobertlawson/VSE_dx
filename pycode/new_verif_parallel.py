@@ -14,6 +14,8 @@ import itertools
 import random
 import warnings
 
+# John hack
+from multiprocess import Pool as mpPool
 
 # JRL: hack to stop the bloody annoying scikit warnings
 # Others might be surpressed too... not always a good idea.
@@ -79,12 +81,12 @@ do_efss = False # Also includes FISS, which is broken?
 object_switch = False
 do_object_pca = False
 do_object_performance = True
-do_object_distr = False
-do_object_matching = True
-do_object_examples = False
-do_object_waffle = False
-do_object_cluster = False
-do_object_brier_uh = True
+do_object_distr = False # TODO re-plot after matching d01-d02
+do_object_matching = False # TODO re-do d01-d02 diffs?
+do_object_examples = False # TODO maybe delete, or do by hand
+do_object_waffle = False # TODO maybe delete
+do_object_cluster = False # TODO prob delete
+do_object_brier_uh = False # TODO finish
                 #max(do_object_performance,do_object_distr,
                 #    do_object_pca,do_object_lda,do_object_matching,)
 
@@ -148,6 +150,7 @@ domnos = (1,2)
 member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 half_member_names = ['m{:02d}'.format(n) for n in range(1,19)]
 test_member_names = ['m{:02d}'.format(n) for n in range(1,6)]
+ten_member_names = ['m{:02d}'.format(n) for n in range(1,11)]
 
 # doms = (1,2)
 # RAINNC
@@ -728,9 +731,11 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     debug_before_uh=False,add_init=True):
     # Overwrite fmts...
     del fmts
-    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    # fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    fcst_fmts = ("d02_1km","d01_3km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
     all_fmts = list(fcst_fmts) + list(obs_fmts)
+    # all_fmts = list(obs_fmts) + list(fcst_fmts)
 
     mega_fname = "MEGAFRAME.megaframe"
     mega_fpath = os.path.join(objectroot,mega_fname)
@@ -765,7 +770,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                 pdb.set_trace()
             #df_list.append(pandas.concat(results,ignore_index=True))
             df_og = pandas.concat(results,ignore_index=True)
-            # del fname, fpath, results
+            # Create new idx here for concat. "index"
+            df_og.reset_index(level=0, inplace=True)
 
             #### HACKS #####
             print("Adding/modifying megaframe...")
@@ -786,7 +792,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
             if add_ens:
                 ens_df = load_ens_df(df_og,fmt=fmt)
                 # pdb.set_trace()
-                df_og = pandas.concat((df_og,ens_df),axis=1)
+                # df_og = pandas.concat((df_og,ens_df),axis=1)
+                df_og = concat_two_dfs(df_og,ens_df)
                 # Now we have megaframe_idx!
                 print("Megaframe hacked: other ensemble stats added.")
 
@@ -796,16 +803,15 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
 
             # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
             # Add on W
-            if add_W:
-                if fmt.startswith("d0"):
-                    CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
-                    print("Created/updated dataframe Catalogue object.")
-                    W_lookup = load_lookup((fmt,),vrbl="Wmax",)#fmts)
-                    W_df = load_W_df(W_lookup,CAT,fmt=fmt)
-                    df_og = concat_W_df(df_og,W_df,fmt=fmt)
-                    print("Megaframe hacked: updraught stats added.")
-                else:
-                    print("Skipping W stats for obs objects.")
+            if add_W and ("d0" in fmt):
+                CAT = Catalogue(df_og,ncpus=ncpus,tempdir=objectroot)
+                print("Created/updated dataframe Catalogue object.")
+                W_lookup = load_lookup((fmt,),vrbl="Wmax",)#fmts)
+                W_df = load_W_df(W_lookup,CAT,fmt=fmt)
+                # df_og = concat_W_df(df_og,W_df,fmt=fmt)
+                # df_og = pandas.concat((df_og,W_df),axis=1)
+                df_og = concat_two_dfs(df_og,W_df)
+                print("Megaframe hacked: updraught stats added.")
 
             if add_uh_aws:
                 """
@@ -827,7 +833,10 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     lookup = load_lookup((_fmt,),vrbl=layer)
                     uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
                     #df_og = concat_uh_df(df_og,uh_df)
-                    df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
+                    # df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
+                    # df_og = pandas.concat((df_og,uh_df),axis=1)
+                    df_og = concat_two_dfs(df_og,uh_df)
+
                     print("Megaframe hacked: UH stats added.")
 
             if add_init:
@@ -839,6 +848,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
     # pdb.set_trace()
     df_og = pandas.concat(df_list,ignore_index=True)
     # At this point, the megaframe indices are set in stone!
+    df.reset_index(level=0, inplace=True)
+    data.rename(columns={'index':'megaframe_idx'}, inplace=True)
     print("Megaframe created.")
 
     # Save pickle
@@ -872,12 +883,20 @@ def load_uh_df(lookup,CAT,layer,fmt):
         print("UH metadata DataFrame loaded from",fpath)
     return uh_df
 
-def concat_W_df(df_og,W_df,fmt):
-    if W_df is None:
+def concat_two_dfs(df_o,df_w,fmt=None,
+                        #mega_idx="megaframe_idx_test",on="megaframe_idx"
+                        ):
+    def do_join(df_o,df_w,mega_idx=None,on="index"):
+        # new_df = df_o.join(df_w.set_index(mega_idx),on=on)
+        new_df = df_o.join(df_w,on=on)
+        return new_df
+
+    if (df_o is None) or (df_w is None):
         print("No items in new dataframe, so just returning old one.")
-        return df_og
-    # TODO: rename, as it can be used for any concatenation, not just W
-    new_df = df_og.join(W_df.set_index('megaframe_idx_test'),on='megaframe_idx')
+        return df_o
+
+    new_df = do_join(df_o,df_w)
+
     return new_df
 
 def load_W_df(W_lookup,CAT,fmt):
@@ -923,13 +942,14 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                     if fcst_vrbl.startswith("UH"):
                         fcst_vrbl = fcst_vrbl.replace("UH","AWS")
                     mns = ('obs',)
-                    fcmns = (0,)
+                    # fcmns = (0,)
                 else:
                     obs = False
                     fcst = True
                     # FCST
                     mns = member_names
-                    fcmns = all_fcstmins
+                    # fcmns = all_fcstmins
+                fcmns = all_fcstmins
                 # pdb.set_trace()
                 for mem in mns:
                     if obs:
@@ -946,9 +966,13 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                         # JRL TODO: here, you'll want to generalise this to
                         # allow obs loading too, for obs verification/matching
                         # with fcst objects, not just 3-to-1km.
-                        #if fcst_vrbl.startswith("UH"):
+                        # if (fcst_vrbl.startswith("AWS") or
+                        #        fcst_vrbl.startswith("nexrad")):
+                        if obs:
+                            validmin = 0
+                        # pdb.set_trace()
                         yield dict(fcst_vrbl=fcst_vrbl, valid_time=validutc,
-                                fcst_min=validmin, prod_code=prod_code,
+                                fcst_min=validmin, # prod_code=prod_code,
                                 path_to_pickle=path_to_pickle,fcst_fmt=fcst_fmt)
 
 def create_lookup(fcst_fmts,vrbl):
@@ -959,7 +983,7 @@ def create_lookup(fcst_fmts,vrbl):
             "fcst_vrbl":"object",
             "valid_time":"datetime64",
             "fcst_min":"i4",
-            "prod_code":"object",
+            # "prod_code":"object",
             "path_to_pickle":"object",
             "fcst_fmt":"object",
             }
@@ -970,8 +994,13 @@ def create_lookup(fcst_fmts,vrbl):
     for n,d in enumerate(itr):
         utils.print_progress(total=nobjs,idx=n,every=500)
         for key in DTYPES.keys():
+            assert len(fcst_fmts) == 1
+            # if (not fcst_fmts[0].startswith("d01")) and (key == "fcst_min"):
+                # No forecast time for obs
+                # key = 0
             new_df.loc[n,key] = d[key]
 
+    # pdb.set_trace()
     return new_df
 
 def load_ens_df(df_og,fmt):
@@ -1108,7 +1137,8 @@ def add_res_to_df(df_og,fmt):
         res_df = utils.load_pickle(fpath=fpath)
         print("Resolution metadata DataFrame loaded from",fpath)
 
-    df_og = pandas.concat((df_og,res_df),axis=1)
+    # df_og = pandas.concat((df_og,res_df),axis=1)
+    df_og = concat_two_dfs(df_og,res_df)
     print("Megaframe hacked: resolution added")
     return df_og
 
@@ -1136,7 +1166,8 @@ def add_initutc_to_df(df_og,fmt):
         init_df = utils.load_pickle(fpath=fpath)
         print("Init code metadata DataFrame loaded from",fpath)
 
-    df_og = pandas.concat((df_og,init_df),axis=1)
+    # df_og = pandas.concat((df_og,init_df),axis=1)
+    df_og = concat_two_dfs(df_og,init_df)
     print("Megaframe hacked: init code added")
     return df_og
 
@@ -1163,7 +1194,8 @@ def add_mode_to_df(df_og,fmt):
         mode_df = utils.load_pickle(fpath=fpath)
         print("Mode metadata DataFrame loaded from",fpath)
 
-    df_og = pandas.concat((df_og,mode_df),axis=1)
+    #df_og = pandas.concat((df_og,mode_df),axis=1)
+    df_og = concat_two_dfs(df_og,mode_df)
     print("Megaframe hacked: mode info added")
     return df_og
 
@@ -2320,6 +2352,7 @@ if object_switch:
         fname = "pca_model_{}.pickle".format(fcst_fmt)
         fpath = os.path.join(objectroot,fname)
         if (not os.path.exists(fpath)) or overwrite_pp:
+            # TODO JRL: is this the right concat, or use the concat_two_dfs()?
             fcst_df = pandas.concat(results_fcst,ignore_index=True)
             CAT = Catalogue(fcst_df,tempdir=objectroot,ncpus=ncpus)
             pca, PC_df, features, scaler = CAT.do_pca()
@@ -2456,7 +2489,7 @@ if do_object_performance:
     MATCH = {}
     # Create pickle of matches
     # for dom_code in ('d01_3km','d02_1km'):
-    mns = half_member_names
+    mns = ten_member_names
     for member in mns:
         for dom_code in ('d02_1km','d01_3km'):
             if member == mns[0]:
@@ -2508,7 +2541,7 @@ if do_object_performance:
                 MATCH[dom_code][member][casestr][initstr]['matches'] = matches
 
     # Plot performance diagrams for each case - can't separate by lead time...
-
+    pdb.set_trace()
 
 if do_object_distr:
     print(stars,"DOING OBJ DISTRIBUTIONS",stars)
