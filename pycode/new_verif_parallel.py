@@ -13,6 +13,7 @@ import time
 import itertools
 import random
 import warnings
+import math
 
 # John hack
 from multiprocess import Pool as mpPool
@@ -827,9 +828,10 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
     # pdb.set_trace()
 
     # Setting object indices!
-    df_og = pandas.concat(df_list,ignore_index=True)
-    df.reset_index(level=0, inplace=True)
+    df_og = pandas.concat(df_list,ignore_index=False)
+    df_og['megaframe_idx'] = df_og.index
     # At this point, the megaframe indices are set in stone!
+    # In their own column: megaframe_idx
     print("Megaframe created.")
 
     # Save pickle
@@ -852,9 +854,9 @@ def load_uh_df(lookup,CAT,layer,fmt):
         # uh_df = create_uh_df(df_og)
         # rot_exceed_vals = get_rot_exceed_vals(fmt,layer)
         # rot_exceed_vals = get_list_pc(vrbl,ensure_fmt(fmt))
-        rot_exceed_vals = PC_Thresh # Pass in the class!
+        # rot_exceed_vals = PC_Thresh # Pass in the class!
         uh_df = CAT.compute_new_attributes(lookup,do_suite=layer,
-                                            rot_exceed_vals=rot_exceed_vals,
+                                            rot_exceed_vals=PC_Thresh,
                                             suffix=sfx)
         utils.save_pickle(obj=uh_df,fpath=fpath)
         print("UH DF Saved to",fpath)
@@ -868,7 +870,8 @@ def concat_two_dfs(df_o,df_w,fmt=None,):
         # new_df = df_o.join(df_w.set_index(mega_idx),on=on)
         assert 'index' in df_o
         assert 'index' in df_w
-        new_df = df_o.join(df_w,on=on)
+        # new_df = df_o.join(df_w,on=on)
+        new_df = df_o.merge(df_w,on=on)
         return new_df
 
     if (df_o is None) or (df_w is None):
@@ -931,57 +934,55 @@ def loop_ens_data(fcst_vrbl,fcst_fmts):
                 fcmns = all_fcstmins
                 # pdb.set_trace()
                 for mem in mns:
-                    if obs:
-                        prod_code = "_".join((fcst_fmt, "obs"))
-                    elif fcst:
-                        prod_code = "_".join((fcst_fmt, mem))
-                    else:
-                        raise Exception
                     for validmin in fcmns:
                         validutc = initutc+datetime.timedelta(seconds=60*int(validmin))
                         path_to_pickle = get_extraction_fpaths(vrbl=fcst_vrbl,
                                     fmt=fcst_fmt,validutc=validutc,
                                     caseutc=caseutc,initutc=initutc,mem=mem)
-                        # JRL TODO: here, you'll want to generalise this to
-                        # allow obs loading too, for obs verification/matching
-                        # with fcst objects, not just 3-to-1km.
-                        # if (fcst_vrbl.startswith("AWS") or
-                        #        fcst_vrbl.startswith("nexrad")):
                         if obs:
                             validmin = 0
                         # pdb.set_trace()
                         yield dict(fcst_vrbl=fcst_vrbl, valid_time=validutc,
-                                fcst_min=validmin, # prod_code=prod_code,
+                                fcst_min=validmin, member=mem,
                                 path_to_pickle=path_to_pickle,fcst_fmt=fcst_fmt)
 
 def create_lookup(fcst_fmts,vrbl):
     itr = list(loop_ens_data(fcst_vrbl=vrbl,fcst_fmts=fcst_fmts))
     nobjs = len(itr)
 
-    DTYPES = {
-            "index":"object",
+    def lookup_series(d):
+        DTYPES = {
+            # "index":"object",
             "fcst_vrbl":"object",
-            "valid_time":"datetime64",
-            "fcst_min":"i4",
+            "valid_time":"object",
+            "fcst_min":"object",
             # "prod_code":"object",
             "path_to_pickle":"object",
             "fcst_fmt":"object",
+            "member":"object",
             }
 
-    new_df = utils.do_new_df(DTYPES,nobjs)
+        new_df = utils.do_new_df(DTYPES,1)
+        for key in DTYPES.keys():
+            new_df.loc[0,key] = d[key]
+        return new_df
 
     print(f"Creating {vrbl} lookup.")
-    for n,d in enumerate(itr):
-        utils.print_progress(total=nobjs,idx=n,every=500)
-        for key in DTYPES.keys():
-            assert len(fcst_fmts) == 1
-            # if (not fcst_fmts[0].startswith("d01")) and (key == "fcst_min"):
-                # No forecast time for obs
-                # key = 0
-            new_df.loc[n,key] = d[key]
 
+    if ncpus > 1:
+        with mpPool(ncpus) as pool:
+            # results = pool.map(compute_df_hax,gg)
+            results = pool.map(lookup_series,itr)
+    else:
+        results = []
+        for i in itr:
+            results.append(lookup_series(i))
+
+    df_lookup = pandas.concat(results,ignore_index=False)
+    # This index is nothing to do with megaframe index
+    df_lookup.reset_index(level=0, inplace=True)
     # pdb.set_trace()
-    return new_df
+    return df_lookup
 
 def add_hax_to_df(df_og,fmt):
     def gen(df):
@@ -1066,36 +1067,52 @@ def add_hax_to_df(df_og,fmt):
     fpath = os.path.join(objectroot,f"hax_df_{fmt}.pickle")
 
     if not os.path.exists(fpath):
+
+        t0 = time.time()
         # Dataset is too big for memory limitations
         # Split into 10
-        df_hax_list = []
-        batches = 10
-        nrows = df_og.shape[0]
-        chunk_size = int(nrows/batches)
-        count = 0
-        for start in range(0,nrows,chunk_size):
-            count += 1
-            print(f"Parallelising for chunk #{count}.")
-            df_subset = df_og.iloc[start:start + chunk_size]
-            # gg = gen(df_og)
-            gg = gen(df_subset)
-            if ncpus > 1:
-                with mpPool(ncpus) as pool:
-                    results = pool.map(compute_df_hax,gg)
-            else:
-                for o in gg:
-                    compute_df_hax(o)
+        #df_hax_list = []
+        #batches = 5
+        #nrows = df_og.shape[0]
+        #chunk_size = int(nrows/batches)
+        #count = 0
+        #for start in range(0,nrows,chunk_size):
+        #    count += 1
+        #    print(f"Parallelising for chunk #{count}.")
+        #    df_subset = df_og.iloc[start:start + chunk_size]
+        gg = gen(df_og)
+        #    gg = gen(df_subset)
+            # cs = math.ceil(chunk_size/ncpus)
+        cs = int(math.ceil(df_og.shape[0]/ncpus))
 
-            print("Done this chunk; now joining this batch of dataframes.")
-            df_hax_list.append(pandas.concat(results,ignore_index=False))
-            # pdb.set_trace()
-            pass
+        if ncpus > 1:
+            with mpPool(ncpus) as pool:
+                # results = pool.map(compute_df_hax,gg)
+                results = pool.map(compute_df_hax,gg, chunksize=cs)
+        else:
+            for o in gg:
+                compute_df_hax(o)
+
+        #print("Done this chunk; now joining this batch of dataframes.")
+        #df_hax_list.append(pandas.concat(results,ignore_index=False))
+        # pdb.set_trace()
+        pass
 
         print("Done all parallelisation; now joining dataframes.")
-        df_hax = pandas.concat(df_hax_list,ignore_index=False)
-        pdb.set_trace()
+        # df_hax = pandas.concat(df_hax_list,ignore_index=False)
+        df_hax = pandas.concat(results,ignore_index=False)
+
+        df_hax = fix_df(df_hax)
         utils.save_pickle(obj=df_hax,fpath=fpath)
         print("Saved to",fpath)
+
+        t1 = time.time()
+        dt = t1-t0
+        dtm = int(dt//60)
+        dts = int(dt%60)
+
+        print(f"DF creation took {dtm:d} min  {dts:d} sec.")
+        # pdb.set_trace()
     else:
         df_hax = utils.load_pickle(fpath=fpath)
         print("Resolution metadata DataFrame loaded from",fpath)
