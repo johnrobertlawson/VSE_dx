@@ -365,6 +365,11 @@ def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None,
                 lat_1=45.,lat_2=55,lat_0=50,lon_0=-107.0)
     return bmap
 
+def fix_df(df):
+    df.reset_index(level=0, inplace=True)
+    df.sort_index(inplace=True)
+    return df
+
 def get_random_domain(caseutc,dom):
     initutc = CASES[caseutc][0]
     casestr = utils.string_from_time('dir',caseutc,strlen='day')
@@ -771,35 +776,16 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
             #df_list.append(pandas.concat(results,ignore_index=True))
             df_og = pandas.concat(results,ignore_index=True)
             # Create new idx here for concat. "index"
-            df_og.reset_index(level=0, inplace=True)
+            fix_df(df_og)
 
             #### HACKS #####
             print("Adding/modifying megaframe...")
-
-            # JRL TODO: these should be parallelised, but I'm
-            # scared of mixing up the order of things
 
             # These also save the .pickle files (like
             # W and ens dataframes below) to speed up
             # creating new dfs to hack into the megaframe
 
-            if add_resolution:
-                df_og = add_res_to_df(df_og,fmt=fmt)
-
-            if add_mode:
-                df_og = add_mode_to_df(df_og,fmt=fmt)
-
-            if add_ens:
-                ens_df = load_ens_df(df_og,fmt=fmt)
-                # pdb.set_trace()
-                # df_og = pandas.concat((df_og,ens_df),axis=1)
-                df_og = concat_two_dfs(df_og,ens_df)
-                # Now we have megaframe_idx!
-                print("Megaframe hacked: other ensemble stats added.")
-
-            #if debug_before_uh:
-            #    # save this half-baked megaframe.
-            #    df_og.to_pickle(mega_fpath)
+            df_og = add_hax_to_df(df_og,fmt=fmt)
 
             # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
             # Add on W
@@ -832,24 +818,18 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
 
                     lookup = load_lookup((_fmt,),vrbl=layer)
                     uh_df = load_uh_df(lookup,CAT,layer=layer,fmt=_fmt)
-                    #df_og = concat_uh_df(df_og,uh_df)
-                    # df_og = concat_W_df(df_og,uh_df,fmt=_fmt)
-                    # df_og = pandas.concat((df_og,uh_df),axis=1)
                     df_og = concat_two_dfs(df_og,uh_df)
-
                     print("Megaframe hacked: UH stats added.")
-
-            if add_init:
-                df_og = add_initutc_to_df(df_og,fmt=fmt)
 
             df_list.append(df_og)
         # df_list.append(df_og)
 
     # pdb.set_trace()
+
+    # Setting object indices!
     df_og = pandas.concat(df_list,ignore_index=True)
-    # At this point, the megaframe indices are set in stone!
     df.reset_index(level=0, inplace=True)
-    data.rename(columns={'index':'megaframe_idx'}, inplace=True)
+    # At this point, the megaframe indices are set in stone!
     print("Megaframe created.")
 
     # Save pickle
@@ -883,11 +863,11 @@ def load_uh_df(lookup,CAT,layer,fmt):
         print("UH metadata DataFrame loaded from",fpath)
     return uh_df
 
-def concat_two_dfs(df_o,df_w,fmt=None,
-                        #mega_idx="megaframe_idx_test",on="megaframe_idx"
-                        ):
+def concat_two_dfs(df_o,df_w,fmt=None,):
     def do_join(df_o,df_w,mega_idx=None,on="index"):
         # new_df = df_o.join(df_w.set_index(mega_idx),on=on)
+        assert 'index' in df_o
+        assert 'index' in df_w
         new_df = df_o.join(df_w,on=on)
         return new_df
 
@@ -896,7 +876,6 @@ def concat_two_dfs(df_o,df_w,fmt=None,
         return df_o
 
     new_df = do_join(df_o,df_w)
-
     return new_df
 
 def load_W_df(W_lookup,CAT,fmt):
@@ -980,6 +959,7 @@ def create_lookup(fcst_fmts,vrbl):
     nobjs = len(itr)
 
     DTYPES = {
+            "index":"object",
             "fcst_vrbl":"object",
             "valid_time":"datetime64",
             "fcst_min":"i4",
@@ -1003,21 +983,45 @@ def create_lookup(fcst_fmts,vrbl):
     # pdb.set_trace()
     return new_df
 
-def load_ens_df(df_og,fmt):
-    fname = f"ens_df_{fmt}.pickle"
-    fpath = os.path.join(objectroot,fname)
-    if not os.path.exists(fpath):
-        ens_df = create_ens_df(df_og)
-        utils.save_pickle(obj=ens_df,fpath=fpath)
-        print("Saved to",fpath)
-    else:
-        ens_df = utils.load_pickle(fpath=fpath)
-        print("Ensemble metadata DataFrame loaded from",fpath)
-    return ens_df
+def add_hax_to_df(df_og,fmt):
+    def gen(df):
+        for o in df.itertuples():
+            yield o
 
-def create_ens_df(megaframe):
-    # TODO: parallelise
-    def get_case_code(utc):
+    def compute_df_hax(o):
+        DTYPES = {
+                    "index":"object",
+                    #"resolution":"object",
+                    #"conv_mode":"object",
+                    #"case_code:":"object",
+                    #"member":"object",
+                    #"domain":"object",
+                    #"leadtime_group":"object",
+                    #"init_code":"object",
+                }
+        df = utils.do_new_df(DTYPES,1)
+
+        # Indexing
+        # idx = o.index
+        idx = 0 # just the first entry of this df
+        # This is the actual object index
+        df.loc[idx,"index"] = o.index
+
+        # Resolution
+        res = "EE1km" if (int(o.nlats) > 200) else "EE3km"
+        df.loc[idx,"resolution"] = res
+
+        # Mode
+        if o.qlcsness < -0.5:
+            conv_mode = "cellular"
+        elif o.qlcsness > 0.5:
+            conv_mode = "linear"
+        else:
+            conv_mode = "ambiguous"
+        df.loc[idx,"conv_mode"] = conv_mode
+
+        # Case code
+        utc = o.time
         if utc < datetime.datetime(2016,4,1,12,0,0):
             case_code = "20160331"
         elif utc < datetime.datetime(2017,5,2,12,0,0):
@@ -1026,13 +1030,17 @@ def create_ens_df(megaframe):
             case_code = "20170502"
         elif utc < datetime.datetime(2017,5,5,12,0,0):
             case_code = "20170504"
-        #elif utc < datetime.datetime():
-        #    case_code = "20180429"
         else:
             raise Exception
-        return case_code
+        df.loc[idx,"case_code"] = case_code
 
-    def get_leadtime_group(lt):
+        # Member, domain
+        dom, dxkm, mem = o.prod_code.split("_")
+        df.loc[idx,"member"] = mem
+        df.loc[idx,"domain"] = dom
+
+        # Lead-time group
+        lt = o.lead_time
         if int(lt) < 62:
             gr = "first_hour"
         elif int(lt) < 122:
@@ -1041,162 +1049,59 @@ def create_ens_df(megaframe):
             gr = "third_hour"
         else:
             raise Exception
-        return gr
+        df.loc[idx,"leadtime_group"] = gr
 
-    DTYPES = {
-            "member":"object",
-            "domain":"object",
-            "case_code":"object",
-            "leadtime_group":"object",
-            # "dx":"f4",
+        # Init-time group
+        if mem == "obs":
+            ic = None
+        else:
+            dt = utc - datetime.timedelta(seconds=60*lt)
+            ic = f"{dt.hour:02d}{dt.minute:02d}"
+        df.loc[idx,"init_code"] = ic
 
-            # This allows lookup with megaframe on top level.
-            "megaframe_idx":"i4"
-            }
+        # pdb.set_trace()
+        return df
 
-    ens_df = utils.do_new_df(DTYPES,len(megaframe))
-    # ens_df = N.zeros([len(megaframe),len(DTYPES)])
+    # First - check if this has been computed already
+    fpath = os.path.join(objectroot,f"hax_df_{fmt}.pickle")
 
-
-    print("Creating DataFrame from ensemble metadata.")
-
-    for o in megaframe.itertuples():
-    # def f(o):
-        oidx = o.Index
-        #if o.prod_code.startswith("d"):
-        #    dom, dxkm, mem = o.prod_code.split("_")
-        #else:
-        #    mem, dxkm = o.prod_code.split("_")
-        #    dom = 0
-        dom, dxkm, mem = o.prod_code.split("_")
-
-        ens_df.loc[oidx,"member"] = mem
-        ens_df.loc[oidx,"domain"] = dom
-        # ens_df.loc[oidx,"dx"] = float(dxkm[0])
-        ens_df.loc[oidx,"megaframe_idx"] = o.Index
-        #pdb.set_trace()
-
-        ens_df.loc[oidx,"case_code"] = get_case_code(o.time)
-        ens_df.loc[oidx,"leadtime_group"] = get_leadtime_group(o.lead_time)
-
-
-        # assert True == False
-        #ens_df.loc[o,"megaframe_idx"] = o.index
-        #ens_df.loc[o,"megaframe_idx"] = o.label
-        utils.print_progress(total=len(megaframe),idx=oidx,every=500)
-        # return
-
-        #if ncpus > 1:
-        #    with multiprocessing.Pool(ncpus) as pool:
-        #        results = pool.map(f,megaframe.itertuples())
-        #else:
-        #    for o in megaframe.itertuples():
-        #        f(o)
-
-
-    return ens_df
-
-def create_uh_df(megaframe):
-    # TODO: parallelise
-    DTYPES = {
-            "member":"object",
-            # This allows lookup with megaframe on top level.
-            "megaframe_idx":"i4"
-            }
-
-    uh_df = utils.do_new_df(DTYPES,len(megaframe))
-    print("Creating DataFrame for UH/AWS object metadata.")
-
-    for o in megaframe.itertuples():
-        oidx = o.Index
-
-        # ens_df.loc[oidx,"case_code"] = get_case_code(o.time)
-
-        utils.print_progress(total=len(megaframe),idx=oidx,every=500)
-    return ens_df
-
-def add_res_to_df(df_og,fmt):
-    def compute_res(df_og):
-        DTYPES = {"resolution":"object"}
-        res_df = utils.do_new_df(DTYPES,len(df_og))
-        for oidx,o in enumerate(df_og.itertuples()):
-            if int(o.nlats) > 200:
-                res = "EE1km"
-            else:
-                res = "EE3km"
-            res_df.loc[oidx,"resolution"] = res
-            # pdb.set_trace()
-        return res_df
-
-    fpath = os.path.join(objectroot,f"res_df_{fmt}.pickle")
     if not os.path.exists(fpath):
-        res_df = compute_res(df_og)
-        utils.save_pickle(obj=res_df,fpath=fpath)
+        # Dataset is too big for memory limitations
+        # Split into 10
+        df_hax_list = []
+        batches = 10
+        nrows = df_og.shape[0]
+        chunk_size = int(nrows/batches)
+        count = 0
+        for start in range(0,nrows,chunk_size):
+            count += 1
+            print(f"Parallelising for chunk #{count}.")
+            df_subset = df_og.iloc[start:start + chunk_size]
+            # gg = gen(df_og)
+            gg = gen(df_subset)
+            if ncpus > 1:
+                with mpPool(ncpus) as pool:
+                    results = pool.map(compute_df_hax,gg)
+            else:
+                for o in gg:
+                    compute_df_hax(o)
+
+            print("Done this chunk; now joining this batch of dataframes.")
+            df_hax_list.append(pandas.concat(results,ignore_index=False))
+            # pdb.set_trace()
+            pass
+
+        print("Done all parallelisation; now joining dataframes.")
+        df_hax = pandas.concat(df_hax_list,ignore_index=False)
+        pdb.set_trace()
+        utils.save_pickle(obj=df_hax,fpath=fpath)
         print("Saved to",fpath)
     else:
-        res_df = utils.load_pickle(fpath=fpath)
+        df_hax = utils.load_pickle(fpath=fpath)
         print("Resolution metadata DataFrame loaded from",fpath)
 
-    # df_og = pandas.concat((df_og,res_df),axis=1)
-    df_og = concat_two_dfs(df_og,res_df)
+    df_og = concat_two_dfs(df_og,df_hax)
     print("Megaframe hacked: resolution added")
-    return df_og
-
-def add_initutc_to_df(df_og,fmt):
-    """ Use HHMM for init time."""
-    def compute_init(df_og):
-        DTYPES = {"init_code":"object"}
-        new_df = utils.do_new_df(DTYPES,len(df_og))
-        for oidx,o in enumerate(df_og.itertuples()):
-            if o.member == "obs":
-                ic = None
-            else:
-                dt = o.time - datetime.timedelta(seconds=60*o.lead_time)
-                ic = f"{dt.hour:02d}{dt.minute:02d}"
-            new_df.loc[oidx,"init_code"] = ic
-            # pdb.set_trace()
-        return new_df
-
-    fpath = os.path.join(objectroot,f"init_df_{fmt}.pickle")
-    if not os.path.exists(fpath):
-        init_df = compute_init(df_og)
-        utils.save_pickle(obj=init_df,fpath=fpath)
-        print("Saved to",fpath)
-    else:
-        init_df = utils.load_pickle(fpath=fpath)
-        print("Init code metadata DataFrame loaded from",fpath)
-
-    # df_og = pandas.concat((df_og,init_df),axis=1)
-    df_og = concat_two_dfs(df_og,init_df)
-    print("Megaframe hacked: init code added")
-    return df_og
-
-def add_mode_to_df(df_og,fmt):
-    def compute_mode(df_og):
-        DTYPES = {"conv_mode":"object"}
-        mode_df = utils.do_new_df(DTYPES,len(df_og))
-        for oidx,o in enumerate(df_og.itertuples()):
-            if o.qlcsness < -0.5:
-                conv_mode = "cellular"
-            elif o.qlcsness > 0.5:
-                conv_mode = "linear"
-            else:
-                conv_mode = "ambiguous"
-            mode_df.loc[oidx,"conv_mode"] = conv_mode
-        return mode_df
-
-    fpath = os.path.join(objectroot,f"mode_df_{fmt}.pickle")
-    if not os.path.exists(fpath):
-        mode_df = compute_mode(df_og)
-        utils.save_pickle(obj=mode_df,fpath=fpath)
-        print("Saved to",fpath)
-    else:
-        mode_df = utils.load_pickle(fpath=fpath)
-        print("Mode metadata DataFrame loaded from",fpath)
-
-    #df_og = pandas.concat((df_og,mode_df),axis=1)
-    df_og = concat_two_dfs(df_og,mode_df)
-    print("Megaframe hacked: mode info added")
     return df_og
 
 def get_color(fmt,mem):
@@ -2698,7 +2603,7 @@ if do_object_matching:
         return
 
     def find_row(df,megaidx):
-        row = df[(df['megaframe_idx'] == megaidx)]
+        row = df[(df['index'] == megaidx)]
         return row
 
     def do_write_diff(df,n,oldkey,newkey,d02,d01):
@@ -2851,7 +2756,7 @@ if do_object_examples:
 
         # Pick this number
         oo = miniframe.iloc[LOOKUP[nq]]
-        obj_id = oo.megaframe_idx
+        obj_id = oo.index
         obj_obj = oo.fpath_save
         obj = utils.load_pickle(obj_obj)
         coords = obj.object_props.loc[obj_id,'coords']
