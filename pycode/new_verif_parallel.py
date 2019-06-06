@@ -47,6 +47,8 @@ from fiss import FISS
 from evac.object.objectid import ObjectID
 from evac.object.catalogue import Catalogue
 from evac.plot.scales import Scales
+from evac.datafiles.narrfile import NARRFile
+
 
 ### ARG PARSE ####
 parser = argparse.ArgumentParser()
@@ -78,15 +80,17 @@ do_efss = False # Also includes FISS, which is broken?
 
 object_switch = False
 do_object_pca = False
-do_object_performance = True # TODO re-do overnight with new matching
+do_object_performance = False # TODO re-do overnight with new matching
 do_object_distr = False # TODO re-plot after matching d01-d02
 do_object_matching = False # TODO re-do d01-d02 diffs, now using megaframe_idx
 do_object_examples = False # TODO maybe delete, or do by hand
 do_object_waffle = False # TODO maybe delete
 do_object_cluster = False # TODO prob delete
-do_object_brier_uh = False # TODO finish
+do_object_brier_uh = True # TODO finish
                 #max(do_object_performance,do_object_distr,
                 #    do_object_pca,do_object_lda,do_object_matching,)
+
+do_case_outline = False # TODO finish plotting CAPE, shear etc
 
 ### SETTINGS ###
 #mp_log = multiprocessing.log_to_stderr()
@@ -139,6 +143,8 @@ objectroot = os.path.join(extractroot,'object_instances')
 outroot = "/Users/john.lawson/data/figures"
 #tempdir = "/Users/john.lawson/data/intermediate_files"
 tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files"
+narrroot = '/Users/john.lawson/data/AprilFool/NARR'
+
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -148,6 +154,7 @@ domnos = (1,2)
 member_names = ['m{:02d}'.format(n) for n in range(1,37)]
 half_member_names = ['m{:02d}'.format(n) for n in range(1,19)]
 test_member_names = ['m{:02d}'.format(n) for n in range(1,2)]
+fifteen_member_names = ['m{:02d}'.format(n) for n in range(1,16)]
 ten_member_names = ['m{:02d}'.format(n) for n in range(1,11)]
 
 # doms = (1,2)
@@ -307,7 +314,8 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     OBS:
     aws02_mrms_rot_3km_20160331_0335.npy
     """
-    if vrbl in fcst_vrbls: # ("Wmax","UH02","UH25","RAINNC"):
+    # ("Wmax","UH02","UH25","RAINNC"):
+    if (vrbl in fcst_vrbls) or (vrbl in "MLCAPE","shear"):
         # TODO: are we not just doing 5-min or 1-hr accum_precip?
         caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
                                                 caseutc.day)
@@ -364,9 +372,9 @@ def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None,
                 lat_1=45.,lat_2=55,lat_0=50,lon_0=-107.0)
     return bmap
 
-def fix_df(df):
-    df.reset_index(level=0, inplace=True)
-    df.sort_index(inplace=True)
+def _fix_df(df):
+    # df.reset_index(level=0, inplace=True)
+    # df.sort_index(inplace=True)
     return df
 
 def get_random_domain(caseutc,dom):
@@ -699,6 +707,8 @@ def get_all_initutcs():
             SET.add(i)
     return list(SET)
 
+
+
 def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     pca_fname = "pca_model_{}.pickle".format(prodfmt)
     pca_fpath = os.path.join(objectroot,pca_fname)
@@ -742,8 +752,8 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
     # fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
     fcst_fmts = ("d02_1km","d01_3km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
-    all_fmts = list(fcst_fmts) + list(obs_fmts)
-    # all_fmts = list(obs_fmts) + list(fcst_fmts)
+    #all_fmts = list(fcst_fmts) + list(obs_fmts)
+    all_fmts = list(obs_fmts) + list(fcst_fmts)
 
     mega_fname = "MEGAFRAME.megaframe"
     mega_fpath = os.path.join(objectroot,mega_fname)
@@ -755,16 +765,7 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
     if os.path.exists(mega_fpath):
         print("Megaframe loaded.")
         return utils.load_pickle(mega_fpath)
-
-    bypass_compute = False
-    if debug_before_uh:
-        mega_fname = "test.megaframe"
-        mega_fpath = os.path.join(objectroot,mega_fname)
-        if os.path.exists(mega_fpath):
-            df_og = utils.load_pickle(mega_fpath)
-            bypass_compute = True
-
-    if not bypass_compute:
+    else:
         print("Creating megaframe.")
 
         df_list = []
@@ -778,8 +779,10 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                 pdb.set_trace()
             #df_list.append(pandas.concat(results,ignore_index=True))
             df_og = pandas.concat(results,ignore_index=True)
-            # Create new idx here for concat. "index"
-            fix_df(df_og)
+
+            # Here, index is set
+            df_og['miniframe_idx'] = df_og.index
+            # df_og.set_index("miniframe_idx",inplace=True)
 
             #### HACKS #####
             print("Adding/modifying megaframe...")
@@ -787,8 +790,11 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
             # These also save the .pickle files (like
             # W and ens dataframes below) to speed up
             # creating new dfs to hack into the megaframe
-
+            # pdb.set_trace()
             df_og = add_hax_to_df(df_og,fmt=fmt)
+            # pdb.set_trace()
+
+            # Here, index is correct.
 
             # JRL TODO: put in MDI, RDI, Az.shear, QPF stuff!
             # Add on W
@@ -824,7 +830,9 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     df_og = concat_two_dfs(df_og,uh_df)
                     print("Megaframe hacked: UH stats added.")
 
-            df_og['miniframe_idx'] = df_og.index
+            df_og.drop_duplicates(inplace=True)
+            # pdb.set_trace()
+            #pdb.set_trace()
             df_list.append(df_og)
         # df_list.append(df_og)
 
@@ -863,6 +871,9 @@ def load_uh_df(lookup,CAT,layer,fmt):
         uh_df = CAT.compute_new_attributes(lookup,do_suite=layer,
                                             rot_exceed_vals=PC_Thresh,
                                             suffix=sfx)
+        # pdb.set_trace()
+        uh_df.set_index("miniframe_idx",inplace=True)
+
         utils.save_pickle(obj=uh_df,fpath=fpath)
         print("UH DF Saved to",fpath)
     else:
@@ -870,20 +881,8 @@ def load_uh_df(lookup,CAT,layer,fmt):
         print("UH metadata DataFrame loaded from",fpath)
     return uh_df
 
-def concat_two_dfs(df_o,df_w,fmt=None,):
-    def do_join(df_o,df_w,mega_idx=None,on="index"):
-        # new_df = df_o.join(df_w.set_index(mega_idx),on=on)
-        assert 'index' in df_o
-        assert 'index' in df_w
-        # new_df = df_o.join(df_w,on=on)
-        new_df = df_o.merge(df_w,on=on)
-        return new_df
-
-    if (df_o is None) or (df_w is None):
-        print("No items in new dataframe, so just returning old one.")
-        return df_o
-
-    new_df = do_join(df_o,df_w)
+def concat_two_dfs(df_o,df_w):
+    new_df = df_o.join(df_w)
     return new_df
 
 def load_W_df(W_lookup,CAT,fmt):
@@ -892,6 +891,8 @@ def load_W_df(W_lookup,CAT,fmt):
     if not os.path.exists(fpath):
         sfx = f"_W_{fmt}"
         W_df = CAT.compute_new_attributes(W_lookup,do_suite="W",suffix=sfx)
+        W_df.set_index("miniframe_idx",inplace=True)
+
         utils.save_pickle(obj=W_df,fpath=fpath)
         print("Saved to",fpath)
     else:
@@ -985,7 +986,7 @@ def create_lookup(fcst_fmts,vrbl):
 
     df_lookup = pandas.concat(results,ignore_index=False)
     # This index is nothing to do with megaframe index
-    df_lookup.reset_index(level=0, inplace=True)
+    # df_lookup.reset_index(level=0, inplace=True)
     # pdb.set_trace()
     return df_lookup
 
@@ -996,7 +997,7 @@ def add_hax_to_df(df_og,fmt):
 
     def compute_df_hax(o):
         DTYPES = {
-                    "index":"object",
+                    "miniframe_idx":"object",
                     #"resolution":"object",
                     #"conv_mode":"object",
                     #"case_code:":"object",
@@ -1011,7 +1012,7 @@ def add_hax_to_df(df_og,fmt):
         # idx = o.index
         idx = 0 # just the first entry of this df
         # This is the actual object index
-        df.loc[idx,"index"] = o.index
+        df.loc[idx,"miniframe_idx"] = o.miniframe_idx
 
         # Resolution
         res = "EE1km" if (int(o.nlats) > 200) else "EE3km"
@@ -1088,15 +1089,16 @@ def add_hax_to_df(df_og,fmt):
         gg = gen(df_og)
         #    gg = gen(df_subset)
             # cs = math.ceil(chunk_size/ncpus)
-        cs = int(math.ceil(df_og.shape[0]/ncpus))
+        #cs = int(math.ceil(df_og.shape[0]/ncpus))
 
         if ncpus > 1:
             with mpPool(ncpus) as pool:
                 # results = pool.map(compute_df_hax,gg)
-                results = pool.map(compute_df_hax,gg, chunksize=cs)
+                results = pool.map(compute_df_hax,gg)#, chunksize=cs)
         else:
+            results = []
             for o in gg:
-                compute_df_hax(o)
+                results.append(compute_df_hax(o))
 
         #print("Done this chunk; now joining this batch of dataframes.")
         #df_hax_list.append(pandas.concat(results,ignore_index=False))
@@ -1106,8 +1108,9 @@ def add_hax_to_df(df_og,fmt):
         print("Done all parallelisation; now joining dataframes.")
         # df_hax = pandas.concat(df_hax_list,ignore_index=False)
         df_hax = pandas.concat(results,ignore_index=False)
+        df_hax.set_index("miniframe_idx",inplace=True)
 
-        df_hax = fix_df(df_hax)
+        # pdb.set_trace()
         utils.save_pickle(obj=df_hax,fpath=fpath)
         print("Saved to",fpath)
 
@@ -1117,11 +1120,13 @@ def add_hax_to_df(df_og,fmt):
         dts = int(dt%60)
 
         print(f"DF creation took {dtm:d} min  {dts:d} sec.")
-        # pdb.set_trace()
     else:
         df_hax = utils.load_pickle(fpath=fpath)
         print("Resolution metadata DataFrame loaded from",fpath)
 
+
+    # Set index for df_hax
+    # pdb.set_trace()
     df_og = concat_two_dfs(df_og,df_hax)
     print("Megaframe hacked: resolution added")
     return df_og
@@ -1161,14 +1166,15 @@ def get_MATCH(mns,return_megaframe=False):
     obs_fmts = ("nexrad_3km","nexrad_1km")
     all_fmts = list(fcst_fmts) + list(obs_fmts)
     megaframe = load_megaframe(fmts=all_fmts)
-
+    # pdb.set_trace()
     CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
 
     MATCH = {}
     # Create pickle of matches
     # for dom_code in ('d01_3km','d02_1km'):
+    modes = ('cellular','linear')
     for member in mns:
-        for dom_code in ('d02_1km','d01_3km'):
+        for dom_code, mode in itertools.product(('d02_1km','d01_3km'),modes):
             if dom_code not in MATCH.keys():
                 MATCH[dom_code] = {}
             dom, res = dom_code.split('_')
@@ -1176,23 +1182,27 @@ def get_MATCH(mns,return_megaframe=False):
             #for member in member_names:
             if member not in MATCH[dom_code].keys():
                 MATCH[dom_code][member] = {}
-            print("Now verifying objects for",member,dom_code)
+            print(f"Now verifying {mode} objects for",member,dom_code)
             for initutc, casestr, initstr in get_initutcs_strs():
                 if casestr not in MATCH[dom_code][member].keys():
                     MATCH[dom_code][member][casestr] = {}
                 if initstr not in MATCH[dom_code][member][casestr].keys():
-                    MATCH[dom_code][member][casestr][initstr] = {}
+                    MATCH[dom_code][member][casestr][initstr] = {m:{} for m in modes}
                 fname = f"{dom}_{member}-verif_{casestr}_{initstr}.pickle"
-                fpath = os.path.join(objectroot,"verif_match_tuples",casestr,initstr,fname)
-                fpath2 = os.path.join(objectroot,"verif_match_2x2",casestr,initstr,fname)
-                if not os.path.exists(fpath):
+                fpath = os.path.join(objectroot,"verif_match_tuples",
+                                        mode,casestr,initstr,fname)
+                fpath2 = os.path.join(objectroot,
+                                "verif_match_2x2",mode,casestr,initstr,fname)
+                if (not os.path.exists(fpath)) or (not os.path.exists(fpath2)):
                     fcst_prod_code = '_'.join((dom_code,member))
-                    dictA = {"prod_code":fcst_prod_code,"member":member,
-                                    "case_code":casestr,"init_code":initstr}
-                    dictB = {"prod_code":obs_prod_code,"case_code":casestr}
+                    dictA = {"prod_code":fcst_prod_code,#"member":member,
+                                    "case_code":casestr,"init_code":initstr,
+                                    "conv_mode":"cellular"}
+                    dictB = {"prod_code":obs_prod_code,"case_code":casestr,
+                                    "conv_mode":"cellular"}
                     print("About to parallelise matching for:\n",casestr,initstr)
                     matches, _2x2 = CAT.match_two_groups(
-                                        dictA,dictB,do_contingency=True,)
+                                        dictA,dictB,do_contingency=True,td_max=21.0)
                     print("=== RESULTS FOR",dom_code,member,casestr,
                         initstr,"===")
 
@@ -1214,11 +1224,12 @@ def get_MATCH(mns,return_megaframe=False):
                 else:
                     matches = utils.load_pickle(fpath=fpath)
                     _2x2 = utils.load_pickle(fpath=fpath2)
+                    # pdb.set_trace()
                     print("Data loaded.")
 
                 # Keep in memory
-                MATCH[dom_code][member][casestr][initstr]['2x2'] = _2x2
-                MATCH[dom_code][member][casestr][initstr]['matches'] = matches
+                MATCH[dom_code][member][casestr][initstr][mode]['2x2'] = _2x2
+                MATCH[dom_code][member][casestr][initstr][mode]['matches'] = matches
             pass
         pass
 
@@ -1576,7 +1587,8 @@ if do_domains:
                 else:
                     label = None
 
-                D.add_domain(name=name,label=label,lats=lats,lons=lons,color=COLORS[dname])
+                D.add_domain(name=name,label=label,lats=lats,lons=lons,
+                                color=COLORS[dname])
         D.plot_domains()
     print("Domains plot saved to",fpath)
 
@@ -2481,59 +2493,64 @@ if do_object_performance:
     # casestr = (20160331...)
     # initstr = (2300 etc - depends on case)
 
-    # mns = ten_member_names
-    mns = test_member_names
+    mns = half_member_names
+    # mns = test_member_names
     MATCH = get_MATCH(mns)
     # 4x5 (cases x init times) for mean performance for case
-    fname = "obj_perfdiag_allcases.png"
-    fpath = os.path.join(outroot,fname)
+    modes = ('cellular','linear')
 
-    fig,axes = plt.subplots(nrows=4,ncols=5,figsize=(18,15))
+    def plot_huge_objperf(mode):
+        fname = f"obj_perfdiag_allcases_{mode}.png"
+        fpath = os.path.join(outroot,fname)
+        fig,axes = plt.subplots(nrows=4,ncols=5,figsize=(18,15))
+        for ax, (initutc, casestr, initstr) in zip(axes.flat,obj_perf_gen()):
+            print(f"Plotting performance for {casestr} {initstr} {mode}")
+            # mns set above, so we can sub-sample members
+            PD = Performance(fpath=fpath,legendkwargs=None,legend=False,fig=fig,ax=ax)
+            for dom_code, mode in itertools.product(('d02_1km','d01_3km'),modes):
+                pod_all = []
+                far_all = []
+                for member in mns:
+                    fmt = dom_code # I think
+                    pod = _2x2.get("POD")
+                    far = _2x2.get("FAR")
+                    pod_all.append(pod)
+                    far_all.append(far)
+                    _2x2 = MATCH[dom_code][member][casestr][initstr][mode]['2x2']
 
-    for ax, (initutc, casestr, initstr) in zip(axes.flat,obj_perf_gen()):
-        print(f"Plotting performance for {casestr} {initstr}")
-        # mns set above, so we can sub-sample members
-        PD = Performance(fpath=fpath,legendkwargs=None,legend=False,fig=fig,ax=ax)
-        for dom_code in ('d02_1km','d01_3km'):
-            pod_all = []
-            far_all = []
-            for member in mns:
-                fmt = dom_code # I think
-                pod = _2x2.get("POD")
-                far = _2x2.get("FAR")
-                pod_all.append(pod)
-                far_all.append(far)
-                _2x2 = MATCH[dom_code][member][casestr][initstr]['2x2']
+                    annostr = "{}".format(member)
+                    pad = 0.04
+                    apad = 0.02
+                    color_phys = get_color(fmt=fmt,mem=member)
+                    pk = {'marker':MARKERS[fmt],'c':color_phys,'s':0.7*SIZES[fmt],
+                                    'alpha':0.2}
+                    lstr = get_nice(fmt)
+                    PD.plot_data(pod=pod,far=far,plotkwargs=pk,label=lstr)
 
-                annostr = "{}".format(member)
-                pad = 0.04
-                apad = 0.02
-                color_phys = get_color(fmt=fmt,mem=member)
-                pk = {'marker':MARKERS[fmt],'c':color_phys,'s':0.7*SIZES[fmt],
-                                'alpha':0.2}
-                lstr = get_nice(fmt)
-                PD.plot_data(pod=pod,far=far,plotkwargs=pk,label=lstr)
+                    PD.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
+                                    xycoords='data',fontsize='6',color='black',
+                                    fontweight='medium')
+                    # pdb.set_trace()
 
-                PD.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
-                                xycoords='data',fontsize='6',color='black',
-                                fontweight='medium')
-                # pdb.set_trace()
+                    #pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                    #                'alpha':ALPHAS[fmt]}
+                    # PD.save()
+                pk_final = {'marker':'x','c':color_phys,'s':4*SIZES[fmt],
+                                                    'alpha':0.9,}
+                pod_mean = N.nanmean(N.array(pod_all))
+                far_mean = N.nanmean(N.array(far_all))
+                PD.plot_data(pod=pod_mean,far=far_mean,plotkwargs=pk_final)
+                PD.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
+                                xycoords='data',fontsize='8',color=color_phys,
+                                    fontweight='bold')
+            ax.set_title(f"{casestr}:  {initstr} UTC")
+        fig.tight_layout()
+        fig.savefig(fpath)
+        plt.close(fig)
+        return
 
-                #pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
-                #                'alpha':ALPHAS[fmt]}
-                # PD.save()
-            pk_final = {'marker':'x','c':color_phys,'s':4*SIZES[fmt],
-                                                'alpha':0.9,}
-            pod_mean = N.nanmean(N.array(pod_all))
-            far_mean = N.nanmean(N.array(far_all))
-            PD.plot_data(pod=pod_mean,far=far_mean,plotkwargs=pk_final)
-            PD.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
-                            xycoords='data',fontsize='8',color=color_phys,
-                                fontweight='bold')
-        ax.set_title(f"{casestr}:  {initstr} UTC")
-    fig.tight_layout()
-    fig.savefig(fpath)
-    plt.close(fig)
+    for mode in modes:
+        plot_huge_objperf(mode)
 
 if do_object_distr:
     print(stars,"DOING OBJ DISTRIBUTIONS",stars)
@@ -2942,261 +2959,357 @@ if do_object_brier_uh:
     # Create waffle plot of all BS scores/components/RPS - ordered by fcst min
 
     # Brier score: UH for 4 levels for matched objects
-    mns = ten_member_names
+    mns = fifteen_member_names
     MATCH, mf = get_MATCH(mns, return_megaframe=True)
     # 4x5 (cases x init times) for mean performance for case
     fname = "obj_UH_Brier.png"
     fpath = os.path.join(outroot,fname)
 
     fcst_doms = ('d02_1km','d01_3km')
+    modes = ('cellular',)#'linear')
 
     obs_IDs = {}
     # Loop first to build unique observed object set
-    for initutc, casestr, initstr in obj_perf_gen():
-        obs_IDs[initutc] = {}
-        for fcst_dom_code in fcst_doms:
-            obs_IDs[initutc][fcst_dom_code] = set()
-            dom, km = fcst_dom_code.split('_')
-            for member in mns:
-                matches = MATCH[fcst_dom_code][member][casestr][initstr]['matches']
-                # for fcst_ID, v in matches.items():
-                for ID_A, v in matches.items():
-                    if v is None: continue
-                    obs_ID, TI = v
-                    # obs_ID is the "real" observed object - build pdf for each
-                    obs_IDs[initutc][fcst_dom_code].add(obs_ID)
+
+    # Create new df with object ID, all props, and % chance of being forecast
+    # % assigned is out of len(mns)
+    # This assumes no matched object in a member is a "fail"
+
+    # concat d01/d02 obs objects in big list
 
     bs_props = ["midrot_exceed_ID_0","midrot_exceed_ID_1",
-                    "midrot_exceed_ID_2","midrot_exceed_ID_3",
-                    "lowrot_exceed_ID_0","lowrot_exceed_ID_1",
-                    "lowrot_exceed_ID_2","lowrot_exceed_ID_3",
-                    ]
-    new_props = ["cell_yesno","line_yesno"]
-    all_props = bs_props + new_props
+    "midrot_exceed_ID_2","midrot_exceed_ID_3",
+    "lowrot_exceed_ID_0","lowrot_exceed_ID_1",
+    "lowrot_exceed_ID_2","lowrot_exceed_ID_3",
+    ]
+    # new_props = ["cell_yesno","line_yesno"]
+    # all_props = bs_props + new_props
+    all_props = bs_props
 
-    # Now build PDFs per object
-    def BS_gen(mns):
-        for initutc, casestr, initstr in obj_perf_gen():
-            for fcst_dom_code in ('d02_1km','d01_3km'):
-                # For each member, do yes/no exceedence, and build pdf later
-                for member in mns:
-                    matches = MATCH[fcst_dom_code][member][casestr][initstr]['matches']
-                    yield fcst_dom_code, member, casestr, initstr, matches
+    all_bs = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
+    all_lt = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
+    overwrite_BS_pickles = False
 
-    def BS_func(iii):
-        # pdb.set_trace()
-        fcst_dom_code, member, casestr, initstr, matches = iii
+    # Just those cells that are rotating
+    all_meso_bs =  {p:{k:[] for k in ("1km","3km")} for p in bs_props}
+    all_meso_lt =  {p:{k:[] for k in ("1km","3km")} for p in bs_props}
 
-        fcst_one = 0
-        fcst_toofew = 0
-        fcst_toomany = 0
-
-        obs_one = 0
-        obs_toofew = 0
-        obs_toomany = 0
-
-        RESULTS = {}
-
-        print("About to evalaute UH with BS for:")
-        print(fcst_dom_code, member, "...on:", casestr, initstr)
-
-        for fcst_ID, v in matches.items():
-            if v is None: continue
-            fcst_prodstr = f"{fcst_dom_code}_{member}"
-            obs_prodstr = f"nexrad_{km}_obs"
-            obs_ID, TI = v
-
-            if obs_ID not in RESULTS.keys():
-                RESULTS[obs_ID] = {}
-
-            # JRL TODO: variables are named wrong, but it works?
-            ID_A = fcst_ID
-            ID_B = obs_ID
-
-            obj_obs = mf[
-                            # (mf['miniframe_idx'] == fcst_ID) &
-                            (mf['miniframe_idx'] == ID_A) &
-                            (mf['prod_code'] == fcst_prodstr)
-                            ]
-            obj_fcst = mf[
-                            # (mf['miniframe_idx'] == obs_ID) &
-                            (mf['miniframe_idx'] == ID_B) &
-                            (mf['prod_code'] == obs_prodstr)
-                            ]
-
-            # assert obj_fcst.size > 0
-            # assert obj_obs.size > 0
-
-            # assert obj_fcst.shape[0] == 1
-            # assert obj_obs.shape[0] == 1
-            nob = obj_obs.shape[0]
-            if nob == 1:
-                obs_one += 1
-                # print("ONE OBS OBJECT!")
-            elif nob > 1:
-                obs_toomany += 1
-                # raise
-                # print("Too many obs objs")
-            elif nob == 0:
-                obs_toofew += 1
-                # print("Too few obs objs")
-                continue
-            else:
-                # raise
-                print("???????????")
-
-            nfc = obj_fcst.shape[0]
-            if nfc == 1:
-                fcst_one += 1
-                # print("ONE FCST OBJECT!")
-            elif nfc > 1:
-                fcst_toomany += 1
-                # raise
-                # print("Too many fcst objs")
-            elif nfc == 0:
-                fcst_toofew += 1
-                # print("Too few fcst objs")
-                continue
-            else:
-                # raise
-                print("!!!!!!!!!!")
-
-            of = obj_fcst.iloc[0]
-            oo = obj_obs.iloc[0]
-
-            # Now do BS/CRPS for many aspects, or stats/diffs
-
-            ### CRPS METHODS ###
-            # area (CRPS)
-            # bbox_area (CRPS)
-            # convex area (CRPS)
-            # eccentricity (CRPS)
-            # equivalent_diameter (CRPS)
-            # extent (CRPS)
-            # longaxis_km (CRPS)
-            # max_intensity (CRPS)
-            # perimeter
-            # ratio
-
-            ### BS METHODS ###
-            # conv mode - three category (BS) - then ignore ambiguous
-            # low_rot x4 (BS)
-            # mid_rot x4 (BS)
-
-            _cell = (of.conv_mode == "cellular")
-            # BS["cell_yesno"][obs_ID][member].append(_cell)
-            RESULTS[obs_ID]["cell_yesno"] = _cell
-
-            _line = (of.conv_mode == "linear")
-            # BS["line_yesno"][obs_ID][member].append(_line)
-            RESULTS[obs_ID]["line_yesno"] = _line
-
-            for prop in bs_props:
-                _bool = of.get(prop)
-                # BS[prop][obs_ID][member].append(_bool)
-                RESULTS[obs_ID][prop] = _bool
-
-
-            ### STATS ###
-            # average lead time of the pair (stat)
-            # difference in valid time (stat)
-
-            ### FOR ROSE PLOTs ###
-            ## object centroid location error (distance, direction)
-            # COMPUTE HERE
-            # location km error
-            # location dir error
-
-            # 0-2 UH max distance/direction from refl centroid
-            # 2-5 UH max distance/direction from refl centroid
-
-            ### DIFFS ####
-            # What about other diffs from d01/d02?
-
-            # pdb.set_trace()
-
-        rets = dict(
-                    RESULTS=RESULTS,
-                    fcst_dom_code=fcst_dom_code,
-                    member=member,
-                    casestr=casestr,
-                    initstr=initstr,
-                    #fcst_one=fcst_one,
-                    #fcst_toomany=fcst_toomany,
-                    #fcst_toofew=fcst_toofew,
-                    #obs_one=obs_one,
-                    #obs_toofew=obs_toofew,
-                    #obs_toomany=obs_toomany,
-                    )
-        # pdb.set_trace()
-        return rets
-
-    fname = "UH_BS.pickle"
-    fpath = os.path.join(objectroot,"UH_BS",fname)
-
-    if not os.path.exists(fpath):
-        gen = BS_gen(mns)
-        if ncpus > 1:
-            with mpPool(ncpus) as pool:
-                results = pool.map(BS_func,gen)
-        else:
-            results = []
-            for g in gen:
-                results.append(BS_func(g))
-
-        # We now have 20 inits x 36 members = 720 results
-
-        utils.save_pickle(obj=results,fpath=fpath)
-    else:
-        results = utils.load_pickle(fpath=fpath)
-
-    # Create PDFs for all props
-    # BS = {p:{o:None for o in obs_IDs[initutc][fcst_dom_code]} for p in all_props}
-
-    for initutc in get_all_initutcs():
-        for fcst_dom_code in ('d02_1km','d01_3km'):
-            ob_set = obs_IDs[initutc][fcst_dom_code]
-            BS = N.zeros([len(all_props),len(ob_set)])
+    # parallelise if too slow?
+    ### THIS IS FOR CREATING DATAFRAME OF OBSERVED OBJECTS PER RUN
+    for initutc, casestr, initstr in obj_perf_gen():
+        # This is a given initialisation (all 180 min, len(mns) members)
+        for fcst_dom_code in fcst_doms:
+            # d01 or d02
             dom, km = fcst_dom_code.split('_')
-            for nob, obs_ID in enumerate(ob_set):
-                for nprop, prop in enumerate(all_props):
-                    l_prop = []
+            for mode in modes:
+                # Save output at this level
+                fname = f"BS_prop_{casestr}_{initstr}_{mode}_{km}.pickle"
+                fpath = os.path.join(objectroot,"BS_pickles",fname)
+
+                if os.path.exists(fpath) and (not overwrite_BS_pickles):
+                    bs = utils.load_pickle(fpath=fpath)
+                else:
+                    # Linear or cell
+                    obs_objs = []
+                    obs_IDs = set()
+                    df_this_init = []
+
                     for member in mns:
-                        for r in results:
-                            RESULTS, fdc, mem, casestr, initstr = r
-                            if (fdc == fcst_dom_code) and (member == member):
-                                l_prop.append(RESULTS[obs_ID][prop])
-                    count = N.sum(l_prop)
-                    # Below is probability of exceeding prop/thresh
-                    # BS[prop][obs_ID]["prob_frac_mns"] = count/len(mns)
-                    # BS[prop][obs_ID]["prob_frac_lenlp"] = count/len(l_prop)
-                    prob_frac_mns = count/len(mns)
-                    prob_frac_lenlp = count/len(l_prop)
+                        matches = MATCH[fcst_dom_code][member][casestr][
+                                                initstr][mode]['matches']
+                        # for fcst_ID, v in matches.items():
+                        for obs_ID, v in matches.items():
+                            # obs_ID is the "real" observed object - build pdf for each
+                            if obs_ID in obs_IDs:
+                                # Obs object already in set
+                                continue
+                            the_row = mf[mf['megaframe_idx']==obs_ID]
+                            assert the_row.shape[0] == 1
+                            obs_objs.append(the_row)
+                            obs_IDs.add(obs_ID)
 
-                    # Now let's compute the score.
-
-                    obs_prodstr = f"nexrad_{km}_obs"
-                    #fcst_code = "_".join(fcst_)
-                    obj_obs = mf[(mf['miniframe_idx'] == obs_ID) &
-                                    (mf['prod_code'] == obs_prodstr)]
-                    try:
-                        assert obj_obs.shape[0] == 1
-                    except:
-                        bs = N.nan
-                        obs_bool = N.nan
+                    # DataFrame with all observed objects that have been matched
+                    if len(obs_objs)>0:
+                        obs_obj_df = pandas.concat(obs_objs,ignore_index=True)
                     else:
-                        if prop == "cell_yesno":
-                            obs_bool = (obj_obs.conv_mode == "cellular")
-                        elif prop == "line_yesno":
-                            obs_bool = (obj_obs.conv_mode == "linear")
-                        else:
-                            obs_bool = obj_obs.get(prop)
+                        print("No objects for this time - skipping")
+                        continue
 
-                        if obs_bool is None:
-                            # JRL: currently treating this as False
-                            obs_bool = False
+                    bs = {o:{} for o in obs_IDs}
+                    # For a given observed object within this run....
+                    for idx,oo in enumerate(obs_obj_df.itertuples()):
+                        if oo is None:
+                            continue
+                        obj_ID = oo.megaframe_idx
+                        fcst_bools = {p:[] for p in bs_props}
 
-                        # print("Found an actual value!")
-                        bs = (prob_frac_mns - float(obs_bool))**2
-                    BS[nprop,nob] = bs
-            pdb.set_trace()
+                        # Probs generated in this loop block
+                        for member in mns:
+                            # Get object that matched
+                            matches = MATCH[fcst_dom_code][member][casestr][
+                                            initstr][mode]['matches']
+
+                            for obs_ID, v in matches.items():
+                                if obs_ID == obj_ID:
+                                    if v is None:
+                                        # No object matched
+                                        for prop in bs_props:
+                                            fcst_bools[prop].append(False)
+                                        continue
+                                    fcst_ID, _TI = v
+                                    of = mf[mf['megaframe_idx']==fcst_ID]
+                                    assert of.shape[0] == 1
+                                    for prop in bs_props:
+                                        fcst_bool = of.get(prop)
+                                        fcst_bools[prop].append(fcst_bool.values[0])
+                                        # pdb.set_trace()
+
+                        # Assume all members have been checked, and missing = fail
+                        obs_bools = {p:[] for p in bs_props}
+                        oo_df = mf[mf['megaframe_idx']==obs_ID]
+
+                        for prop in bs_props:
+                            new_prop = f"{prop}_BS"
+                            obs_bools[prop] = oo_df.get(prop).values[0]
+                            # obs_bools[prop].append(obs_bool)
+
+                            obs_val = 1 if obs_bools[prop] is True else 0
+
+                            prob_frac_mns = N.sum(fcst_bools[prop])/len(mns)
+                            bs_val = (prob_frac_mns - float(obs_val))**2
+                            # ([0,1] - {1,0}) **2
+                            # Perfect score: 100% and it is observed (0**2)
+                            # Also, 0% and it is not observed.
+
+                            bs[obj_ID][prop] = bs_val
+
+                            # The nans are related to missing mrms data
+                            #if N.isnan(bs_val):
+                            #    pdb.set_trace()
+
+                            lt_val = ((oo.time-initutc).total_seconds())/60
+                            bs[obj_ID]["leadtime"] = lt_val
+
+                            all_bs[prop][km].append(bs_val)
+                            all_lt[prop][km].append(lt_val)
+
+                            if obs_val == 1:
+                                all_meso_bs[prop][km].append(bs_val)
+                                all_meso_lt[prop][km].append(lt_val)
+
+                            #if prop == "midrot_exceed_ID_0":
+                            #    pdb.set_trace()
+                            # obs_obj_df.iloc[idx,new_prop]
+                        # bs is a dictionary - each prop key accesses the BS for
+                        # that object in this run. Get average fcst time?
+                        # pdb.set_trace()
+                        pass
+                    # pdb.set_trace()
+                    pass
+
+                    # BS values need dumping in table with valid time
+
+                    utils.save_pickle(fpath=fpath,obj=bs)
+                    print("Saved to",fpath)
+                pass
+                # Dump objects into a big array
+                # [lead_time,BS]
+                # lead_times.append()
+
+    fname = f"all_leadtimes_BS_objs_{mode}.pickle"
+    fpath = os.path.join(objectroot,"BS_pickles",fname)
+    if os.path.exists(fpath) and (not overwrite_BS_pickles):
+        all_lt = utils.load_pickle(fpath)
+    else:
+        utils.save_pickle(fpath=fpath,obj=all_lt)
+
+    fname = f"all_brierscores_BS_objs_{mode}.pickle"
+    fpath = os.path.join(objectroot,"BS_pickles",fname)
+    if os.path.exists(fpath) and (not overwrite_BS_pickles):
+        all_bs = utils.load_pickle(fpath)
+    else:
+        utils.save_pickle(fpath=fpath,obj=all_bs)
+
+    fname = f"all_leadtimes_BS_mesos_{mode}.pickle"
+    fpath = os.path.join(objectroot,"BS_pickles",fname)
+    if os.path.exists(fpath) and (not overwrite_BS_pickles):
+        all_meso_lt = utils.load_pickle(fpath)
+    else:
+        utils.save_pickle(fpath=fpath,obj=all_meso_lt)
+
+    fname = f"all_brierscores_BS_mesos_{mode}.pickle"
+    fpath = os.path.join(objectroot,"BS_pickles",fname)
+    if os.path.exists(fpath) and (not overwrite_BS_pickles):
+        all_meso_bs = utils.load_pickle(fpath)
+    else:
+        utils.save_pickle(fpath=fpath,obj=all_meso_bs)
+
+    # pdb.set_trace()
+    # For domain, for init time:
+    # Load all obs' BS scores
+    # Sort by lead time
+    # Do waffle plot ordered by lead time, coloured by BS from 0-1
+
+    # Do eight props as left-to-right increasing lead time
+    # One fig for 3km, another for 1km
+
+    for meso_sw in ("meso-only","all"):
+        # meso_sw = "meso-only"
+        # meso_sw = "all"
+
+        if meso_sw == "meso-only":
+            all_bs = all_meso_bs
+            all_lt = all_meso_lt
+            sbs_nice_n = 125
+            nrows = 5
+        else:
+            sbs_nice_n = 375
+            nrows = 15
+
+        # from pywaffle import Waffle
+        for km in ("1km","3km"):
+            for prop in bs_props:
+                fname = f"waffle_{prop}_{km}_{meso_sw}.png"
+                fpath = os.path.join(outroot,"waffle",fname)
+                arr = N.array([all_lt[prop][km],all_bs[prop][km]])
+
+                df = pandas.DataFrame(data=arr.T,columns=('lead_time','brier_score'))
+
+                #arr_sort = N.sort(arr,axis=0)[0,:]
+                # Each array entry (axis 1) is now BS for that object
+                #assert len(N.where(arr_sort > 1)) == 0
+                #assert len(N.where(arr_sort < 1)) == 0
+
+                # pdb.set_trace()
+
+                # Subsample?
+                # total_raw = df_sort.shape[0]
+                # sbs_frac = 0.2
+                # sbs_n = int(sbs_frac * total_raw)
+
+                # nrows = 5
+                # Make right for reshaping - multiple of nrows
+
+                # sbs_nice_n = sbs_n - (sbs_n%nrows)
+                # sbs_nice_n = 125
+
+                try:
+                    df = df.sample(n=sbs_nice_n)
+                except ValueError: # not enough samples
+                    print("Skipping this figure - not enough data")
+                    continue
+
+                df = df.sort_values(by="lead_time")
+                # Reshape for nrows (these rows should increase in time left to right)
+                data_arr = df.brier_score.values
+                # pdb.set_trace()
+
+                ncols = data_arr.size//nrows
+
+                # JRL: which order?!
+                data_arr = N.reshape(data_arr,[nrows,ncols],order="F")
+                # arr_waffle = N.reshape(arr_sort,(20,-1))
+
+                cm = M.cm.Reds_r if km=="1km" else M.cm.Blues_r
+                cm.set_bad('grey',1.0)
+
+                fig,ax = plt.subplots(figsize=(8,4))
+                # data_arr_mi = N.ma.masked_invalid(data_arr)
+                pcm = ax.pcolormesh(
+                                        # data_arr_mi,
+                                        data_arr,
+                                        edgecolors="white",
+                                        snap=True,
+                                        cmap=cm,
+                                        alpha=0.8,
+                                        vmin=0.0,vmax=1.0,
+                                        )
+                plt.colorbar(pcm,ax=ax,orientation='horizontal')
+                ax.grid(False)
+                ax.axis("off")
+                ax.set_aspect("equal")
+                utils.trycreate(fpath,isdir=False)
+                fig.tight_layout()
+                fig.savefig(fpath)
+                print("Saved to",fpath)
+                # pdb.set_trace()
+                pass
+
+if do_case_outline:
+    CASES_narr = collections.OrderedDict()
+    CASES_narr[datetime.datetime(2016,3,31,0,0,0)] = datetime.datetime(2016,3,31,12,0,0)
+    CASES_narr[datetime.datetime(2017,5,1,0,0,0)] = datetime.datetime(2017,5,1,12,0,0)
+    CASES_narr[datetime.datetime(2017,5,2,0,0,0)] = datetime.datetime(2017,5,2,12,0,0)
+    CASES_narr[datetime.datetime(2017,5,4,0,0,0)] = datetime.datetime(2017,5,4,12,0,0)
+
+    CASES_EE3 = collections.OrderedDict()
+    CASES_EE3[datetime.datetime(2016,3,31,0,0,0)] = datetime.datetime(2016,3,31,19,0,0)
+    CASES_EE3[datetime.datetime(2017,5,1,0,0,0)] = datetime.datetime(2017,5,1,19,0,0)
+    CASES_EE3[datetime.datetime(2017,5,2,0,0,0)] = datetime.datetime(2017,5,2,23,0,0)
+    CASES_EE3[datetime.datetime(2017,5,4,0,0,0)] = datetime.datetime(2017,5,4,22,0,0)
+    # Load tornado report CSV to plot lat/lon
+
+
+    # Load severe hail reports, or draw a swathe of SVR reports with Python?
+    # Could plot hail reports as proxy for mesocyclonic activity.
+
+    fig,_axes = plt.subplots(ncols=4,nrows=4,figsize=(12,10))
+    fig_fname = "case_outline.png"
+    fig_fpath = os.path.join(outroot,fig_fname)
+    axes = _axes.flat
+
+    # For each case...
+    for (caseutc, plotutc_NR),(_caseutc, plotutc_EE) in zip(
+                CASES_narr.items(),CASES_EE3.items()):
+        casestr = utils.string_from_time('dir',plotutc_NR,strlen='hour')
+        narr_fname = f'merged_AWIP32.{casestr}.3D'
+        narr_fpath = os.path.join(narrroot,narr_fname)
+
+        # Load NARR data
+        # G = GribFile(fpath)
+        G = NARRFile(narr_fpath)
+        data_925 = G.get("HGT",level="level 925")[0,0,:,:]
+        data_500 = G.get("HGT",level="level 500")[0,0,:,:]
+
+        # lats = G.lats
+        # lons = G.lons
+
+        # Plot 500 hPa height, 925 hPa height from NARR
+        ax = next(axes)
+        ax.set_title(f"1200 UTC (NARR)")
+        m0 = create_bmap(50.0,-55.0,25.0,-130.0,ax=ax)
+        x,y = m0(G.lons,G.lats)
+        m0.drawcoastlines()
+        m0.drawmapboundary(fill_color='gray')
+        m0.fillcontinents(color="lightgray",lake_color="gray")
+        m0.drawstates()
+        m0.drawcountries()
+
+        kws = {'linewidths':0.7}
+
+        # mediumorchid
+        # purple
+        m0.contour(x,y,data_500,colors='k',levels=N.arange(4000,6000,60),**kws)
+        m0.contour(x,y,data_925,colors='mediumorchid',levels=N.arange(0,2000,40),**kws)
+
+        # Plot shear and CAPE from EE3km
+        ax = next(axes)
+        ax.set_title(f"{plotutc_EE.hour:02d}00 UTC (EE3km)")
+        fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl='MLCAPE',
+                                fcst_fmt="d01_3km",validutc=plotutc_EE,
+                                caseutc=caseutc,initutc=plotutc_EE,mem='m01')
+        m1 = create_bmap(fcst_lats.max(),fcst_lons.max(),
+                        fcst_lats.min(),fcst_lons.min(),ax=ax)
+        m1.drawstates()
+        m1.drawcountries()
+        m1.contourf(x,y,fcst_data,levels=N.arange(200,5000,100),cmap=M.cm.jet)
+
+        # maybe boundaries/theta-e?
+
+        # Thumbnail of reflectivity with reports (tornado and/or hail)
+
+        fig.savefig(fig_fpath)
+        pdb.set_trace()
+
+    fig.savefig(fig_fpath)
+    plt.close(fig)
