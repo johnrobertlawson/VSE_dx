@@ -3292,7 +3292,7 @@ if do_case_outline:
         m0.contour(x,y,data_500,colors='k',levels=N.arange(4000,6000,60),**kws)
         m0.contour(x,y,data_925,colors='mediumorchid',levels=N.arange(0,2000,40),**kws)
 
-        # Plot shear and CAPE from EE3km
+        # Plot shear (0-1), SRH (0-3), and CAPE from EE3km
         ax = next(axes)
         ax.set_title(f"{plotutc_EE.hour:02d}00 UTC (EE3km)")
         fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl='MLCAPE',
