@@ -34,7 +34,9 @@ import scipy
 import pandas
 from mpl_toolkits.basemap import Basemap
 from netCDF4 import Dataset
-from scipy.stats import rv_histogram
+from scipy.stats import rv_histogram, gaussian_kde
+from scipy.stats import mode as ss_mode
+from scipy.ndimage import gaussian_filter
 import seaborn as sns
 
 import evac.utils as utils
@@ -48,6 +50,7 @@ from evac.object.objectid import ObjectID
 from evac.object.catalogue import Catalogue
 from evac.plot.scales import Scales
 from evac.datafiles.narrfile import NARRFile
+from windrose import WindroseAxes
 
 
 ### ARG PARSE ####
@@ -60,37 +63,42 @@ parser.add_argument('-op','--overwrite_pp',dest='overwrite_pp',
                             action='store_true',default=False)
 parser.add_argument('-nq','--no_quick',dest="no_quick",
                             action='store_true',default=False)
+parser.add_argument('-of','--overwrite_perf',dest='overwrite_perf',
+                            action='store_true',default=False)
 
 PA = parser.parse_args()
 ncpus = PA.ncpus
 overwrite_output = PA.overwrite_output
 overwrite_pp = PA.overwrite_pp
+overwrite_perf = PA.overwrite_perf
 do_quicklooks = not PA.no_quick
 
 ### SWITCHES ###
 do_plot_quicklooks = False
 do_domains = False
 do_percentiles = False
+_do_performance = False # Broken - to delete?
 do_performance = False
-do_efss = False # Also includes FISS, which is broken?
-
+do_efss = False # TODO - average for cref over cases, for paper
 # From scratch, do object_switch, do_object_pca, then
 # delete the object dfs (in subdirs too), and
 # and re-run object_switch to do the MDI of each cell
-
 object_switch = False
 do_object_pca = False
-do_object_performance = False # TODO re-do overnight with new matching
-do_object_distr = False # TODO re-plot after matching d01-d02
-do_object_matching = False # TODO re-do d01-d02 diffs, now using megaframe_idx
+do_object_performance = False # TODO re-do with new (18) matching and diff vectors?
+do_object_distr = False # TODO re-plot after matching new (18) matches
+do_object_matching = False # TODO finish 18 members; do info-gain diffs?
+do_object_windrose = False # # TODO leave till later...
+do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
+do_object_infogain = False # TODO broken due to indents etc
+do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
+do_one_objectID = False
+do_qlcs_verif = True
+
+# MAYBE DELETE
 do_object_examples = False # TODO maybe delete, or do by hand
 do_object_waffle = False # TODO maybe delete
 do_object_cluster = False # TODO prob delete
-do_object_brier_uh = True # TODO finish
-                #max(do_object_performance,do_object_distr,
-                #    do_object_pca,do_object_lda,do_object_matching,)
-
-do_case_outline = False # TODO finish plotting CAPE, shear etc
 
 ### SETTINGS ###
 #mp_log = multiprocessing.log_to_stderr()
@@ -134,8 +142,8 @@ key_pp = 'AprilFool'
 #extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 
-objectroot = os.path.join(extractroot,'object_instances')
-#objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
+# objectroot = os.path.join(extractroot,'object_instances')
+objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
@@ -156,10 +164,13 @@ half_member_names = ['m{:02d}'.format(n) for n in range(1,19)]
 test_member_names = ['m{:02d}'.format(n) for n in range(1,2)]
 fifteen_member_names = ['m{:02d}'.format(n) for n in range(1,16)]
 ten_member_names = ['m{:02d}'.format(n) for n in range(1,11)]
+three_member_names = ['m{:02d}'.format(n) for n in range(1,4)]
 
 # doms = (1,2)
 # RAINNC
-fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp")
+fcst_vrbls = ("Wmax","UH02","UH25","accum_precip","REFL_comp",
+                "u_shear01","v_shear01","SRH03","CAPE_100mb",
+                "u_shear06","v_shear06")
 obs_vrbls = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 all_fcstmins = N.arange(5,185,5)
 # fcst_fmts = ("d01_3km","d02_1km","d02_3km")
@@ -315,7 +326,7 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     aws02_mrms_rot_3km_20160331_0335.npy
     """
     # ("Wmax","UH02","UH25","RAINNC"):
-    if (vrbl in fcst_vrbls) or (vrbl in "MLCAPE","shear"):
+    if (vrbl in fcst_vrbls):# or (vrbl in "MLCAPE","shear"):
         # TODO: are we not just doing 5-min or 1-hr accum_precip?
         caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
                                                 caseutc.day)
@@ -323,7 +334,7 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
         validHHMM = "{:02d}{:02d}".format(validutc.hour,validutc.minute)
         fname = "{}_{}_{}_{}_{}_{}.npy".format(vrbl,fmt,caseYYYYMMDD,initHHMM,
                                         validHHMM,mem)
-    elif vrbl in obs_vrbls: # ("AWS02","AWS25","DZ","ST4"):
+    elif (vrbl in obs_vrbls): # ("AWS02","AWS25","DZ","ST4"):
         caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
                                                 caseutc.day)
         # utcYYYYMMDD = validutc
@@ -350,6 +361,30 @@ def get_object_picklepaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
         fname = "objects_{}_{}_{}_{}.pickle".format(vrbl,fmt,caseYYYYMMDD,utcHHMM)
     return os.path.join(objectroot,caseYYYYMMDD,fname)
 
+def just_colorbar(fig,fobj,fpath,fontsize=30,cb_xlabel=None,**kw):
+    """
+    fobj is the output from a matplotlib plotting command.
+    """
+    # defaults - and for testing
+    use_defaults = True
+    kw = dict()
+    if use_defaults:
+        kw['orientation'] = 'horizontal'
+
+    # I think this is important to get font size compatible with OG figure
+    FIGSIZE = fig.get_size_inches()
+
+    new_fig,ax = plt.subplots(figsize=FIGSIZE)
+    cbar = plt.colorbar(fobj,ax=ax,**kw)
+    cbar.ax.tick_params(labelsize=fontsize)
+    if cb_xlabel:
+        cbar.ax.set_xlabel(cb_xlabel,fontsize=fontsize)
+    ax.remove()
+    # plt.savefig(fpath)
+    new_fig.tight_layout()
+    plt.savefig(fpath,bbox_inches='tight')
+    return
+
 def round_nearest(x,a,method='floor'):
     """
     Args:
@@ -371,6 +406,9 @@ def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None,
                 resolution='l',projection=proj,ax=ax,
                 lat_1=45.,lat_2=55,lat_0=50,lon_0=-107.0)
     return bmap
+
+def get_member_names(n):
+    return ['m{:02d}'.format(n) for n in range(1,n+1)]
 
 def _fix_df(df):
     # df.reset_index(level=0, inplace=True)
@@ -469,11 +507,21 @@ def loop_obj_obs(obs_vrbl,all_times=True):
         assert case is not None
         yield obs_vrbl, obs_fmt, t, case
 
-def loop_efss(caseutc,vrbl,fcstmin,fmt):
-    # for caseutc, initutcs in CASES.items():
-    for initutc in CASES[caseutc]:
+def loop_efss(caseutc,vrbl,fcstmin,fmt,middle_three=False):
+    initutcs = CASES[caseutc]
+    if middle_three:
+        initutcs = initutcs[1:-1]
+        assert len(initutcs) == 3
+    else:
+        assert len(initutcs) == 5
+    for initutc in initutcs:
         validutc = initutc+datetime.timedelta(seconds=60*int(fcstmin))
         yield vrbl, caseutc, initutc, fmt, validutc
+
+def all_init_sort():
+    for caseutc, initutcs in CASES.items():
+        for idx,initutc in enumerate(initutcs):
+            yield caseutc, idx, initutc
 
 def get_initutcs_strs():
     for caseutc, initutcs in CASES.items():
@@ -488,21 +536,6 @@ def obj_perf_gen():
     for initutc, casestr, initstr in get_initutcs_strs():
         yield initutc, casestr, initstr
 
-def loop_perf(vrbl,thresh,fcstmin=None,fcst_fmt=None):
-    if fcstmin:
-        fcstmins = (fcstmin,)
-
-    if fcst_fmt:
-        fcst_fmts = (fcst_fmt,)
-
-    #for vrbl in ("REFL_comp",):
-    for caseutc, initutcs in CASES.items():
-        for initutc in initutcs:
-            for mem in member_names:
-                for validmin in fcstmins:
-                    validutc = initutc+datetime.timedelta(seconds=60*int(validmin))
-                    for fmt in fcst_fmts:
-                        yield vrbl, caseutc, initutc, mem, fmt, validutc, thresh
 
 def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
     fcst_data = load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,
@@ -516,15 +549,23 @@ def load_both_data(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem):
 
     return fcst_data, obs_data
 
+def normalise(x):
+    return (x-N.nanmin(x))/(N.nanmax(x)-N.nanmin(x))
+
 def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem,return_ll=True):
     if mem == "all":
-        for midx, mem in enumerate(member_names):
+        the_mems = member_names
+    elif mem == "first_half":
+        the_mems = get_member_names(18)
+
+    if mem in ("first_half","all"):
+        for midx, mem in enumerate(the_mems):
             fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
                     validutc=validutc,caseutc=caseutc,initutc=initutc,
                     mem=mem)
             temp_data = N.load(fcst_fpath)
             if midx == 0:
-                fcst_data = N.zeros([len(member_names),*temp_data.shape])
+                fcst_data = N.zeros([len(the_mems),*temp_data.shape])
             fcst_data[midx,:,:] = temp_data
     else:
         fcst_fpath = get_extraction_fpaths(vrbl=fcst_vrbl,fmt=fcst_fmt,
@@ -572,10 +613,14 @@ def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='al
     nt = window
     ws = int((nt-1)/2)
 
-    if mem != 'all':
+    if mem == 'all':
+        pass
+    elif mem == "first_half":
+        pass
+    else:
         raise Exception
     # Load central time first
-    fcst_c, obs_c = load_both_data(vrbl,fmt,validutc,caseutc,initutc,'all')
+    fcst_c, obs_c = load_both_data(vrbl,fmt,validutc,caseutc,initutc,mem)
     nens, nlat, nlon = fcst_c.shape
     fcst_data = N.zeros([nens,nt,nlat,nlon])
     fcst_data[:,ws,:,:] = fcst_c
@@ -589,7 +634,7 @@ def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='al
             continue
 
         offsetutc = validutc + datetime.timedelta(seconds=t_off*5*60)
-        fcst_i, obs_i = load_both_data(vrbl,fmt,offsetutc,caseutc,initutc,'all')
+        fcst_i, obs_i = load_both_data(vrbl,fmt,offsetutc,caseutc,initutc,mem)
         fcst_data[:,tidx,:,:] = fcst_i
         obs_data[tidx,:,:] = obs_i
     return fcst_data, obs_data
@@ -1172,7 +1217,8 @@ def get_MATCH(mns,return_megaframe=False):
     MATCH = {}
     # Create pickle of matches
     # for dom_code in ('d01_3km','d02_1km'):
-    modes = ('cellular','linear')
+    # modes = ('cellular',)#'linear')
+    modes = ('linear',)
     for member in mns:
         for dom_code, mode in itertools.product(('d02_1km','d01_3km'),modes):
             if dom_code not in MATCH.keys():
@@ -1193,15 +1239,19 @@ def get_MATCH(mns,return_megaframe=False):
                                         mode,casestr,initstr,fname)
                 fpath2 = os.path.join(objectroot,
                                 "verif_match_2x2",mode,casestr,initstr,fname)
+                fpath3 = os.path.join(objectroot,"verif_match_sorted",
+                                        mode,casestr,initstr,fname)
                 if (not os.path.exists(fpath)) or (not os.path.exists(fpath2)):
                     fcst_prod_code = '_'.join((dom_code,member))
                     dictA = {"prod_code":fcst_prod_code,#"member":member,
                                     "case_code":casestr,"init_code":initstr,
-                                    "conv_mode":"cellular"}
+                                    # "conv_mode":"cellular"}
+                                    "conv_mode":mode}
                     dictB = {"prod_code":obs_prod_code,"case_code":casestr,
-                                    "conv_mode":"cellular"}
+                                    # "conv_mode":"cellular"}
+                                    "conv_mode":mode}
                     print("About to parallelise matching for:\n",casestr,initstr)
-                    matches, _2x2 = CAT.match_two_groups(
+                    matches, _2x2, sorted_pairs = CAT.match_two_groups(
                                         dictA,dictB,do_contingency=True,td_max=21.0)
                     print("=== RESULTS FOR",dom_code,member,casestr,
                         initstr,"===")
@@ -1220,22 +1270,116 @@ def get_MATCH(mns,return_megaframe=False):
                                 f"c = {_2x2.c}")
                     utils.save_pickle(obj=matches, fpath=fpath)
                     utils.save_pickle(obj=_2x2, fpath=fpath2)
+                    utils.save_pickle(obj=sorted_pairs,fpath=fpath3)
                     print("Data saved.")
                 else:
                     matches = utils.load_pickle(fpath=fpath)
                     _2x2 = utils.load_pickle(fpath=fpath2)
+                    sorted_pairs = utils.load_pickle(fpath=fpath3)
                     # pdb.set_trace()
                     print("Data loaded.")
 
                 # Keep in memory
                 MATCH[dom_code][member][casestr][initstr][mode]['2x2'] = _2x2
                 MATCH[dom_code][member][casestr][initstr][mode]['matches'] = matches
+                MATCH[dom_code][member][casestr][initstr][mode]['sorted'] = sorted_pairs
             pass
         pass
 
     if return_megaframe:
         return MATCH, megaframe
     return MATCH
+
+def get_dom_match(mns,return_megaframe=False,modes=None):
+    if modes is None:
+        modes = ('linear',)#'cellular')
+    # Load one big df with all objects
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
+    megaframe = load_megaframe(fmts=all_fmts)
+    # pdb.set_trace()
+    CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
+
+    MATCH = {}
+    # Create pickle of matches
+    # for dom_code in ('d01_3km','d02_1km'):
+    for member in mns:
+        MATCH[member] = {}
+        for mode in modes:
+            MATCH[member][mode] = {}
+            for initutc, casestr, initstr in get_initutcs_strs():
+                if casestr not in MATCH[member][mode].keys():
+                    MATCH[member][mode][casestr] = {}
+                if initstr not in MATCH[member][mode][casestr].keys():
+                    MATCH[member][mode][casestr][initstr] = {}
+
+                fname_match = f"{mode}_{member}-dom-match_{casestr}_{initstr}.pickle"
+                fname_2x2 = fname_match.replace("match","2x2")
+                fname_sorted = fname_match.replace("match","sortedpairs")
+                mdir = os.path.join(objectroot,"dom_match_pickles",
+                                        mode,casestr,initstr)
+                fpath_match = os.path.join(mdir,fname_match)
+                fpath_2x2 = os.path.join(mdir,fname_2x2)
+                fpath_sorted = os.path.join(mdir,fname_sorted)
+                if (not os.path.exists(fpath_match)):
+                    dictA = {"member":member,"conv_mode":mode,
+                                "case_code":casestr,"init_code":initstr,
+                                "domain":"d01"}
+                    dictB = {"member":member,"conv_mode":mode,
+                                "case_code":casestr,"init_code":initstr,
+                                "domain":"d02"}
+                    print("About to parallelise dom-matching for:\n",
+                                stars,casestr,initstr,member,stars)
+                    matches, _2x2, sorted_pairs = CAT.match_two_groups(
+                                        dictA,dictB,do_contingency=True,td_max=21.0)
+                    print("=== RESULTS FOR",member,casestr,
+                        initstr,"===")
+
+                    if _2x2 is None:
+                        print("No objects - skipping.")
+                    else:
+                        qquad = '    '
+                        bias = _2x2.get("BIAS")
+                        pod = _2x2.get("POD")
+                        far = _2x2.get("FAR")
+                        csi = _2x2.get("CSI")
+                        print(f"BIAS: {bias:.2f}",qquad,f"POD: {pod:.2f}",qquad,
+                                f"FAR: {far:.2f}",qquad,f"CSI: {csi:.2f}")
+                        print(f"a = {_2x2.a}",qquad,f"b = {_2x2.b}",qquad,
+                                f"c = {_2x2.c}")
+                    utils.save_pickle(obj=matches, fpath=fpath_match)
+                    utils.save_pickle(obj=_2x2, fpath=fpath_2x2)
+                    utils.save_pickle(obj=sorted_pairs, fpath=fpath_sorted)
+                    print("Data saved.")
+                else:
+                    matches = utils.load_pickle(fpath=fpath_match)
+                    _2x2 = utils.load_pickle(fpath=fpath_2x2)
+                    sorted_pairs = utils.load_pickle(fpath=fpath_sorted)
+                    # pdb.set_trace()
+                    print("Data loaded.")
+
+                # Keep in memory
+                MATCH[member][mode][casestr][initstr]['2x2'] = _2x2
+                MATCH[member][mode][casestr][initstr]['matches'] = matches
+                MATCH[member][mode][casestr][initstr]['sorted'] = sorted_pairs
+            pass
+        pass
+
+    if return_megaframe:
+        return MATCH, megaframe
+    return MATCH
+
+def constrain(frac,minmax=(0.01,0.99)):
+    assert 0.0 <= frac <= 1.0
+    assert minmax[1] > minmax[0]
+    if frac > minmax[1]:
+        return minmax[1]
+    elif frac < minmax[0]:
+        return minmax[0]
+    else:
+        return frac
+
 
 ###############################################################################
 ############################### END OF FUNCTIONS ##############################
@@ -1752,7 +1896,8 @@ if do_percentiles:
             pass
 
 
-if do_performance:
+if _do_performance:
+    fcst_fmts = ("d01_3km","d02_1km")
     print(stars,"DOING PERFORMANCE",stars)
 
     # TODO: a zoomed in version where each member is plotted individually as a swarm.
@@ -1769,176 +1914,412 @@ if do_performance:
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return (DS,caseutc,mem)
 
-    # Create a "master" figure for the paper
-    fname = "perfdiag_REFL_comp_30_multi.png"
-    fpath = os.path.join(outroot,fname)
-    PD0 = Performance(fpath=fpath,legendkwargs=None,legend=False)
-    #_ths = (15,30,40,50)
-    #_fms = (30,60,90,120,150,180,)
     _vs = ("REFL_comp",)
     _ths = (15,30,40,50)
     #_fms = (60,120,180)
     _fms = (30,60,90,120,150,180)
 
-    ZZZ = {}
-    YYY = {}
-    for thresh, vrbl, fcstmin in itertools.product(_ths,_vs,_fms):
-        for fmt in fcst_fmts:
-            itr = loop_perf(vrbl=vrbl,thresh=thresh,fcstmin=fcstmin,fcst_fmt=fmt)
-            itr2 = itertools.tee(itr)
-            nrun = len(list(itr2))
+    switch_25 = 0
+    # overwrite_perf is set in lines 60-70 from python args
 
-            print("About to parallelise over {} grids ({} per member)".format(
-                            nrun,nrun//36))
+    # allall is just for 40 dBZ - want to plot that for all
+    fpath_diffs = "./trad_perf_diffs_array.pickle"
+    fpath_allpod = './allall_pod.pickle'
+    fpath_allfar = './allall_pod.pickle'
 
-            with multiprocessing.Pool(ncpus) as pool:
-                results = pool.map(compute_perf,itr)
-            # for i in list(itr):
-            #     compute_perf(i)
-            casestrs = [utils.string_from_time('dir',c,strlen='day')
-                            for c in CASES.keys()]
-            ZZZ[fmt] = dict()
-            ZZZ[fmt]["POD"] = {casestr:[] for casestr in casestrs}
-            ZZZ[fmt]["FAR"] = {casestr:[] for casestr in casestrs}
+    if os.path.exists(fpath) and os.path.exists(allall_fpath) and (not overwrite_perf):
+        diffs_arr = utils.load_pickle(fpath)
+        allall = utils.load_pickle(allall_fpath)
+    else:
 
-            YYY[fmt] = dict()
-            YYY[fmt]["POD"] = {casestr:{m:[] for m in member_names} for casestr in casestrs}
-            YYY[fmt]["FAR"] = {casestr:{m:[] for m in member_names} for casestr in casestrs}
+        clist = []
+        for case in CASES.keys():
+            clist.append(utils.string_from_time('dir',case,strlen='day'))
+        allall = {p:{f:{c:[] for c in clist} for f in fcst_fmts} for p in ("pod","far")}
 
-            for r in results:
-                mem = r[2]
-                casestr = utils.string_from_time('dir',r[1],strlen='day')
+        # Create a "master" figure for the paper
+        fname = "perfdiag_REFL_comp_30_multi.png"
+        fpath = os.path.join(outroot,fname)
+        PD0 = Performance(fpath=fpath,legendkwargs=None,legend=False)
 
-                _pod = r[0].get("POD")
-                _far = r[0].get("FAR")
+        # This are continually overwritten i think...dimensions are silly
+        far_vec_diff = N.zeros([4,len(_vs_),len(_fms),len(_ths),len(member_names),5])
+        pod_vec_diff = N.zeros_like(far_vec_diff)
 
-                ZZZ[fmt]["POD"][casestr].append(_pod)
-                ZZZ[fmt]["FAR"][casestr].append(_far)
+        # dimensions: (vrbl, case, fcst_min, threshold )
+        # hm_arr = N.zeros([len(_vs),4,len(_fms),len(_ths)])
+        hm_arr = N.zeros_like(far_vec_diff)
 
-                YYY[fmt]["POD"][casestr][mem].append(_pod)
-                YYY[fmt]["FAR"][casestr][mem].append(_far)
+        ZZZ = {}
+        YYY = {}
+        for (nthresh,thresh), (nvrbl,vrbl), (nfm,fcstmin) in itertools.product(
+                enumerate(_ths),enumerate(_vs,),enumerate(_fms)):
+            for fmt in ("d01_3km","d02_1km"): # in indices, [1] - [0] for figs
+                itr = loop_perf(vrbl=vrbl,thresh=thresh,fcstmin=fcstmin,fcst_fmt=fmt)
+
+                with multiprocessing.Pool(ncpus) as pool:
+                    results = pool.map(compute_perf,itr)
+
+                pdb.set_trace()
+                # for i in list(itr):
+                #     compute_perf(i)
+                casestrs = [utils.string_from_time('dir',c,strlen='day')
+                                for c in CASES.keys()]
+                ZZZ[fmt] = dict()
+                ZZZ[fmt]["POD"] = {casestr:[] for casestr in casestrs}
+                ZZZ[fmt]["FAR"] = {casestr:[] for casestr in casestrs}
+
+                YYY[fmt] = dict()
+                YYY[fmt]["POD"] = {casestr:{m:[] for m in member_names} for casestr in casestrs}
+                YYY[fmt]["FAR"] = {casestr:{m:[] for m in member_names} for casestr in casestrs}
+
+                for r in results:
+                    mem = r[2]
+                    casestr = utils.string_from_time('dir',r[1],strlen='day')
+
+                    _pod = r[0].get("POD")
+                    _far = r[0].get("FAR")
+
+                    ZZZ[fmt]["POD"][casestr].append(_pod)
+                    ZZZ[fmt]["FAR"][casestr].append(_far)
+
+                    YYY[fmt]["POD"][casestr][mem].append(_pod)
+                    YYY[fmt]["FAR"][casestr][mem].append(_far)
 
 
-        # pdb.set_trace()
-        for casestr in casestrs:
-            fname1 = "perfdiag_{}_{}th_{}min_{}".format(vrbl,thresh,fcstmin,casestr)
-            fpath1 = os.path.join(outroot,"perfdiag",casestr,fname1)
-            PD1 = Performance(fpath=fpath1,legendkwargs=None,legend=True)
+            # pdb.set_trace()
+            for ncase,casestr in enumerate(casestrs):
+                fname1 = "perfdiag_{}_{}th_{}min_{}".format(vrbl,thresh,fcstmin,casestr)
+                fpath1 = os.path.join(outroot,"perfdiag",casestr,fname1)
+                PD1 = Performance(fpath=fpath1,legendkwargs=None,legend=True)
 
-            fname2 = "perfdiag_{}_{}th_{}min_{}_eachens".format(vrbl,thresh,fcstmin,casestr)
-            fpath2 = os.path.join(outroot,"perfdiag","eachens",casestr,fname2)
-            PD2 = Performance(fpath=fpath2,legendkwargs=None,legend=False)
+                fname2 = "perfdiag_{}_{}th_{}min_{}_eachens".format(vrbl,thresh,fcstmin,casestr)
+                fpath2 = os.path.join(outroot,"perfdiag","eachens",casestr,fname2)
+                PD2 = Performance(fpath=fpath2,legendkwargs=None,legend=False)
 
-            pod_all = []
-            far_all = []
-            pod_mem = {f:{m:[] for m in member_names} for f in fcst_fmts}
-            far_mem = {f:{m:[] for m in member_names} for f in fcst_fmts}
-            for fmt in fcst_fmts:
-                POD = ZZZ[fmt]["POD"]
-                FAR = ZZZ[fmt]["FAR"]
+                pod_all = []
+                far_all = []
+                pod_mem = N.zeros([2,len(member_names),5])
+                far_mem = N.zeros_like(pod_mem)
+                #pod_mem = {f:{m:N.zeros([2,len(member_names)]) for m in member_names} for f in fcst_fmts}
+                #far_mem = {f:{m:[] for m in member_names} for f in fcst_fmts}
+                for nfmt, fmt in enumerate(fcst_fmts):
+                    POD = ZZZ[fmt]["POD"]
+                    FAR = ZZZ[fmt]["FAR"]
 
-                pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
-                                'alpha':ALPHAS[fmt]}
-                lstr = get_nice(fmt)
-                print("Plotting",fmt,"to",fpath1)
+                    pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                                    'alpha':ALPHAS[fmt]}
+                    lstr = get_nice(fmt)
+                    print("Plotting",fmt,"to",fpath1)
+                    # pdb.set_trace()
+                    PD1.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
+
+                    #if (fcstmin in (60,120,180)) and (vrbl == "REFL_comp") and (thresh==30):
+                    if (fcstmin in (30,90,150)) and (vrbl == "REFL_comp") and (thresh==30):
+                        if fcstmin > 60:
+                            lstr = None
+                        PD0.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,
+                                            label=lstr)
+                        if fmt.startswith("d01"):
+                            annostr = "{} min".format(fcstmin)
+                            PD0.ax.annotate(annostr,xy=(1-N.mean(FAR[casestr])-0.055,N.mean(POD[casestr])+0.03),
+                                            xycoords='data',fontsize='8',color='black',
+                                            fontweight='bold')
+                    for nmem, mem in enumerate(member_names):
+                        _pod_ = YYY[fmt]["POD"][casestr][mem]
+                        pod_all.append(_pod_)
+                        _far_ = YYY[fmt]["FAR"][casestr][mem]
+                        far_all.append(_far_)
+                        if (thresh == 30):
+                            allall['pod'][fmt][casestr].append(_pod_)
+                            allall['far'][fmt][casestr].append(_far_)
+
+                        # pod_mem[fmt][mem].append(_pod_)
+                        # far_mem[fmt][mem].append(_far_)
+                        pod_mem[nfmt,nmem,:] = _pod_
+                        far_mem[nfmt,nmem,:] = _far_
+
+                # One last dump (heh heh)
+
+                pod_max = N.nanmax(pod_all)
+                pod_min = N.nanmin(pod_all)
+                sr_min  = 1-N.nanmax(far_all)
+                sr_max = 1-N.nanmin(far_all)
+                pad = 0.1
+
+                sr_min = max(0,sr_min)
+                sr_max = min(1,sr_max)
+                pod_max = min(1,pod_max)
+                pod_min = max(0,pod_min)
+                PD2.ax.set_ylim([pod_min-pad,pod_max+pad])
+                PD2.ax.set_xlim([sr_min-pad,sr_max+pad])
+
+                for fmt in fcst_fmts:
+                    for mem in member_names:
+                        POD_ea = YYY[fmt]["POD"][casestr][mem]
+                        FAR_ea = YYY[fmt]["FAR"][casestr][mem]
+
+                        pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                                        'alpha':0.4}
+                        PD2.plot_data(pod=N.mean(POD_ea),far=N.mean(FAR_ea),
+                                            plotkwargs=pk, label=lstr)
+
+
+                PD2.save()
+                PD1.save()
+
+                # Get differences between POD and FAR for vector computation!
+                for nmem, mem in enumerate(member_names):
+                    pod_vec_diff[ncase,nvrbl,nfm,nthresh,nmem,:] = (pod_mem[1,nmem,:] - pod_mem[0,nmem,:])
+                    # far_vec_diff[ncase,nmem,:] = (far_mem[1,nmem,:] - far_mem[0,nmem,:])
+                    far_vec_diff[ncase,nvrbl,nfm,nthresh,nmem,:] = (far_mem[1,nmem,:] - far_mem[0,nmem,:])
                 # pdb.set_trace()
-                PD1.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
 
-                #if (fcstmin in (60,120,180)) and (vrbl == "REFL_comp") and (thresh==30):
-                if (fcstmin in (30,90,150)) and (vrbl == "REFL_comp") and (thresh==30):
-                    if fcstmin > 60:
-                        lstr = None
-                    PD0.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,
-                                        label=lstr)
-                    if fmt.startswith("d01"):
-                        annostr = "{} min".format(fcstmin)
-                        PD0.ax.annotate(annostr,xy=(1-N.mean(FAR[casestr])-0.055,N.mean(POD[casestr])+0.03),
-                                        xycoords='data',fontsize='8',color='black',
-                                        fontweight='bold')
-                for mem in member_names:
-                    _pod_ = YYY[fmt]["POD"][casestr][mem]
-                    pod_all.append(_pod_)
-                    _far_ = YYY[fmt]["FAR"][casestr][mem]
-                    far_all.append(_far_)
+                # Do wind rose of performance-diagram differences (i.e. which way the difference
+                # points, with optimal being 1.0 in the "northeast" direction.
 
-                    pod_mem[fmt][mem].append(_pod_)
-                    far_mem[fmt][mem].append(_far_)
+                # dfar = far_vec_diff[ncase,1,:,:] - far_vec_diff[ncase,0,:,:]
+                # dpod = pod_vec_diff[ncase,1,:,:] - pod_vec_diff[ncase,0,:,:]
+                # dfar = far_vec_diff[ncase,:,:].flatten()
+                # dpod = pod_vec_diff[ncase,:,:].flatten()
 
-            pod_max = N.nanmax(pod_all)
-            pod_min = N.nanmin(pod_all)
-            sr_min  = 1-N.nanmax(far_all)
-            sr_max = 1-N.nanmin(far_all)
-            pad = 0.1
+                # Mean for this vrbl, fcstmin, case, threshold.
+                dfar = far_vec_diff[ncase,nvrbl,nfm,nthresh,:,:].flatten()
+                dpod = pod_vec_diff[ncase,nvrbl,nfm,nthresh,:,:].flatten()
+
+                # For each in the array, compute speed and direction from x/y difference
+                wspd, wdir = utils.combine_wind_components(dfar,dpod)
+
+                # thresh, vrbl, fcstmin, casestr
+                fname = f"perf_diag_diffs_{vrbl}_{fcstmin}min_{casestr}_{thresh}th.png"
+                fpath = os.path.join(outroot,"perfdiag_diffs",fname)
+                utils.trycreate(fpath)
+
+                mag_list = []
+                fig,ax = plt.subplots(1,figsize=(6,8))
+
+                # Work out magnitude - if EE1km did better, make it positive.
+                mag = N.sqrt(dpod**2 + dfar**2)
+                EE3_best = {}
+                # angles = (135,315)
+                angles = (225,45)
+                EE3_best[0] = N.where(wdir < max(angles))
+                EE3_best[1] = N.where(wdir > min(angles))
+                for n, idx in EE3_best.items():
+                    mag[EE3_best[n]] *= -1
+
+                _dfar = dfar *-1
+                # Plot
+                _sc = ax.scatter(dpod,_dfar,alpha=0.4,c=mag,
+                                    # cmap=M.cm.cividis,
+                                    vmin=-0.3,vmax=0.3,zorder=100,
+                                    cmap='vse_diverg')
+                ax.axhline(0,color='grey')
+                ax.axvline(0,color='grey')
+                ax.plot([-1,1],[-1,1],color='red',linestyle='dotted',zorder=0,alpha=0.5)
+                ax.plot([-1,1],[1,-1],color='lightgrey',zorder=0,alpha=0.5)
+                ax.grid(True,color='lightgrey')
+                plt.colorbar(_sc,ax=ax,orientation='horizontal',shrink=0.7,)
+
+                mean_dpod = N.mean(dpod)
+                mean_dfar = N.mean(dfar)
+                mean__dfar = N.mean(_dfar)
+                # wspd, wdir = utils.combine_wind_components(mean_dfar,mean_dpod)
+
+                # Work out magnitude - if EE1km did better, make it positive.
+                mag, wdir = utils.combine_wind_components(mean_dfar,mean_dpod)
+                # mag = N.sqrt(mean_dpod**2 + mean_dfar**2)
+                angles = (225,45)
+                Q = N.zeros([2],dtype=bool)
+                Q[0] = wdir < max(angles)
+                Q[1] = wdir > min(angles)
+                if N.all(Q):
+                    # d02 did better (well, while I think the order is right!)
+                    # mag *= -1
+                    col = "#D41159"
+                    # N.zeros([4,len(member_names),5])
+                    # JRL TODO: here, add this time/init/case to a
+                    mag_list.append(-1 * mag)
+                else:
+                    col = "#1A85FF"
+                    mag_list.append(mag)
+
+                # if "perf_diag_diffs_REFL_comp_120min_20160331_15th" in fpath:
+                #     pdb.set_trace()
+                # Plot mean!
+                ax.scatter(mean_dpod,mean__dfar,marker='X',c=col,
+                                edgecolors='k',# markeredgewidth=3.0,
+                                s=210,alpha=0.99,zorder=2000)
+
+                ax.set_xlim([-0.3,0.3])
+                ax.set_ylim([-0.3,0.3])
+                ax.set_aspect('equal')
+                ax.set_xlabel("EE1km-EE3km differences in Strike Rate")
+                ax.set_ylabel("EE3km-EE1km differences in Prob. of Detection")
+
+                fig.tight_layout()
+                fig.savefig(fpath)
+                plt.close(fig)
+                # pdb.set_trace()
+                pass
+                hm_arr[nvrbl,ncase,nfm,nthresh] = N.array(mag_list)
+                #pdb.set_trace()
+                pass
+            # pdb.set_trace()
+            pass
+
+            # PD.ax.set_xlim([0,0.3])
+            fname3 = "perfdiag_{}_{}th_{}min_mean_ens".format(vrbl,thresh,fcstmin)
+            fpath3 = os.path.join(outroot,"perfdiag","eachens",fname3)
+            PD3 = Performance(fpath=fpath3,legendkwargs=None,legend=False)
+            _podmms = []
+            _farmms = []
+            for nfmt, fmt in enumerate(fcst_fmts):
+                for nmem, mem in enumerate(member_names):
+                    annostr = "".format(mem)
+                    pod_mem_mean = N.nanmean(pod_mem[nfmt,nmem,:])
+                    far_mem_mean = N.nanmean(far_mem[nfmt,nmem,:])
+
+                    _podmms.append(pod_mem_mean)
+                    _farmms.append(far_mem_mean)
+
+
+            pod_max = N.nanmax(_podmms)
+            pod_min = N.nanmin(_podmms)
+            sr_min  = 1-N.nanmax(_farmms)
+            sr_max = 1-N.nanmin(_farmms)
+            pad = 0.04
+            apad = 0.01
 
             sr_min = max(0,sr_min)
             sr_max = min(1,sr_max)
             pod_max = min(1,pod_max)
             pod_min = max(0,pod_min)
-            PD2.ax.set_ylim([pod_min-pad,pod_max+pad])
-            PD2.ax.set_xlim([sr_min-pad,sr_max+pad])
+            PD3.ax.set_ylim([pod_min-pad,pod_max+pad])
+            PD3.ax.set_xlim([sr_min-pad,sr_max+pad])
 
-            for fmt in fcst_fmts:
-                for mem in member_names:
-                    POD_ea = YYY[fmt]["POD"][casestr][mem]
-                    FAR_ea = YYY[fmt]["FAR"][casestr][mem]
-
-                    pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+            for nfmt, fmt in enumerate(fcst_fmts):
+                for nmem, mem in enumerate(member_names):
+                    annostr = "{}".format(mem)
+                    pod_mem_mean = N.nanmean(pod_mem[nfmt,nmem,:])
+                    far_mem_mean = N.nanmean(far_mem[nfmt,nmem,:])
+                    color_phys = get_color(fmt=fmt,mem=mem)
+                    pk = {'marker':MARKERS[fmt],'c':color_phys,'s':SIZES[fmt],
                                     'alpha':0.4}
-                    PD2.plot_data(pod=N.mean(POD_ea),far=N.mean(FAR_ea),
+                    PD3.plot_data(pod=pod_mem_mean,far=far_mem_mean,
                                         plotkwargs=pk, label=lstr)
+                    PD3.ax.annotate(annostr,xy=(1-far_mem_mean-apad,pod_mem_mean+apad),
+                                    xycoords='data',fontsize='6',color='black',
+                                    fontweight='bold')
+            PD3.ax.set_ylim([pod_min-pad,pod_max+pad])
+            PD3.ax.set_xlim([sr_min-pad,sr_max+pad])
+
+            PD3.save()
 
 
-            PD2.save()
-            PD1.save()
-        # pdb.set_trace()
 
-        # PD.ax.set_xlim([0,0.3])
-        fname3 = "perfdiag_{}_{}th_{}min_mean_ens".format(vrbl,thresh,fcstmin)
-        fpath3 = os.path.join(outroot,"perfdiag","eachens",fname3)
-        PD3 = Performance(fpath=fpath3,legendkwargs=None,legend=False)
-        _podmms = []
-        _farmms = []
+        PD0.save()
+
+        utils.save_pickle(obj=hm_arr,fpath=fpath)
+        utils.save_pickle(obj=allall,fpath=allall_fpath)
+
+
+    # Do summary plot of whether means were red or blue.
+    # Use eFSS method of plotting diffs
+    # dimensions: (vrbl, case, fcst_min, threshold )
+    # averaged for vrbl over: (members, init times)
+
+    # Loop image creation for vrbl and cases
+    # y-axis is threshold (absolute)
+    # x-axis is fcstmin
+    # Just need to plot the diff values themselves ...
+
+    kw = dict(vmin=-0.15,vmax=0.15)
+    for (ncase, case), (nvrbl, vrbl) in itertools.product(
+                    enumerate(CASES.keys()),enumerate(_vs)):
+        casestr = utils.string_from_time('dir',case,strlen='day')
+        fname = f"trad_perfdiag_diffs_{casestr}_{vrbl}.png"
+        fpath = os.path.join(outroot,fname)
+        fig,ax = plt.subplots(1)
+        data = hm_arr[nvrbl,ncase,:,:].T
+        im = ax.imshow(data,cmap='vse_diverg', **kw)
+
+        nx,ny = data.shape
+        ax.set_yticks(N.arange(nx))
+        ax.set_xticks(N.arange(ny))
+
+        ax.set_xticklabels(_fms)
+        ax.set_xlabel("Forecast minute")
+
+        ax.set_yticklabels(_ths)
+        ax.set_ylabel("dBZ threshold")
+
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+                rotation_mode="anchor")
+
+        for i,j in itertools.product(range(nx),range(ny)):
+            t = "{:.2f}".format(data[i,j])
+            text = ax.text(j,i,t,ha="center",va="center",color="k",size=14,
+                                fontweight="bold")
+        plt.colorbar(im,ax=ax)
+        fig.tight_layout()
+
+        fig.savefig(fpath)
+        print(f"Finished plotting differences for {vrbl} on {case}.")
+
+    # Finally, the summary
+    pod_all = allall['pod']
+    far_all = allall['far']
+    # pdb.set_trace()
+
+
+
+    #  allall['pod'][fmt][casestr].append(pod_all)
+    fname = f"trad_perfdiag_summary_30dBZ_alltimes.png"
+    fpath = os.path.join(outroot,fname)
+    PDx = Performance(fpath=fpath,legendkwargs=None,legend=True)
+    switch_622 = 1
+    # For each case, plot a marker and annotate that case
+    letters = ["A","B","C","D"]
+
+    PADS = {
+        0:[-0.15,0.065],
+        1:[-0.08,0.03],
+        2:[-0.08,0.03],
+        3:[-0.15,0.03],
+        }
+
+    for ncase,caseutc in enumerate(CASES.keys()):
+
+        casestr = utils.string_from_time('dir',caseutc,strlen='day')
+
         for fmt in fcst_fmts:
-            for mem in member_names:
-                annostr = "".format(mem)
-                pod_mem_mean = N.nanmean(pod_mem[fmt][mem])
-                far_mem_mean = N.nanmean(far_mem[fmt][mem])
+            if switch_622:
+                lstr = get_nice(fmt)
+            else:
+                lstr = None
 
-                _podmms.append(pod_mem_mean)
-                _farmms.append(far_mem_mean)
+            if casestr[:4] == "2016":
+                ypad = 0.05
+            else:
+                ypad = 0.03
 
-        pod_max = N.nanmax(_podmms)
-        pod_min = N.nanmin(_podmms)
-        sr_min  = 1-N.nanmax(_farmms)
-        sr_max = 1-N.nanmin(_farmms)
-        pad = 0.04
-        apad = 0.01
+                # D and A need to be way left
 
-        sr_min = max(0,sr_min)
-        sr_max = min(1,sr_max)
-        pod_max = min(1,pod_max)
-        pod_min = max(0,pod_min)
-        PD3.ax.set_ylim([pod_min-pad,pod_max+pad])
-        PD3.ax.set_xlim([sr_min-pad,sr_max+pad])
-
-        for fmt in fcst_fmts:
-            for mem in member_names:
-                annostr = "{}".format(mem)
-                pod_mem_mean = N.nanmean(pod_mem[fmt][mem])
-                far_mem_mean = N.nanmean(far_mem[fmt][mem])
-                color_phys = get_color(fmt=fmt,mem=mem)
-                pk = {'marker':MARKERS[fmt],'c':color_phys,'s':SIZES[fmt],
-                                'alpha':0.4}
-                PD3.plot_data(pod=pod_mem_mean,far=far_mem_mean,
-                                    plotkwargs=pk, label=lstr)
-                PD3.ax.annotate(annostr,xy=(1-far_mem_mean-apad,pod_mem_mean+apad),
-                                xycoords='data',fontsize='6',color='black',
-                                fontweight='bold')
-        PD3.ax.set_ylim([pod_min-pad,pod_max+pad])
-        PD3.ax.set_xlim([sr_min-pad,sr_max+pad])
-
-        PD3.save()
-    PD0.save()
+            pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                        'alpha':ALPHAS[fmt]}
+            podpt = N.nanmean(pod_all[fmt][casestr])
+            farpt = N.nanmean(far_all[fmt][casestr])
+            PDx.plot_data(pod=podpt,far=farpt,
+                            plotkwargs=pk,label=lstr)
+            # Label this case for d01  (should see which is which?)
+            if fmt == "d01_3km":
+                annostr = "{}-{}".format(letters[ncase],casestr)
+                PDx.ax.annotate(annostr,xy=((1-farpt)+PADS[ncase][0],N.mean(podpt)+PADS[ncase][1]),
+                                xycoords='data',fontsize=10,color='black',
+                                fontweight='bold',annotation_clip=False)
+        switch_622 = 0
+    PDx.save()
 
 if do_efss:
     print(stars,"DOING EFSS",stars)
@@ -1949,7 +2330,7 @@ if do_efss:
         threshs_obs = PC_Thresh.get_threshs(obs_vrbl,fmt)
         fcst_data, obs_data = load_timewindow_both_data(vrbl=fcst_vrbl,
                         fmt=fcst_fmt,validutc=validutc,caseutc=caseutc,
-                        initutc=initutc,mem='all',window=temporal_window)
+                        initutc=initutc,mem='first_half',window=temporal_window)
         efss = FISS(xfs=fcst_data,xa=obs_data,thresholds_obs=threshs_obs,
                         thresholds_fcst=threshs_fcst,ncpus=ncpus,efss=True,
                         neighborhoods=spatial_windows,
@@ -1972,36 +2353,32 @@ if do_efss:
                         # "d02_1km":(1,3,9,15,21,27,33,39)}
                         "d02_1km":(1,3,9,15,21,27,)}
 
-    temporal_windows = (1,3)
-    # temporal_windows = (1,)
+    temporal_windows = (1,3,5)
+    # temporal_windows = (5,)
 
-    #_fms = (30,60,90,120,150,180,)
-    # fcstmins = (30,60,90,120,150,180)
+
     fcstmins = (30,90,150)
-    # fcstmins = (150,)
-    # fcstmins = (30,90,150)
-    # vrbl = "accum_precip"
-    # vrbl = "UH02"
-    # vrbl = "UH25"
-    # vrbl = "REFL_comp"
-    vrbl = "UH25"
-    fssdir = os.path.join(extractroot,"efss_fiss",vrbl)
-    utils.trycreate(fssdir,isdir=True)
+    vrbls = ("UH25","UH02","REFL_comp")
 
-    obs_qts = PC_Thresh.get_quantiles(vrbl)
-
-    for fcstmin, temporal_window,caseutc, in itertools.product(
-                fcstmins,temporal_windows,CASES.keys()):
+    for fcstmin, temporal_window,caseutc,vrbl in itertools.product(
+                fcstmins,temporal_windows,CASES.keys(),vrbls):
         casestr = utils.string_from_time('dir',caseutc,strlen='day')
+        fssdir = os.path.join(extractroot,"efss_fiss",vrbl)
+        utils.trycreate(fssdir,isdir=True)
+        obs_qts = PC_Thresh.get_quantiles(vrbl)
 
-        print("Doing {} min, {} tw, for case {}.".format(
-            fcstmin, temporal_window, casestr))
+        print(f"Doing {fcstmin} min, {temporal_window} tw, for case {casestr}, "
+                        f"for {vrbl}.")
         efss_data = {}
         fiss_data = {}
-        e_npy0_f = "d01_3km_efss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
-        e_npy1_f = "d02_1km_efss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
-        f_npy0_f = "d01_3km_fiss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
-        f_npy1_f = "d02_1km_fiss_{}_{}tw_{}min.npy".format(casestr,temporal_window,fcstmin)
+        e_npy0_f = "d01_3km_efss_{}_{}tw_{}min.npy".format(
+                                    casestr,temporal_window,fcstmin)
+        e_npy1_f = "d02_1km_efss_{}_{}tw_{}min.npy".format(
+                                    casestr,temporal_window,fcstmin)
+        f_npy0_f = "d01_3km_fiss_{}_{}tw_{}min.npy".format(
+                                    casestr,temporal_window,fcstmin)
+        f_npy1_f = "d02_1km_fiss_{}_{}tw_{}min.npy".format(
+                                    casestr,temporal_window,fcstmin)
 
         e_npy0 = os.path.join(fssdir,e_npy0_f)
         e_npy1 = os.path.join(fssdir,e_npy1_f)
@@ -2015,13 +2392,18 @@ if do_efss:
             fiss_data['d02_1km'] = N.load(f_npy1)
         else:
             for fmt in ("d01_3km","d02_1km"):
+                t0 = time.time()
                 threshs_fcst = PC_Thresh.get_threshs(vrbl,fmt)
                 threshs_obs = PC_Thresh.get_threshs(vrbl,fmt)
-                itr = loop_efss(caseutc,vrbl=vrbl,fcstmin=fcstmin,fmt=fmt)
+                itr = loop_efss(caseutc,vrbl=vrbl,fcstmin=fcstmin,fmt=fmt,
+                                middle_three=False)
+                                # middle_three can be turned on if evaluating all
+                                # otherwise we use all init times
 
                 efss = []
                 for i in list(itr):
-                    efss.append(compute_efss(i,spatial_windows[fmt],temporal_window))
+                    efss.append(compute_efss(i,shuffled_copy(spatial_windows[fmt]),
+                                    temporal_window))
 
                 #for vrbl, fmt, fcstmin in itertools.product(_vs,fcst_fmts,_fcms):
                 # fname = "fss_{}_{}min".format(vrbl,fcstmin)
@@ -2050,13 +2432,19 @@ if do_efss:
                     for eidx,e in enumerate(efss):
                         efss_load.append(e[th][nh][tw]["eFSS"])
                         fiss_load.append(e[th][nh][tw]["FISS"])
-                    efss_data[fmt][nhidx,thidx] = N.mean(efss_load)
-                    fiss_data[fmt][nhidx,thidx] = N.mean(fiss_load)
+                    efss_data[fmt][nhidx,thidx] = N.nanmean(efss_load)
+                    fiss_data[fmt][nhidx,thidx] = N.nanmean(fiss_load)
 
             N.save(file=e_npy0,arr=efss_data['d01_3km'])
             N.save(file=e_npy1,arr=efss_data['d02_1km'])
             N.save(file=f_npy0,arr=fiss_data['d01_3km'])
             N.save(file=f_npy1,arr=fiss_data['d02_1km'])
+
+            t1 = time.time()
+            dt = t1-t0
+            dtm = int(dt//60)
+            dts = int(dt%60)
+            print(f"FISS+eFSS calculation for all times took {dtm:d} min  {dts:d} sec.")
 
         fig,ax = plt.subplots(1)
         fname = "efss_{}_{}min_{}tw.png".format(casestr,fcstmin,temporal_window)
@@ -2146,7 +2534,8 @@ if do_efss:
         # lawson_cm
 
         for score in ("efss","fiss"):
-            fname = "{}-diffs_{}_{}min_{}tw.png".format(score,casestr,fcstmin,temporal_window)
+            fname = "{}-diffs_{}_{}min_{}tw.png".format(
+                                score,casestr,fcstmin,temporal_window)
             fpath = os.path.join(outroot,"{}-diffs".format(score),vrbl,fname)
             utils.trycreate(fpath,isdir=False)
 
@@ -2157,7 +2546,7 @@ if do_efss:
 
             if score == "efss":
                 _diffs = efss_data['d02_1km'][1:,:] - efss_data['d01_3km']
-                kw = dict(vmin=-0.1,vmax=0.1)
+                kw = dict(vmin=-0.15,vmax=0.15)
             elif score == "fiss":
                 _diffs = fiss_data['d02_1km'][1:,:] - fiss_data['d01_3km']
                 kw = dict(vmin=-_diffs.max(), vmax=_diffs.max())
@@ -2187,16 +2576,16 @@ if do_efss:
 
             for i,j in itertools.product(range(nx),range(ny)):
                 t = "{:.2f}".format(diffs[i,j])
-                text = ax.text(j,i,t,ha="center",va="center",color="k",size=7,
+                text = ax.text(j,i,t,ha="center",va="center",color="k",size=14,
                                     fontweight="bold")
             plt.colorbar(im,ax=ax)
             fig.tight_layout()
 
             fig.savefig(fpath)
             # pdb.set_trace()
-        # pdb.set_trace()
         pass
     pass
+    pdb.set_trace()
 
 
 
@@ -2209,6 +2598,37 @@ if object_switch:
     # plot_what = 'extent'; plot_dir ='check_extent'
     # plot_what = "4-panel"; plot_dir = "four-panel"
     plot_what = "pca"; plot_dir = "pca_check"
+
+
+    def plot_object_quicklook(i):
+        fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem, load = i
+
+        # Check for object save file for obs/fcst
+        pk_fpath = get_object_picklepaths(fcst_vrbl,fcst_fmt,validutc,caseutc,
+                                        initutc=initutc,mem=mem)
+        # print(stars,"FCST OBJ QUICK PLOT DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
+
+        obj = utils.load_pickle(pk_fpath)
+        if obj == "ERROR":
+            pdb.set_trace()
+
+        # QUICK LOOKS
+        fcstmin = int(((validutc-initutc).seconds)/60)
+        if fcstmin in range(30,210,30) and do_quicklooks and (mem == "m01"):
+            ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(fcst_fmt,initutc,fcstmin)
+            outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
+            ql_fpath = os.path.join(outdir,ql_fname)
+            if (not os.path.exists(ql_fpath)) or overwrite_output:
+                obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what)
+            else:
+                print("Figure already created")
+                pass
+
+        return
+
+
+
+
 
     def compute_obj_fcst(i):
         fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem, load = i
@@ -2268,7 +2688,7 @@ if object_switch:
             if (not os.path.exists(ql_fpath)) or overwrite_output:
                 obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what)
             else:
-                #print("Figure already created")
+                print("Figure already created")
                 pass
 
         return obj.objects
@@ -2354,7 +2774,15 @@ if object_switch:
             utils.save_pickle(obj=results_fcst,fpath=fcst_fpath)
         else:
             results_fcst = utils.load_pickle(fcst_fpath)
+            itr_fcst_2 = loop_obj_fcst(fcst_vrbl,fcstmins=N.arange(60,210,30),
+                                    fcst_fmt=fcst_fmt,members=['m01',],load=True)
 
+            if ncpus > 1:
+                with multiprocessing.Pool(ncpus) as pool:
+                    pool.map(plot_object_quicklook,itr_fcst_2)
+            else:
+                for i in itr_fcst_2:
+                    plot_object_quicklook(i)
 
         # pdb.set_trace()
         fname = "pca_model_{}.pickle".format(fcst_fmt)
@@ -2493,17 +2921,50 @@ if do_object_performance:
     # casestr = (20160331...)
     # initstr = (2300 etc - depends on case)
 
-    mns = half_member_names
+    # mns = half_member_names
+    mns = fifteen_member_names
     # mns = test_member_names
     MATCH = get_MATCH(mns)
     # 4x5 (cases x init times) for mean performance for case
-    modes = ('cellular','linear')
+    # modes = ('cellular',)#'linear')
+    modes = ("linear",)
+
+    plot_these = [
+            ("20160331","1900"),
+            ("20160331","2100"),
+            ("20160331","2300"),
+
+            ("20170501","1900"),
+            ("20170501","2100"),
+            ("20170501","2300"),
+
+            ("20170502","2300"),
+            ("20170502","0100"),
+            ("20170502","0300"),
+
+            ("20170504","2200"),
+            ("20170504","0000"),
+            ("20170504","0200"),
+    ]
 
     def plot_huge_objperf(mode):
         fname = f"obj_perfdiag_allcases_{mode}.png"
         fpath = os.path.join(outroot,fname)
+
+        fname2 = f"obj_perfdiag_allcases_{mode}_pub.png"
+        fpath2 = os.path.join(outroot,fname2)
+
         fig,axes = plt.subplots(nrows=4,ncols=5,figsize=(18,15))
+        fig2,_axes2 =  plt.subplots(nrows=4,ncols=3,figsize=(12,15))
+        axes2 = _axes2.flat
         for ax, (initutc, casestr, initstr) in zip(axes.flat,obj_perf_gen()):
+            if (casestr,initstr) in plot_these:
+                do_pub_fig = True
+                PD2 = Performance(fpath=fpath2,legendkwargs=None,legend=False,
+                                    fig=fig2,ax=next(axes2))
+
+            else:
+                do_pub_fig = False
             print(f"Plotting performance for {casestr} {initstr} {mode}")
             # mns set above, so we can sub-sample members
             PD = Performance(fpath=fpath,legendkwargs=None,legend=False,fig=fig,ax=ax)
@@ -2511,12 +2972,12 @@ if do_object_performance:
                 pod_all = []
                 far_all = []
                 for member in mns:
+                    _2x2 = MATCH[dom_code][member][casestr][initstr][mode]['2x2']
                     fmt = dom_code # I think
                     pod = _2x2.get("POD")
                     far = _2x2.get("FAR")
                     pod_all.append(pod)
                     far_all.append(far)
-                    _2x2 = MATCH[dom_code][member][casestr][initstr][mode]['2x2']
 
                     annostr = "{}".format(member)
                     pad = 0.04
@@ -2526,10 +2987,16 @@ if do_object_performance:
                                     'alpha':0.2}
                     lstr = get_nice(fmt)
                     PD.plot_data(pod=pod,far=far,plotkwargs=pk,label=lstr)
+                    if do_pub_fig:
+                        PD2.plot_data(pod=pod,far=far,plotkwargs=pk,label=lstr)
 
                     PD.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
                                     xycoords='data',fontsize='6',color='black',
                                     fontweight='medium')
+                    if do_pub_fig:
+                        PD2.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
+                                        xycoords='data',fontsize='6',color='black',
+                                        fontweight='medium')
                     # pdb.set_trace()
 
                     #pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
@@ -2540,13 +3007,26 @@ if do_object_performance:
                 pod_mean = N.nanmean(N.array(pod_all))
                 far_mean = N.nanmean(N.array(far_all))
                 PD.plot_data(pod=pod_mean,far=far_mean,plotkwargs=pk_final)
+                if do_pub_fig:
+                    PD2.plot_data(pod=pod_mean,far=far_mean,plotkwargs=pk_final)
                 PD.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
                                 xycoords='data',fontsize='8',color=color_phys,
                                     fontweight='bold')
+                if do_pub_fig:
+                    PD2.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
+                                    xycoords='data',fontsize='8',color=color_phys,
+                                        fontweight='bold')
+                    PD2.ax.set_title(f"{casestr}:  {initstr} UTC\n")
+
             ax.set_title(f"{casestr}:  {initstr} UTC")
         fig.tight_layout()
         fig.savefig(fpath)
         plt.close(fig)
+
+        fig2.tight_layout()
+        fig2.savefig(fpath2)
+        plt.close(fig2)
+
         return
 
     for mode in modes:
@@ -2671,36 +3151,8 @@ if do_object_distr:
 
 if do_object_matching:
     print(stars,"DOING OBJ MATCHING/DIFFS",stars)
-    # Load one big df with all objects
-    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
-    obs_fmts = ("nexrad_3km","nexrad_1km")
-    all_fmts = list(fcst_fmts) + list(obs_fmts)
-    megaframe_all = load_megaframe(fmts=all_fmts)
-    # For testing
-    #megaframe = megaframe_all[(megaframe_all['case_code'] == '20160331') &
-    #                            (megaframe_all['lead_time'] > 150)]
-    megaframe = megaframe_all
-    CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
-
-    # megaframe = load_megaframe()
-
-    # Match objects
-    # JRL TODO: need to redo this and loop over member to member?
-    fname = "object-matches_d01-d02.pickle"
-    fpath = os.path.join(objectroot,fname)
-    if (not os.path.exists(fpath)):
-        verif_domain = 'nexrad'
-        matches = CAT.match_domains(members=member_names,initutcs=get_all_initutcs(),
-                        leadtimes=all_fcstmins,domains=dom_names)
-        #dictA = {"prod_code":fcst_prod_code,"member":member,
-        #                "case_code":casestr,"init_code":initstr}
-        #dictB = {"prod_code":obs_prod_code,"case_code":casestr}
-
-        #matches = CAT.match_two_groups()
-        utils.save_pickle(obj=matches, fpath=fpath)
-    else:
-        matches = utils.load_pickle(fpath=fpath)
-
+    mns = get_member_names(7)
+    match_dict, megaframe = get_dom_match(mns, return_megaframe=True)
 
     ### DIFFS ###
 
@@ -2712,7 +3164,8 @@ if do_object_matching:
         return
 
     def find_row(df,megaidx):
-        row = df[(df['index'] == megaidx)]
+        row = df[(df['megaframe_idx'] == megaidx)]
+        assert len(row) == 1
         return row
 
     def do_write_diff(df,n,oldkey,newkey,d02,d01):
@@ -2724,45 +3177,38 @@ if do_object_matching:
                 "d01_id":"i4",
                 "d02_id":"i4",
 
-                # diffs
-                "area_diff":"f4",
-                # "centroid_gap_angle":"f4",
-                "eccentricity_diff":"f4",
-                "equivalent_diameter_diff":"f4",
-                "extent_diff":"f4",
-                "max_intensity_diff":"f4",
-                "mean_intensity_diff":"f4",
-                "perimeter_diff":"f4",
-                "ratio_diff":"f4",
-                "longaxis_km_diff":"f4",
-                "qlcsness_diff":"f4",
-
-                # Updraught props
-                "max_updraught_diff":"f4",
-                "mean_updraught_diff":"f4",
-                "min_updraught_diff":"f4",
-
-
-                # rotation diffs
-                "max_rotation_diff":"f4",
-                "mean_rotation_diff":"f4",
-                # soemething like updraught ones above
-                # "rot_exceed_ID_0":"f4"
-
-                # non-straight-forward diffs
-                "centroid_gap_km":"f4",
-                # "ud_centroid_diff_km":"f4",
-                # JRL TODO: need something for wind rose?
                 }
 
     prop_names = []
-    diff_df = utils.do_new_df(DTYPES,len(matches))
-    for nm,match in enumerate(matches):
+
+    # match_dict[member][mode][casestr][initstr][{'2x2','matches'}]
+
+    megalist = []
+    # loop over all matches, and join dicts together - alert if any clashes in keys
+    for member in mns:
+        for initutc, casestr, initstr in get_initutcs_strs():
+            # this_dict = match_dict[member]["cellular"][casestr][initstr]['matches']
+            this_dict = match_dict[member]["linear"][casestr][initstr]['matches']
+
+            for k,v in this_dict.items():
+                if v is not None:
+                    megalist.append((k,v[0]))
+
+    # JRL TODO: something with BIAS, CSI etc information?
+    # could also do that RDI with a PCA between the two domain cellular objects
+
+    # pdb.set_trace()
+
+    diff_df = utils.do_new_df(DTYPES,len(megalist))
+
+    for nm,match in enumerate(megalist):
         if match is None:
             continue
-        d01_obj_id, d02_obj_id = match
+        d02_obj_id, d01_obj_id = sorted(match)
         d01 = find_row(megaframe,d01_obj_id)
         d02 = find_row(megaframe,d02_obj_id)
+
+        # pdb.set_trace()
 
         # diff_df.loc[nm,'d01_id'] = d01_obj
         write_row(diff_df,nm,"d01_id",d01_obj_id)
@@ -2779,19 +3225,56 @@ if do_object_matching:
         # Persistent 0-2 or 2-5 rotation signals within object bbox
 
         # Simple differences
-        props = ("area","eccentricity","equivalent_diameter","extent",
+        _all_props = ("area","eccentricity","equivalent_diameter","extent",
                         "max_intensity","mean_intensity","perimeter",
                         "ratio","longaxis_km","qlcsness",
                         "max_updraught","mean_updraught",
                         "max_lowrot", "max_midrot",
                         )
+        props = ('area','extent','longaxis_km','eccentricity',
+                    'max_intensity','max_updraught','max_lowrot','max_midrot')
         prop_diffs = [p + '_diff' for p in props]
         for prop, prop_diff in zip(props,prop_diffs):
             do_write_diff(diff_df,nm,prop,prop_diff,d02,d01)
 
     # These is the dataframe with no missing data (Nones)
     diff_df = diff_df[(diff_df['d01_id'] != 0.0)]
+    # pdb.set_trace()
 
+    LIMS = {
+        "area_diff":[-300,300],
+        "extent_diff":[-0.5,0.3],
+        "longaxis_km_diff":[-15,20],
+        # "qlcsness_diff":[-3,3],
+        'eccentricity_diff':[-0.5,0.5],
+        "max_intensity_diff":[-10,25],
+        "max_updraught_diff":[-15,35],
+        "max_lowrot_diff":[-20,100],
+        "max_midrot_diff":[-50,350],
+    }
+
+    BINS = {
+        "area_diff":90,
+        "extent_diff":32,
+        "longaxis_km_diff":55,
+        "eccentricity_diff":40,
+        "max_intensity_diff":35,
+        "max_updraught_diff":35,
+        "max_lowrot_diff":50,
+        "max_midrot_diff":60,
+    }
+
+    NICESTR = {
+        "area_diff":"Object area (km2/pixels?)",
+        "extent_diff":"Extent (fraction)",
+        "longaxis_km_diff":"Longest axis length ($km$)",
+        # "qlcsness_diff":[-3,3],
+        'eccentricity_diff':"Eccentricity",
+        "max_intensity_diff":"Maximum comp. reflectivity ($dBZ$)",
+        "max_updraught_diff":"Maximum updraft ($m\,s^{-1}$)",
+        "max_lowrot_diff":"Maximum 0-2 km UH ($m^2\,s^{-2}$)",
+        "max_midrot_diff":"Maximum 2-5 km UH ($m^2\,s^{-2}$)",
+    }
 
     #from evac.plot.ridgeplot import RidgePlot
     #fname = "diffs_ridgeplot.png"
@@ -2802,25 +3285,150 @@ if do_object_matching:
     fname = "hist_3x3.png"
     fpath = os.path.join(outroot,"match_diffs",fname)
     utils.trycreate(fpath)
-    fig,axes = plt.subplots(nrows=3,ncols=5,figsize=(12,8))
+    fig,axes = plt.subplots(nrows=3,ncols=3,figsize=(11,11))
+    loc_frac = (0.85,0.85)
 
-    palette = itertools.cycle(sns.cubehelix_palette(14,light=0.8,dark=0.2))
-
+    # palette = itertools.cycle(sns.cubehelix_palette(9,light=0.7,dark=0.3))
+    lll = utils.generate_letters_loop(9)
     axit = axes.flat
     for n,p_d in enumerate(prop_diffs):
         ax = next(axit)
-        ax.hist(diff_df[p_d],bins=50,color=next(palette))
-        ax.set_title(p_d)
-        ax.axvline(0,color='black')
+        ax.hist(diff_df[p_d],bins=BINS[p_d],color='grey')
+        # ax.hist(diff_df[p_d],color=next(palette))
+        ax.set_title(NICESTR[p_d])
+        ax.set_facecolor('lightgray')
+        x_locs = list(N.nanpercentile(diff_df[p_d],(5,25,50,75,95)).flatten())
+        x_locs +=  [N.nanmean(diff_df[p_d]),]
+        for n,x_loc in enumerate(x_locs):
+            if n in (1,3):
+                c = 'orange'
+            elif n in (2,):
+                # c = 'red'
+                c = 'magenta'
+            elif n in (0,4):
+                continue
+                c = 'yellow'
+                continue
+            elif n == 5:
+                continue
+                # c = 'magenta'
+            ax.axvline(x_loc,color=c,linestyle='--',linewidth=2)
+        ax.axvline(0,color='black',linewidth=3)
+        ax.set_xlim(LIMS[p_d])
+        utils.make_subplot_label(ax,f"({next(lll)})",loc_frac=loc_frac)
 
     ax = next(axit)
+    ax.set_facecolor('lightgray')
     ax.hist(diff_df["centroid_gap_km"],bins=50,color='green')
+    ax.set_xlim([0,50])
     ax.set_title("Gap in centroids (km)")
+    utils.make_subplot_label(ax,f"({next(lll)})",loc_frac=(0.9,0.9))
+
 
     fig.tight_layout()
     fig.savefig(fpath)
 
     # Joint distributions
+
+if do_object_windrose:
+    # Do polar coordinate scatter plot for location of max updraft from centroid,
+    # for cell objects only, assuming eccentricity = circle
+
+    #fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    #obs_fmts = ("nexrad_3km","nexrad_1km")
+    #all_fmts = list(fcst_fmts) + list(obs_fmts)
+    #mf = load_megaframe(fmts=all_fmts)
+
+    def cart2pol(x, y):
+        rho = N.sqrt(x**2 + y**2)
+        phi = N.arctan2(y, x)
+        return(rho, phi)
+
+    def pol2cart(rho, phi):
+        # radius is rho
+        # angle is phi
+        x = rho * N.cos(phi)
+        y = rho * N.sin(phi)
+        return(x, y)
+
+    if False:
+        # EE to obs
+        mns = get_member_names(16)
+        MATCH, mf = get_MATCH(mns, return_megaframe=True)
+    elif True:
+        # EE3 to EE1
+        mns = get_member_names(8)
+        MATCH, mf = get_dom_match(mns,return_megaframe=True)
+        # pdb.set_trace()
+
+    # This is for d01-d02
+
+    angles_all = {n:[] for n in (0,1)}
+    distances_all = {n:[] for n in (0,1)}
+
+    x_all = {n:[] for n in (0,1)}
+    y_all = {n:[] for n in (0,1)}
+
+    # for ID_A, ID_B in MATCH:
+    for member in mns:
+        for initutc, casestr, initstr in get_initutcs_strs():
+            # matches = MATCH[member]['cellular'][casestr][initstr]['sorted']
+            matches = MATCH[member]['linear'][casestr][initstr]['sorted']
+            for ID_A, ID_B in matches:
+                objA = mf[mf['megaframe_idx'] == ID_A]
+                objB = mf[mf['megaframe_idx'] == ID_B]
+                assert len(objA) == 1
+                assert len(objB) == 1
+                # ud_angle_from_centroid
+                # ud_distance_from_centroid
+                vals = N.zeros([2,2])
+                for n,o in enumerate([objA,objB]):
+                    v0 = o.ud_angle_from_centroid.values[0]
+                    vals[n,0] = v0
+                    v1 = o.ud_distance_from_centroid.values[0]
+                    vals[n,1] = v1
+
+                    x,y = pol2cart(v0, v1)
+
+                    angles_all[n].append(v0)
+                    distances_all[n].append(v1)
+
+                    x_all[n].append(x)
+                    y_all[n].append(y)
+
+                # diffs = N.zeros([2])
+                # for n in (0,1):
+                    # diffs[n] = vals[1,n] - vals[0,n]
+
+
+                # pdb.set_trace()
+
+
+    # pdb.set_trace()
+    for n,km in enumerate(["3km","1km"]):
+        x = N.array(x_all[n]).flatten()
+        y = N.array(y_all[n]).flatten()
+
+        fname = f"ud_centroid_diffs_{km}.png"
+        fpath = os.path.join(outroot,"polar",fname)
+        fig,ax = plt.subplots()
+
+        # Calculate the point density
+        xy = N.vstack([x,y])
+        z = gaussian_kde(xy)(xy)
+
+        # Sort the points by density, so that the densest points are plotted last
+        idx = z.argsort()
+        xx, yy, zz = x[idx], y[idx], z[idx]
+
+        ax.scatter(xx, yy, c=zz, s=50, edgecolor='')
+
+        fig.tight_layout()
+        utils.trycreate(fpath)
+        fig.savefig(fpath)
+        print(f"Saved {km} updraft--centroid diffs")
+
+    # For matched objects only: what is the "mean vector" difference between EE3/1
 
 
 if do_object_examples:
@@ -2959,14 +3567,13 @@ if do_object_brier_uh:
     # Create waffle plot of all BS scores/components/RPS - ordered by fcst min
 
     # Brier score: UH for 4 levels for matched objects
-    mns = fifteen_member_names
+    # mns = fifteen_member_names
+    mns = get_member_names(18)
     MATCH, mf = get_MATCH(mns, return_megaframe=True)
-    # 4x5 (cases x init times) for mean performance for case
-    fname = "obj_UH_Brier.png"
-    fpath = os.path.join(outroot,fname)
 
     fcst_doms = ('d02_1km','d01_3km')
-    modes = ('cellular',)#'linear')
+    # modes = ('cellular',)#'linear')
+    modes = ('linear',)
 
     obs_IDs = {}
     # Loop first to build unique observed object set
@@ -2988,7 +3595,7 @@ if do_object_brier_uh:
 
     all_bs = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
     all_lt = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
-    overwrite_BS_pickles = False
+    overwrite_BS_pickles = True
 
     # Just those cells that are rotating
     all_meso_bs =  {p:{k:[] for k in ("1km","3km")} for p in bs_props}
@@ -3015,6 +3622,7 @@ if do_object_brier_uh:
                     df_this_init = []
 
                     for member in mns:
+                        # JRL TODO: this is where we convert to sorted_pairs
                         matches = MATCH[fcst_dom_code][member][casestr][
                                                 initstr][mode]['matches']
                         # for fcst_ID, v in matches.items():
@@ -3054,14 +3662,16 @@ if do_object_brier_uh:
                                     if v is None:
                                         # No object matched
                                         for prop in bs_props:
-                                            fcst_bools[prop].append(False)
+                                            fcst_bools[prop].append(0)
                                         continue
                                     fcst_ID, _TI = v
                                     of = mf[mf['megaframe_idx']==fcst_ID]
                                     assert of.shape[0] == 1
                                     for prop in bs_props:
-                                        fcst_bool = of.get(prop)
-                                        fcst_bools[prop].append(fcst_bool.values[0])
+                                        fcst_bool = of.get(prop).values[0]
+                                        if not N.isnan(fcst_bool):
+                                            fcst_bool = int(fcst_bool)
+                                        fcst_bools[prop].append(fcst_bool)
                                         # pdb.set_trace()
 
                         # Assume all members have been checked, and missing = fail
@@ -3070,22 +3680,34 @@ if do_object_brier_uh:
 
                         for prop in bs_props:
                             new_prop = f"{prop}_BS"
-                            obs_bools[prop] = oo_df.get(prop).values[0]
                             # obs_bools[prop].append(obs_bool)
 
-                            obs_val = 1 if obs_bools[prop] is True else 0
+                            # obs_val = 1 if obs_bools[prop] is True else 0
 
-                            prob_frac_mns = N.sum(fcst_bools[prop])/len(mns)
-                            bs_val = (prob_frac_mns - float(obs_val))**2
-                            # ([0,1] - {1,0}) **2
-                            # Perfect score: 100% and it is observed (0**2)
-                            # Also, 0% and it is not observed.
+                            # obs_bools[prop] = int(oo_df.get(prop).values[0])
+                            # obs_val = obs_bools[prop]
+
+                            obs_val = oo_df.get(prop).values[0]
+                            if not N.isnan(obs_val):
+                                obs_val = int(obs_val)
+
+                                # number of non-nan members
+                                isnan = N.isnan(fcst_bools[prop])
+                                total_nans = N.sum(isnan)
+                                n_valid_mem = len(mns) - total_nans
+                                prob_frac_mns = N.nansum(fcst_bools[prop])/n_valid_mem
+                                assert 0 <= prob_frac_mns <= 1
+                                bs_val = (prob_frac_mns - obs_val)**2
+                                # ([0,1] - {1,0}) **2
+                                # Perfect score: 100% and it is observed (0**2)
+                                # Also, 0% and it is not observed.
+                            else:
+                                bs_val = N.nan
 
                             bs[obj_ID][prop] = bs_val
 
                             # The nans are related to missing mrms data
-                            #if N.isnan(bs_val):
-                            #    pdb.set_trace()
+                            # if N.isnan(bs_val):
 
                             lt_val = ((oo.time-initutc).total_seconds())/60
                             bs[obj_ID]["leadtime"] = lt_val
@@ -3153,15 +3775,20 @@ if do_object_brier_uh:
     # Do eight props as left-to-right increasing lead time
     # One fig for 3km, another for 1km
 
-    for meso_sw in ("meso-only","all"):
+    for meso_sw in ("meso-only",):#"all"):
         # meso_sw = "meso-only"
         # meso_sw = "all"
 
+        # JRL TODO: pick the largest sbs_nice_n to have most sample size for
+        # low percentile - and maybe do 10 nrows.
+        # Going to test with just a few members, and run more for larger sample
         if meso_sw == "meso-only":
             all_bs = all_meso_bs
             all_lt = all_meso_lt
-            sbs_nice_n = 125
-            nrows = 5
+            #sbs_nice_n = 125
+            #nrows = 5
+            sbs_nice_n = 200
+            nrows = 8
         else:
             sbs_nice_n = 375
             nrows = 15
@@ -3192,6 +3819,7 @@ if do_object_brier_uh:
 
                 # sbs_nice_n = sbs_n - (sbs_n%nrows)
                 # sbs_nice_n = 125
+                df.dropna(inplace=True)
 
                 try:
                     df = df.sample(n=sbs_nice_n)
@@ -3199,7 +3827,7 @@ if do_object_brier_uh:
                     print("Skipping this figure - not enough data")
                     continue
 
-                df = df.sort_values(by="lead_time")
+                df = df.sort_values(by="brier_score")
                 # Reshape for nrows (these rows should increase in time left to right)
                 data_arr = df.brier_score.values
                 # pdb.set_trace()
@@ -3247,23 +3875,48 @@ if do_case_outline:
     CASES_EE3[datetime.datetime(2017,5,1,0,0,0)] = datetime.datetime(2017,5,1,19,0,0)
     CASES_EE3[datetime.datetime(2017,5,2,0,0,0)] = datetime.datetime(2017,5,2,23,0,0)
     CASES_EE3[datetime.datetime(2017,5,4,0,0,0)] = datetime.datetime(2017,5,4,22,0,0)
+
+    # representative times (from tor reports etc)
+    RTs = collections.OrderedDict()
+    RTs[datetime.datetime(2016,3,31,0,0,0)] = datetime.datetime(2016,4,1,0,15,0)
+    RTs[datetime.datetime(2017,5,1,0,0,0)] = datetime.datetime(2017,5,1,19,30,0)
+    RTs[datetime.datetime(2017,5,2,0,0,0)] = datetime.datetime(2017,5,3,3,15,0)
+    RTs[datetime.datetime(2017,5,4,0,0,0)] = datetime.datetime(2017,5,5,1,30,0)
+
+    # And the init that each representative time comes from
+    RTs_init = collections.OrderedDict()
+    RTs_init[datetime.datetime(2016,3,31,0,0,0)] = datetime.datetime(2016,3,31,23,0,0)
+    RTs_init[datetime.datetime(2017,5,1,0,0,0)] = datetime.datetime(2017,5,1,19,0,0)
+    RTs_init[datetime.datetime(2017,5,2,0,0,0)] = datetime.datetime(2017,5,3,3,0,0)
+    RTs_init[datetime.datetime(2017,5,4,0,0,0)] = datetime.datetime(2017,5,5,1,0,0)
+
     # Load tornado report CSV to plot lat/lon
 
 
     # Load severe hail reports, or draw a swathe of SVR reports with Python?
     # Could plot hail reports as proxy for mesocyclonic activity.
 
-    fig,_axes = plt.subplots(ncols=4,nrows=4,figsize=(12,10))
+    fig,_axes = plt.subplots(ncols=4,nrows=4,figsize=(12,12),tight_layout=True)
     fig_fname = "case_outline.png"
     fig_fpath = os.path.join(outroot,fig_fname)
     axes = _axes.flat
 
+    fcmin = 10
+    import sklearn.preprocessing as sklp
+    letters = ['A','B','C','D']
+
+    count = 0
     # For each case...
-    for (caseutc, plotutc_NR),(_caseutc, plotutc_EE) in zip(
+    for (caseutc, plotutc_NR),(_caseutc, initutc_EE) in zip(
                 CASES_narr.items(),CASES_EE3.items()):
         casestr = utils.string_from_time('dir',plotutc_NR,strlen='hour')
         narr_fname = f'merged_AWIP32.{casestr}.3D'
         narr_fpath = os.path.join(narrroot,narr_fname)
+
+        plotutc_EE = initutc_EE + datetime.timedelta(seconds=60*fcmin)
+        # radarutc = initutc_EE + datetime.timedelta(seconds=60*180)
+        radarutc = RTs[caseutc]
+        initutc_radar = RTs_init[caseutc]
 
         # Load NARR data
         # G = GribFile(fpath)
@@ -3276,14 +3929,16 @@ if do_case_outline:
 
         # Plot 500 hPa height, 925 hPa height from NARR
         ax = next(axes)
-        ax.set_title(f"1200 UTC (NARR)")
-        m0 = create_bmap(50.0,-55.0,25.0,-130.0,ax=ax)
+        casecode = f"{letters[count]}-{casestr[:8]}"
+        ax.set_title(f"1200 UTC (NARR) \n {casecode}",weight='bold')
+        m0 = create_bmap(45.0,-65.0,25.0,-115.0,ax=ax)
         x,y = m0(G.lons,G.lats)
         m0.drawcoastlines()
         m0.drawmapboundary(fill_color='gray')
         m0.fillcontinents(color="lightgray",lake_color="gray")
         m0.drawstates()
         m0.drawcountries()
+        count += 1
 
         kws = {'linewidths':0.7}
 
@@ -3292,24 +3947,752 @@ if do_case_outline:
         m0.contour(x,y,data_500,colors='k',levels=N.arange(4000,6000,60),**kws)
         m0.contour(x,y,data_925,colors='mediumorchid',levels=N.arange(0,2000,40),**kws)
 
+        # plot d01 domain for reference
+        lats = N.load(os.path.join(extractroot,"d01_raw",casestr[:8],"lats.npy"))
+        lons = N.load(os.path.join(extractroot,"d01_raw",casestr[:8],"lons.npy"))
+        x,y = m0(lons,lats)
+        color = "#1A85FF"
+        m0.plot(x[0,:],y[0,:],color,lw=2)
+        m0.plot(x[:,0],y[:,0],color,lw=2)
+        m0.plot(x[len(y)-1,:],y[len(y)-1,:],color,lw=2)
+        m0.plot(x[:,len(x)-1],y[:,len(x)-1],color,lw=2)
+
         # Plot shear and CAPE from EE3km
+        from sklearn.preprocessing import MinMaxScaler
+
+        # Load data
+        kw = {'fcst_fmt':"d01_3km",'validutc':plotutc_EE,'initutc':initutc_EE,
+                'caseutc':caseutc,'mem':"first_half"}
+
+        DATA = {}
+        NORM = {}
+        # array size is (n_members,nlats,nlons)
+        vrbls = ('u_shear01','v_shear01','CAPE_100mb',"SRH03","REFL_comp",
+                    'u_shear06','v_shear06')
+        for vrbl in vrbls:
+            fcst_data, fcst_lats, fcst_lons = load_fcst_dll(vrbl,**kw)
+            if vrbl == "REFL_comp":
+                fcst_data[fcst_data < 0.0] = 0.0
+            elif vrbl == "SRH03":
+                fcst_data[fcst_data < 0.0] = 0.0
+
+            fcst_data_norm = N.zeros_like(fcst_data)
+            # Loop and normalise
+            for nmem,mem in enumerate(get_member_names(18)):
+                # norm_data = sklp.normalize(fcst_data[nmem,:,:])
+                # norm_data = MinMaxScaler().fit_transform(fcst_data[nmem,...])
+                # norm_data = normalise(fcst_data[nmem,:,:])
+                norm_data = fcst_data[nmem,:,:]
+                fcst_data_norm[nmem,...] = norm_data
+
+
+            # z-scores, right?
+            NORM[vrbl] = fcst_data_norm
+            DATA[vrbl] = fcst_data
+
+        # DATA['shear_u_all'], lats, lons = load_fcst_dll("u_shear01",**kw)
+        # DATA['shear_v_all'], *_ = load_fcst_dll("v_shear01",**kw)
+        # DATA['CAPE_all'], *_ = load_fcst_dll("CAPE_100mb",**kw)
+        # DATA['SRH03_all'], *_ = load_fcst_dll("SRH03",**kw)
+        # DATA['cref_all'], *_ = load_fcst_dll("REFL_comp",**kw)
+
+        # Closest member to mean - pick three for each variable in descending order
+        # Find member that is representative of all three variables
+        MIs = N.zeros([len(vrbls),18])
+        best_members = []
+        for nv,vrbl in enumerate(vrbls):
+            print(vrbl)
+            for nmem,mem in enumerate(get_member_names(18)):
+                # member data
+                mem_slice = NORM[vrbl][nmem,:,:]
+                # Mean for each grid point
+                mean_slice = N.nanmean(NORM[vrbl],axis=0)
+
+                # do mutual information for each member w/ mean_val
+                hist_2d, x_edges, y_edges = N.histogram2d(mem_slice.ravel(),
+                                                mean_slice.ravel(),bins=20)
+
+                # convert bin count to fraction
+                pxy = hist_2d / N.sum(hist_2d)
+                # marginal for x over y, and y over x
+                px = N.sum(pxy,axis=1)
+                py = N.sum(pxy,axis=0)
+
+                method = 2
+                if method == 1:
+                    import sklearn.metrics as skm
+                    MI = skm.adjusted_mutual_info_score(px,py)
+                elif method == 2:
+                    # Multiply marginals by broadcast
+                    px_py = px[:,None] * py[None,:]
+                    # Only want non-zero values.
+                    nzs = pxy > 0
+                    MI = N.sum(pxy[nzs] * N.log(pxy[nzs]/px_py[nzs]))
+                    # assert 0 <= MI <= 1
+                MIs[nv,nmem] = MI
+
+            max_MI = MIs[nv,:].max()
+            min_MI = MIs[nv,:].min()
+            print("Min MI is",min_MI)
+            print("Max MI is",max_MI)
+            idx = N.argmax(MIs[nv,:])
+            best_member = get_member_names(18)[idx]
+            print("Member with max is member",best_member)
+            best_members.append(idx)
+
+        # JRL: TODO use total mutual interest - just sum
+        # Then plot the percentile of that member as a bar chart for the variables used
+        # Output separately so i can use as inset
+        # Also output colorbar separately (use the just_one_colorbar method?)
+        # This shows the reader it is a representative member.
+
+        mode_method = 2
+        if mode_method == 1:
+            moderesult = ss_mode(best_members)
+            # (mode index, count for each mode index)
+            modeidx, modecount = moderesult
+            if modeidx.size == 1:
+                overall_best_idx = modeidx[0]
+
+            overall_best_member = get_member_names(18)[overall_best_idx]
+            print("Using the mode, the best member overall is", overall_best_member)
+
+        elif mode_method == 2:
+            # total_MI = N.sum(MIs,axis=0)
+            # overall_best_idx = N.argmax(total_MI)
+            average_MI_bits = N.mean(MIs,axis=0)
+            overall_best_idx = N.argmax(average_MI_bits)
+            overall_best_member = get_member_names(18)[overall_best_idx]
+            print("Using total MI, the best member overall is", overall_best_member)
+
+        RMs = dict()
+        for nv,vrbl in enumerate(vrbls):
+            RMs[vrbl] = DATA[vrbl][overall_best_idx,:,:]
+
+        # MIs is distribution of MI for this case/time - can be used to show
+        # clustering over time for each variable. MI is unitless, so can be
+        # averaged over mulitple variables to give the "closest member"
+
         ax = next(axes)
-        ax.set_title(f"{plotutc_EE.hour:02d}00 UTC (EE3km)")
-        fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl='MLCAPE',
-                                fcst_fmt="d01_3km",validutc=plotutc_EE,
-                                caseutc=caseutc,initutc=plotutc_EE,mem='m01')
+        phr = plotutc_EE.hour
+        ax.set_title(f"{phr:02d}{fcmin} UTC (EE3km): {overall_best_member}")
+
+
+        # second column: shear, cape, helicity from 3-km:
+        # shear_01 as wind barbs
+        # cape_100mb as contour of certain levels, or a shading that's alpha/etc
+        # SRH03 as contour w/ hatching? [-200,1000+]
+        # (>2 in?) svr hail reports labelled with warn time and observed time - separate?
+        # Do higher in threshold to 'thin' reports, as their purpose here is as
+        # a proxy for supercell rotation
+
+        # m1 = create_bmap(50.0,-55.0,25.0,-130.0,ax=ax)
+
         m1 = create_bmap(fcst_lats.max(),fcst_lons.max(),
-                        fcst_lats.min(),fcst_lons.min(),ax=ax)
-        m1.drawstates()
-        m1.drawcountries()
-        m1.contourf(x,y,fcst_data,levels=N.arange(200,5000,100),cmap=M.cm.jet)
+                        fcst_lats.min(),fcst_lons.min(),ax=ax,
+                        proj='merc')
+        x,y = m1(fcst_lons,fcst_lats)
+        m1.drawstates(color='grey')
+        m1.drawcountries(color='grey')
+        cape = m1.contourf(x,y,RMs["CAPE_100mb"],
+                        cmap=M.cm.Reds, levels=N.arange(200,2100,100),alpha=0.5)
+        if count == 1:
+            just_colorbar(fig,cape,os.path.join(outroot,"case_CAPE_cb.png"),
+                                cb_xlabel="CAPE (J/kg)")
 
-        # maybe boundaries/theta-e?
+        srh_lvs = N.arange(100,2000,100)
+        srh = m1.contour(x,y,gaussian_filter(RMs['SRH03'],sigma=2.5,mode='nearest'),
+                        colors='grey',levels=srh_lvs)
+        ax.clabel(srh, srh_lvs[::2], inline=1, fontsize=10,fmt='%d')
+        fmt='%1.1f'
 
-        # Thumbnail of reflectivity with reports (tornado and/or hail)
+        nn = 26 # higher nn = fewer bars
+        n = int(nn/2)
+        bl = 7
+        # Mask all under a certain amount? For both shears?
+        m1.barbs(x[n::nn,n::nn],y[n::nn,n::nn],RMs['u_shear01'][n::nn,n::nn],
+                    RMs['v_shear01'][n::nn,n::nn],length=bl,color='black')
+        m1.barbs(x[::nn,::nn],y[::nn,::nn],RMs['u_shear06'][::nn,::nn],
+                    RMs['v_shear06'][::nn,::nn],length=bl,color='blue')
 
-        fig.savefig(fig_fpath)
-        pdb.set_trace()
+        # Get severe reports csv
+        report_csv_fname = "observed_tornadoes.csv"
+        report_csv_fpath = os.path.join(extractroot,"storm_reports",report_csv_fname)
+        tor_df = pandas.read_csv(report_csv_fpath)
+        # pdb.set_trace()
+        # Get only cases for this day.
+        case_df = tor_df[tor_df['Case'] == int(casestr[:8])]
 
-    fig.savefig(fig_fpath)
+        # third column: cref (one time, with bunkers storm motion?) with reports
+        # cref as contourf, as it's most important
+        # tor reports labelled with warn time and observed time - separate?
+
+        def annotate_naders(case_df,ax,m):
+            for o in case_df.itertuples():
+                x_pt, y_pt = m(o.Lon,o.Lat)
+                # warn = int(o.get("Warning time").values[0])
+                warn = int(o._7)
+                # pdb.set_trace()
+                method = 3
+                if method == 1:
+                    ax.annotate(warn,xy=(x_pt,y_pt),xycoords="data",
+                        annotation_clip=False,zorder=1000,
+                        fontsize=8,# fontstyle="italic",
+                        fontweight='bold',color="red",)
+                elif method == 2:
+                    fontdict = {"color":"white","fontweight":"bold"}
+                    # fontdict = None
+                    bbox = dict(facecolor='red', alpha=0.6, edgecolor='k',
+                                    linewidth=1)
+                    ax.text(x_pt,y_pt,warn,fontdict=fontdict,bbox=bbox)
+                else:
+                    pass
+            return
+
+        rhr = radarutc.hour
+        rmn = radarutc.minute
+        fm = int((radarutc - initutc_radar).total_seconds()/60)
+
+        ax = next(axes)
+        ax.set_title(f"{rhr:02d}{rmn:02d} UTC (EE3km): {overall_best_member} ({fm} min)")
+
+        kw = {'fcst_fmt':"d01_3km",'validutc':radarutc,'initutc':initutc_radar,
+                        'caseutc':caseutc,'mem':overall_best_member}
+        EE3_data, fcst_lats, fcst_lons = load_fcst_dll("REFL_comp",**kw)
+        if vrbl == "REFL_comp":
+            EE3_data[EE3_data < 0.0] = 0.0
+
+        # m2 = create_bmap(50.0,-55.0,25.0,-130.0,ax=ax)
+        m2 = create_bmap(fcst_lats.max(),fcst_lons.max(),
+                        fcst_lats.min(),fcst_lons.min(),ax=ax,
+                        proj='merc')
+        x,y = m2(fcst_lons,fcst_lats)
+        m2.drawstates(color='grey')
+        m2.drawcountries(color='grey')
+        S = Scales('cref')
+        # m2.contourf(x,y,EE3_data,cmap=S.cm,levels=S.clvs,alpha=0.8)
+        pcm = m2.pcolormesh(x,y,EE3_data,cmap=S.cm,vmin=S.clvs[0],
+                            vmax=S.clvs[-1],alpha=0.5,
+                            antialiased=True,)
+        pcm.cmap.set_under('white')
+
+        annotate_naders(case_df,ax,m2)
+
+        # Load data for EE1km to compare
+        ax = next(axes)
+        ax.set_title(f"{rhr:02d}{rmn:02d} UTC (EE1km): {overall_best_member} ({fm} min)")
+
+        kw = {'fcst_fmt':"d02_1km",'validutc':radarutc,'initutc':initutc_radar,
+                'caseutc':caseutc,'mem':overall_best_member}
+        EE1_data, fcst_lats, fcst_lons = load_fcst_dll("REFL_comp",**kw)
+        if vrbl == "REFL_comp":
+            EE1_data[EE1_data < 5.0] = 5.0
+
+        # m2 = create_bmap(50.0,-55.0,25.0,-130.0,ax=ax)
+        m3 = create_bmap(fcst_lats.max(),fcst_lons.max(),
+                        fcst_lats.min(),fcst_lons.min(),ax=ax,
+                        proj='merc')
+        x,y = m3(fcst_lons,fcst_lats)
+        m3.drawstates(color='grey')
+        m3.drawcountries(color='grey')
+        S = Scales('cref')
+        cm2 = S.cm
+        # m3.contourf(x,y,EE1_data,cmap=S.cm,levels=S.clvs,alpha=0.8)
+        pcm = m3.pcolormesh(x,y,EE1_data,cmap=cm2,vmin=S.clvs[0],
+                            vmax=S.clvs[-1],alpha=0.5,
+                            antialiased=True,)
+        pcm.cmap.set_under('white')
+
+        annotate_naders(case_df,ax,m3)
+
+        if count == 1:
+            just_colorbar(fig,pcm,os.path.join(outroot,"case_cref_cb.png"),
+                            cb_xlabel="Composite reflectivity (dBZ)")
+
+        # fig.savefig(fig_fpath)
+        # pdb.set_trace()
+
+    # fig.tight_layout()
+    fig.savefig(fig_fpath)#,bbox_inches='tight')
     plt.close(fig)
+
+if do_object_infogain:
+    halfhours = N.arange(30,210,30)
+
+    def n_p_gen(naive_probs, means, medians):
+        for n_p in naive_probs:
+            yield n_p, means, medians
+
+    def plot(ax,EE3,EE1,fpath,bounds):
+        worst_score, best_score = bounds
+        # sns.despine(bottom=True,left=True)
+        cols = ["#1A85FF","#D41159",]
+        dstrs = ["3km","1km"]
+        fig,ax = plt.subplots(1,figsize=(7,5))
+        for n,data in enumerate((EE3,EE1)):
+            # sns.set(rc ={'figure.figsize':(8,8)})
+
+            #sns.stripplot(x=data,y=n,color=cols[n],
+            #            dodge=True,jitter=True,
+            #            alpha=0.25,zorder=1,)
+            sns.kdeplot(data,shade=True,color=cols[n],alpha=0.3,
+            # clip=[worst_score,best_score],
+            clip = [worst_score,best_score],
+            label=dstrs[n],ax=ax,
+            kernel='gau',legend=True,)
+
+        # all_min = min(EE3.min(),EE1.min())
+        # all_max = max(EE3.max(),EE1.max())
+        # logbins = N.logspace(all_min,all_max,50)
+        # logbins = N.logspace(-4,4,50)
+        logbins = N.concatenate([N.logspace(-1,0,25),N.logspace(0,1,25)])
+        # logbins = 50
+        # Need to fit a log-friendly KDE? Scatter?
+        ax.hist([EE3,EE1],bins=logbins,alpha=0.7,label=["3km","1km"],
+            color=["#1A85FF","#D41159"],
+            #range=[N.floor(all_min),N.ceil(all_max)],
+        #range=[-4,4],
+        )
+        ax.set_xscale("symlog",)#linthreshx=1)
+
+        ax.axvline(0,color='k',linewidth=2)
+        ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1,linestyle='--')
+        ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1,linestyle='--')
+        ax.axvline(N.nanmedian(EE3),color='#1A85FF',linewidth=1,linestyle=':')
+        ax.axvline(N.nanmedian(EE1),color='#D41159',linewidth=1,linestyle=':')
+
+        ax.axvline(worst_score,color='brown',linewidth=2)
+        ax.axvline(best_score,color='green',linewidth=2)
+        ax.set_ylabel("Density")
+        ax.set_xlabel("Object information gain (bits)")
+        # ax.legend()
+        ax.set_xlim([worst_score-0.5,best_score+0.5])
+        # ax.set_ylim([0,1.2])
+
+        fig.tight_layout()
+        fig.savefig(fpath)
+        print("Saved to",fpath)
+        return
+
+    def compute_OSIG(i):
+        naive_prob, means, medians = i
+        mns = get_member_names(18)
+        # naive_prob = 0.2
+
+        # Approximates 1/36 - could be set to even smaller values to greater
+        # punish certainty - but that doesn't make sense with a model with
+        # known underdispersion.
+        constrain_minmax = (0.01,0.99)
+        # Compute the prior ignorance (assuming a blanket SPC-style probability)
+        # Could make this a manual field, drawn like a forecast!
+        # Then do differences between the two
+        # Plot as EE3 v EE1 distributions of info gain/loss of all objects
+        # Compute stat.sig? Could do for two distributions!
+
+        MATCH, mf = get_MATCH(mns, return_megaframe=True)
+        # 4x5 (cases x init times) for mean performance for case
+
+        fcst_doms = ('d02_1km','d01_3km')
+        # modes = ('cellular',)#'linear')
+        modes = ("linear",)
+        groups = list(mf.leadtime_group.unique())
+
+
+        all_IGs = {m:{fdc:N.zeros([2,0]) for fdc in fcst_doms} for m in modes}
+        IGs_by_time = {m:{fdc:{g:[] for tp in tperiods} for fdc in fcst_doms} for m in modes}
+        for mode, fcst_dom_code in itertools.product(modes,fcst_doms):
+            for initutc, casestr, initstr in obj_perf_gen():
+                # This is a given initialisation (all 180 min, len(mns) members)
+                dom, km = fcst_dom_code.split('_')
+
+                print("Doing IG for: ",mode,fcst_dom_code,casestr,initstr)
+
+                prod_code = f"nexrad_{km}_obs"
+                earliest_utc = initutc - datetime.timedelta(seconds=60*10)
+                latest_utc = initutc +  datetime.timedelta(seconds=60*190)
+                obs_objs_IDs = mf[
+                        (mf['prod_code'] == prod_code) &
+                        (mf['conv_mode'] == mode) &
+                        (mf['case_code'] == casestr) &
+                        (mf['time'] >= earliest_utc) &
+                        (mf['time'] <= latest_utc)
+                        ].megaframe_idx
+
+                # Check to see all unique
+                unique_IDs = obs_objs_IDs.unique()
+                assert len(unique_IDs) == len(obs_objs_IDs)
+                # IGs[mode][fcst_dom_code] = N.zeros([2,len(unique_IDs)])
+                IGs = N.zeros([2,len(unique_IDs)])
+                # pdb.set_trace()
+
+                for noidx, obs_ID in enumerate(unique_IDs):
+                    match_bools = N.zeros([len(mns)],dtype=bool)
+                    for nm, member in enumerate(mns):
+                        matches = MATCH[fcst_dom_code][member][casestr][
+                        initstr][mode]['matches']
+                        # for fcst_ID, v in matches.items():
+                        for o, v in matches.items():
+                            if v is None:
+                                # No match
+                                # JRL - IMPORTANT:
+                                # Note that matching the "wrong" mode will give False
+                                # should consider redoing with above/below MDI = 0.0
+                                # which is a bit of fuzzy logic.
+                                # Will be OK will cell/line split as it was done
+                                # to both obs/fcst fields so we hope error is random
+                                # match_bools[nm] = False
+                                pass
+                            elif o == obs_ID:
+                                # This is the object we're checking for
+                                # else, there's a match!
+                                match_bools[nm] = True
+                                continue
+
+                                # If there's no match at all, maybe there are no objects?
+                                assert isinstance(match_bools[nm],N.bool_)
+
+                    fcst_prob = N.sum(match_bools.astype(int))/len(mns)
+                    fcst_prob = constrain(fcst_prob,minmax=constrain_minmax)
+                    # For all observed objects for a domain in a given init (/20):
+                    # What is the % of a match?
+
+                    # naive_ign = -N.log2(naive_prob)
+                    # fcst_ign = -N.log2(fcst_prob)
+                    # info_gain = fcst_ign - naive_ign
+                    info_gain = N.log2(fcst_prob/naive_prob)
+                    assert not N.isnan(info_gain)
+
+                    # IGs[mode][fcst_dom_code][0,noidx] = obs_ID
+                    # IGs[mode][fcst_dom_code][1,noidx] = info_gain
+                    IGs[0,noidx] = int(obs_ID)
+                    IGs[1,noidx] = info_gain
+
+                    the_obj = mf[mf['megaframe_idx'] == obs_ID]
+                    assert len(the_obj) == 1
+                    obj_utc = the_obj.time.values[0]
+
+                    all_IGs[mode][fcst_dom_code] = N.concatenate(
+                        [all_IGs[mode][fcst_dom_code],IGs],
+                        axis=1,)
+
+                    # determine which time window this is in
+                    compare_utc = initutc + datetime.timedelta(
+                                    seconds=int(halfhour)*60)
+                    obj_utc = utils.dither_one_value(obj_utc)
+                    dt = (compare_utc-obj_utc).total_seconds()
+                    idx = N.searchsorted(halfhours,dt)
+
+                    pdb.set_trace()
+                    # 0 is 30 min or earlier.
+                    # Then work from there.
+
+        # 1/4 done
+        worst_score = N.log2(constrain_minmax[0]/naive_prob)
+        best_score = N.log2(constrain_minmax[1]/naive_prob)
+        print(f"Worst IG score is {worst_score:.2f} bits")
+
+        # mode = 'cellular'
+        mode = 'linear'
+
+        naive = int(naive_prob*100)
+        figsize = (6,4)
+        fig,ax = plt.subplots(1,figsize=figsize)
+        fname = f"obj_infogain_distrs_{mode}_allhours_{naive}pc.png"
+        fpath = os.path.join(outroot,"info_gain",fname)
+        utils.trycreate(fpath)
+
+        EE3_IGs = all_IGs[mode]["d01_3km"][1,:].flatten()
+        EE1_IGs = all_IGs[mode]["d02_1km"][1,:].flatten()
+
+        # pdb.set_trace()
+        # fig,ax = plt.subplots(1)
+        plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+        fig.savefig(fpath)
+
+        for nh, tperiod in enumerate(tperiods):
+            fig,ax = plt.subplots(1,figsize=figsize)
+            fname = f"obj_infogain_distrs_{mode}_{hour}_{naive}pc.png"
+            fpath = os.path.join(outroot,"info_gain",fname)
+
+            EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
+            EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
+
+            plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+
+            # Put the mean/median into array for bar chart
+            means[0,nh] = N.nanmean(EE3_IG)
+            means[1,nh] = N.nanmean(EE1_IG)
+
+            medians[0,nh] = N.nanmedian(EE3_IG)
+            medians[1,nh] = N.nanmedian(EE1_IG)
+
+            # Note we use three bins for times, which isn't great, but
+            # sample size probably too small for e.g. 30 min bins, also
+            # not fair that 180 min of forecasts can match with 220 min of obs?
+        fig.savefig(fpath)
+        return
+
+    naive_probs = N.arange(0.1,1.0,0.1)
+    # arrays for means for each [dx,tperiod,]
+
+    means = utils.generate_shared_arr([2,6,len(naive_probs)],dtype=float)
+    medians = utils.generate_shared_arr([2,6,len(naive_probs)],dtype=float)
+
+    # means = N.zeros([2,3,len(naive_probs)])]
+
+    # Probabilistic object-information-gain!
+
+    # naive_prob% of a user at a point being affected by a (linear, cellular) object,
+    # with the usual object-ID tolerances and assumptions
+
+    fpath_means = "./OSIG_means.npy"
+    fpath_medians = './OSIG_medians.npy'
+
+    loaded = False
+    gg = n_p_gen(naive_probs,means,medians)
+
+    if os.path.exists(fpath_means) and os.path.exists(fpath_medians):
+        means = N.load(file=fpath_means)
+        medians = N.load(file=fpath_medians)
+    else:
+        if ncpus > 1:
+            with multiprocessing.Pool(ncpus) as pool:
+                pool.map(compute_OSIG,gg)
+        else:
+            for g in gg:
+                compute_OSIG(g)
+
+
+
+    # N.save(file=fpath_means,arr=means)
+    # N.save(file=fpath_medians,arr=medians)
+
+    # CR-IG between the two?
+
+    # Bar chart of (x-axis) hour 1/2/3 and (y) median/mean OSIG
+    fig,ax = plt.subplots(1)
+    pdb.set_trace()
+
+    # fit a curve once we have the bars  - log? find ref from chaos lit
+
+    # asymptotic curve?
+
+
+if do_performance:
+    fcst_fmts = ("d01_3km","d02_1km")
+    mns = get_member_names(18)
+
+    def compute_perf(i):
+        caseutc, initutcs, fmt, vrbl, fcstmin, thresh, member = i
+        # The 5 init times
+        POD = N.zeros([5])
+        FAR = N.zeros_like(POD)
+
+        for ninit,initutc in enumerate(initutcs):
+            validutc = initutc + datetime.timedelta(seconds=60*int(fcstmin))
+            fcst_data, obs_data = load_both_data(fcst_vrbl=vrbl,fcst_fmt=fmt,
+                            validutc=validutc,caseutc=caseutc,initutc=initutc,
+                            mem=member)
+            DS = DetScores(fcst_arr=fcst_data,obs_arr=obs_data,thresh=thresh,
+                            overunder='over')
+            POD[ninit] = DS.get("POD")
+            FAR[ninit] = DS.get("FAR")
+        # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
+        return (POD,FAR,caseutc,fmt,vrbl,fcstmin,thresh,member)
+
+    def loop_perf():
+        for caseutc, initutcs in CASES.items():
+            for fmt, vrbl, fcstmin, thresh, member in itertools.product(
+                    fcst_fmts,vrbls,fcstmins,threshs,mns):
+                yield caseutc, initutcs, fmt, vrbl, fcstmin, thresh, member
+
+
+    vrbls = ("REFL_comp",)
+    threshs = (15,30,40,50)
+    fcstmins = (30,60,90,120,150,180)
+
+    nvrbls = len(vrbls)
+    nthreshs = len(threshs)
+    nfms = len(fcstmins)
+    nmems = len(mns)
+
+    # POD and FAR saved here
+    fpath_allpod = './allall_pod.npy'
+    fpath_allfar = './allall_far.npy'
+
+    if os.path.exists(fpath_allpod) and (not overwrite_perf):
+        allpod = N.load(fpath_allpod)
+        allfar = N.load(fpath_allfar)
+    else:
+        # [format, case, vrbl, fcstmin, thresh, member, init-time.]
+        allpod = N.zeros([2,4,nvrbls,nfms,nthreshs,nmems,5])
+        allfar = N.zeros_like(allpod)
+
+        with multiprocessing.Pool(ncpus) as pool:
+            results = pool.map(compute_perf,loop_perf())
+
+        for r in results:
+            POD,FAR,caseutc,fmt,vrbl,fcstmin,thresh,member = r
+            nfmt = fcst_fmts.index(fmt)
+            ncase = list(CASES.keys()).index(caseutc)
+            nvrbl = vrbls.index(vrbl)
+            nfm = fcstmins.index(fcstmin)
+            nthresh = threshs.index(thresh)
+            nmem = mns.index(member)
+
+            allpod[nfmt,ncase,nvrbl,nfm,nthresh,nmem,:] = POD
+            allfar[nfmt,ncase,nvrbl,nfm,nthresh,nmem,:] = FAR
+
+        N.save(file=fpath_allpod,arr=allpod)
+        N.save(file=fpath_allfar,arr=allfar)
+
+    # vecmags,vecdirs = utils.combine_wind_components(dfar,dpod)
+
+    PADS = {
+    0:[-0.15,0.065],
+    1:[-0.08,0.03],
+    2:[-0.08,0.03],
+    3:[-0.15,0.03],
+        }
+    letters = ["A","B","C","D"]
+    # For plotting basic perf diags for d01, d02.
+    switch_a = 1
+    skip_tier1 = 0
+    for vrbl, fcstmin, thresh in itertools.product(
+            vrbls, fcstmins, threshs):
+        if skip_tier1: continue
+        fname = f"perf_diag_{vrbl}_{fcstmin}min_{thresh}th.png"
+        fpath = os.path.join(outroot,"perfdiag_basic",fname)
+        PDx = Performance(fpath=fpath,legendkwargs=None,legend=True)
+        for ncase, caseutc in enumerate(CASES.keys()):
+            casestr = utils.string_from_time('dir',caseutc,strlen='day')
+
+            nfmt = fcst_fmts.index(fmt)
+            nvrbl = vrbls.index(vrbl)
+            nfm = fcstmins.index(fcstmin)
+            nthresh = threshs.index(thresh)
+
+            # These are 3D?
+            pod_slice = allpod[:,ncase,nvrbl,nfm,nthresh,:,:]
+            far_slice = allfar[:,ncase,nvrbl,nfm,nthresh,:,:]
+
+            assert pod_slice.ndim == 3
+
+            # Do diffs?
+
+            # Average over initutcs
+            pod_slice_aveinit = N.nanmean(pod_slice, axis=2)
+            far_slice_aveinit = N.nanmean(far_slice, axis=2)
+
+            # Now 2D (formats and members)
+            # Average over members
+            pod_slice_avemem = N.nanmean(pod_slice_aveinit, axis=1)
+            far_slice_avemem = N.nanmean(far_slice_aveinit, axis=1)
+
+            for nfmt, fmt in enumerate(fcst_fmts):
+                lstr = get_nice(fmt) if not ncase else None
+
+                pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
+                        'alpha':ALPHAS[fmt]}
+                farpt = far_slice_avemem[nfmt]
+                podpt = pod_slice_avemem[nfmt]
+                PDx.plot_data(pod=podpt,far=farpt,
+                                    plotkwargs=pk,label=lstr)
+
+                if fmt == "d01_3km":
+                    annostr = "{}-{}".format(letters[ncase],casestr)
+                    PDx.ax.annotate(annostr,xy=((1-farpt)+PADS[ncase][0],N.mean(podpt)+PADS[ncase][1]),
+                                    xycoords='data',fontsize=10,color='black',
+                                    fontweight='bold',annotation_clip=False)
+        PDx.save()
+        print("Saved to",fpath)
+
+    # For plotting difference heatmaps
+    dpod = allpod[1,...] - allpod[0,...]
+    dfar = allfar[1,...] - allfar[0,...]
+
+    vecmags,vecdirs = utils.combine_wind_components(dfar,dpod)
+
+    vecmags[vecdirs > 45] *= -1
+    vecmags[vecdirs < 225] *= -1
+
+    kw = dict(vmin=-0.15,vmax=0.15)
+    for (nvrbl,vrbl), (ncase,caseutc), in itertools.product(
+            enumerate(vrbls),enumerate(CASES.keys()),):
+        casestr = utils.string_from_time('dir',caseutc,strlen='day')
+        fname = f"perfdiag_diffs_{vrbl}_{casestr}.png"
+        fpath = os.path.join(outroot,"perfdiag_diff-heatmaps",fname)
+        utils.trycreate(fpath)
+
+        mag_slice = vecmags[ncase,nvrbl,:,:,:,:]
+        hm_arr = N.mean(mag_slice,axis=(2,3))
+
+        fig,ax = plt.subplots(1)
+        data = hm_arr.T
+        im = ax.imshow(data,cmap='vse_diverg', **kw)
+
+        nx,ny = data.shape
+        ax.set_yticks(N.arange(nx))
+        ax.set_xticks(N.arange(ny))
+
+        ax.set_xticklabels(fcstmins)
+        ax.set_xlabel("Forecast minute")
+
+        ax.set_yticklabels(threshs)
+        ax.set_ylabel("dBZ threshold")
+
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+                rotation_mode="anchor")
+
+        for i,j in itertools.product(range(nx),range(ny)):
+            t = "{:.2f}".format(data[i,j])
+            text = ax.text(j,i,t,ha="center",va="center",color="k",size=14,
+                                fontweight="bold")
+        plt.colorbar(im,ax=ax)
+        fig.tight_layout()
+
+        fig.savefig(fpath)
+        print("Saved to",fpath)
+
+
+if do_one_objectID:
+    initutcs = get_all_initutcs()
+    objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
+
+    fms = N.arange(30,210,30)
+
+    def do_plot(i):
+        validutc,caseutc,casestr,initutc,initstr = i
+        fm = int((validutc-initutc).total_seconds()/60)
+        obj_fpath = get_object_picklepaths(vrbl="REFL_comp",
+                        fmt="d02_1km",
+                        validutc=validutc,caseutc=caseutc,
+                        initutc=initutc,mem="m01")
+        obj = utils.load_pickle(obj_fpath)
+        outdir = os.path.join(outroot,"object_example")
+        fname = f"obj_d02_1km_{casestr}_{initstr}_{fm}min.png"
+        plot_what = 'pca'
+        # pdb.set_trace()
+        obj.plot_quicklook(outdir=outdir,fname=fname,what=plot_what)
+        return
+
+    def gen_ex_loop():
+        for caseutc, *_, initutc in all_init_sort():
+            casestr = utils.string_from_time('dir',caseutc,strlen='day')
+            initstr = f"{initutc.hour:02d}{initutc.minute:02d}"
+            # print("Doing examples for {casestr}    {initstr}")
+            for fm in fms:
+                validutc = initutc + datetime.timedelta(seconds=int(fm)*60)
+                yield validutc,caseutc,casestr,initutc,initstr
+
+    # Now, loop and plot
+    if ncpus > 1:
+        with multiprocessing.Pool(ncpus) as pool:
+            pool.map(do_plot,gen_ex_loop())
+    else:
+        for g in gen_ex_loop():
+            do_plot(g)
+    print("Done.")
+
+if do_qlcs_verif:
+    # Open 
