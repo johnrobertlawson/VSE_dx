@@ -4695,4 +4695,25 @@ if do_one_objectID:
     print("Done.")
 
 if do_qlcs_verif:
-    # Open
+    # Get all linear/complex objects (fcst, obs)
+    # Subset by eccentricity for QLCS only
+    # Get UH exceedance binaries for object in obs from megaframe
+    # Then look in each ensemble member within x km and x min of that max
+    # Assumed that supercell objects won't contaminate this with small x km.
+
+    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+    obs_fmts = ("nexrad_3km","nexrad_1km")
+    all_fmts = list(fcst_fmts) + list(obs_fmts)
+    megaframe = load_megaframe(fmts=all_fmts)
+
+    obsframe = megaframe[(megaframe['member'] == 'obs') &
+                        (megaframe['qlcsness'] > 0.5) &
+                        (megaframe['eccentricity'] > 0.85)
+                        ]
+
+    fcstframe = megaframe[(megaframe['member'] != 'obs') &
+                        (megaframe['qlcsness'] > 0.5) &
+                        (megaframe['eccentricity'] > 0.85)
+                        ]
+
+    pdb.set_trace()
