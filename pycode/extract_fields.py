@@ -63,31 +63,31 @@ radardir = '/work/john.lawson/NEXRAD_data'
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                         datetime.datetime(2016,3,31,19,0,0),
-                        datetime.datetime(2016,3,31,20,0,0),
-                        datetime.datetime(2016,3,31,21,0,0),
-                        datetime.datetime(2016,3,31,22,0,0),
-                        datetime.datetime(2016,3,31,23,0,0),
+                        # datetime.datetime(2016,3,31,20,0,0),
+                        # datetime.datetime(2016,3,31,21,0,0),
+                        # datetime.datetime(2016,3,31,22,0,0),
+                        # datetime.datetime(2016,3,31,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,1,0,0,0)] = [
                         datetime.datetime(2017,5,1,19,0,0),
-                        datetime.datetime(2017,5,1,20,0,0),
-                        datetime.datetime(2017,5,1,21,0,0),
-                        datetime.datetime(2017,5,1,22,0,0),
-                        datetime.datetime(2017,5,1,23,0,0),
+                        # datetime.datetime(2017,5,1,20,0,0),
+                        # datetime.datetime(2017,5,1,21,0,0),
+                        # datetime.datetime(2017,5,1,22,0,0),
+                        # datetime.datetime(2017,5,1,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,2,0,0,0)] = [
                         datetime.datetime(2017,5,2,23,0,0),
-                        datetime.datetime(2017,5,3,0,0,0),
-                        datetime.datetime(2017,5,3,1,0,0),
-                        datetime.datetime(2017,5,3,2,0,0),
-                        datetime.datetime(2017,5,3,3,0,0),
+                        # datetime.datetime(2017,5,3,0,0,0),
+                        # datetime.datetime(2017,5,3,1,0,0),
+                        # datetime.datetime(2017,5,3,2,0,0),
+                        # datetime.datetime(2017,5,3,3,0,0),
                         ]
 CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                         datetime.datetime(2017,5,4,22,0,0),
-                        datetime.datetime(2017,5,4,23,0,0),
-                        datetime.datetime(2017,5,5,0,0,0),
-                        datetime.datetime(2017,5,5,1,0,0),
-                        datetime.datetime(2017,5,5,2,0,0),
+                        # datetime.datetime(2017,5,4,23,0,0),
+                        # datetime.datetime(2017,5,5,0,0,0),
+                        # datetime.datetime(2017,5,5,1,0,0),
+                        # datetime.datetime(2017,5,5,2,0,0),
                         ]
 
 ##### OTHER STUFF #####
@@ -98,19 +98,21 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 
 stars = "*"*10
 dom_names = ("d01","d02")
-member_names = ['m{:02d}'.format(n) for n in range(1,37)]
-# member_names = ['m{:02d}'.format(n) for n in range(1,19)]
+# member_names = ['m{:02d}'.format(n) for n in range(1,37)]
+member_names = ['m{:02d}'.format(n) for n in range(1,19)]
 # member_names = ['m{:02d}'.format(n) for n in range(1,2)]
 # doms = (1,2)
 
 # THESE are all possible variables in the script
 # Note that UP_HELI_MAX is 2-5 km time-window-max
 FCST_VRBLS = ("Wmax","UH02","UH25","RAINNC","REFL_comp","UP_HELI_MAX")
+other_list = ["u_shear01","v_shear01","u_shear06","v_shear06","SRH03","CAPE_100mb"]
 OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 
 # "NEXRAD"
 # These are the requests variables
-fcst_vrbls = ("UH02","UH25")
+fcst_vrbls = ("u_shear06","v_shear06")
+# fcst_vrbls = ("SRH03","u_shear01","v_shear01")
 # fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
 obs_vrbls = ("DZ",)
@@ -121,7 +123,7 @@ obs_vrbls = ("DZ",)
 # Maybe not needed once lats.npy and lons.npy are created
 assert fcst_vrbls and obs_vrbls
 
-debug_mode = False
+debug_mode = True
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
@@ -243,7 +245,7 @@ def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
     aws02_mrms_rot_3km_20160331_0335.npy
 
     """
-    if vrbl in FCST_VRBLS: # ("Wmax","UH02","UH25","RAINNC"):
+    if (vrbl in FCST_VRBLS) or (vrbl in other_list): # ("Wmax","UH02","UH25","RAINNC"):
         # TODO: are we not just doing 5-min or 1-hr accum_precip?
         caseYYYYMMDD = "{:04d}{:02d}{:02d}".format(caseutc.year,caseutc.month,
                                                 caseutc.day)
@@ -295,7 +297,8 @@ def get_data(caseutc,fmt,vrbl=None,validutc=None,initutc=None,mem=None,
     """
     casestr = utils.string_from_time('dir',caseutc,strlen='day')
     if mem:
-        assert initutc and (vrbl in FCST_VRBLS)
+        assert initutc
+        assert (vrbl in FCST_VRBLS) or (vrbl in other_list)
         initstr = utils.string_from_time('dir',initutc,strlen='hour')
         memdir = os.path.join(ensroot,initstr,mem)
 
@@ -529,7 +532,7 @@ def generate_itr_from_commands(commands):
 
 def generate_valid_utcs(initutc):
     if debug_mode:
-        utc1 = initutc + datetime.timedelta(seconds=25*60)
+        utc1 = initutc + datetime.timedelta(seconds=10*60)
     else:
         utc1 = initutc + datetime.timedelta(seconds=3600*3)
     # utc1 = initutcs[-1] + datetime.timedelta(seconds=maxsec)
@@ -548,7 +551,7 @@ def generate_obs_loop():
             # Earliest time:
             utc0 = initutcs[0]
             # Latest time is 3 hours after the latest initialisation
-            secs = 3600*3 if not debug_mode else 60*25
+            secs = 3600*3 if not debug_mode else 60*10
             utc1 = initutcs[-1] + datetime.timedelta(seconds=secs)
             # utc1 = initutcs[-1] + datetime.timedelta(seconds=maxsec)
 
