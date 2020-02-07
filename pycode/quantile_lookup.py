@@ -12,8 +12,10 @@ import matplotlib.pyplot as plt
 
 ### paths etc
 # dataroot = '/Users/john.lawson/data/AprilFool'
-extractroot = '/Users/john.lawson/data/AprilFool'
-outdir = '/Users/john.lawson/VSE_dx/pyoutput'
+# extractroot = '/Users/john.lawson/data/AprilFool'
+extractroot = '/work/john.lawson/VSE_reso/pp/AprilFool'
+# outdir = '/Users/john.lawson/VSE_dx/pyoutput'
+outdir = '/home/john.lawson/VSE_dx/pycode'
 
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
