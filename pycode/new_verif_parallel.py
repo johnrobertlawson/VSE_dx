@@ -83,7 +83,7 @@ do_efss = False # TODO - average for cref over cases, for paper
 # From scratch, do object_switch, do_object_pca, then
 # delete the object dfs (in subdirs too), and
 # and re-run object_switch to do the MDI of each cell
-object_switch = False
+object_switch = True
 do_object_pca = False
 do_object_performance = False # TODO re-do with new (18) matching and diff vectors?
 do_object_distr = False # TODO re-plot after matching new (18) matches
@@ -93,7 +93,10 @@ do_object_brier_uh = False # TODO finish - split into first_hour, second_hour et
 do_object_infogain = False # TODO broken due to indents etc
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
-do_qlcs_verif = True
+do_qlcs_verif = False
+do_spurious_example = False
+do_oID_example = False
+do_ign_storm = True
 
 # MAYBE DELETE
 do_object_examples = False # TODO maybe delete, or do by hand
@@ -142,8 +145,8 @@ key_pp = 'AprilFool'
 #extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 
-# objectroot = os.path.join(extractroot,'object_instances')
-objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
+objectroot = os.path.join(extractroot,'object_instances_PC')
+# objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
@@ -397,7 +400,7 @@ def round_nearest(x,a,method='floor'):
     return FUNCS[method](x/a) * a
 
 def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None,
-                    proj="lcc",):
+                    proj="lcc",latlon=None):
     bmap = Basemap(
                 # width=12000000,height=9000000,
                 urcrnrlat=urcrnrlat,urcrnrlon=urcrnrlon,
@@ -405,6 +408,9 @@ def create_bmap(urcrnrlat,urcrnrlon,llcrnrlat,llcrnrlon,ax=None,
                 rsphere=(6378137.00,6356752.3142),
                 resolution='l',projection=proj,ax=ax,
                 lat_1=45.,lat_2=55,lat_0=50,lon_0=-107.0)
+    if latlon is not None:
+        x,y = bmap(latlon[1],latlon[0])
+        bmap.scatter(x,y,s=800,color='k',marker='+',zorder=100)
     return bmap
 
 def get_member_names(n):
@@ -496,7 +502,6 @@ def loop_obj_obs(obs_vrbl,all_times=True):
                 validutc = initutc+datetime.timedelta(seconds=60*int(t))
                 obtimes.add(validutc)
                 casetimes[caseutc].add(validutc)
-
     # pdb.set_trace()
     for t in obtimes:
         case = None
@@ -609,7 +614,8 @@ def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
     else:
         return obs_data
 
-def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,initutc,window=1,mem='all'):
+def load_timewindow_both_data(vrbl,fmt,validutc,caseutc,
+                    initutc,window=1,mem='all'):
     nt = window
     ws = int((nt-1)/2)
 
@@ -679,6 +685,14 @@ def do_pca_plots(pca,PC_df,features,fmt):
     utils.trycreate(fpath)
     fig.savefig(fpath)
 
+    # features -> make pretty
+    nice_features = []
+    for f in features:
+        s = copy.copy(f)
+        s = s.replace('_',' ')
+        s = s.capitalize()
+        nice_features.append(s)
+
     # JRL TODO: this needs to be pretty for paper
     ### PCs in feature space ###
     for num_feats in (1,3):
@@ -696,9 +710,9 @@ def do_pca_plots(pca,PC_df,features,fmt):
         # for n,pc in enumerate(pca.components_[:1]):
         for n,pc in enumerate(plot_these_components):
             if n == 0:
-                label = "Morph. Index (PC1)"
+                label = "MDI (PC1)"
             else:
-                label = "PC{}".format(n)
+                label = "PC{}".format(n+1)
             names.append(label)
             scores.append(pc*100)
 
@@ -709,7 +723,7 @@ def do_pca_plots(pca,PC_df,features,fmt):
         for n, (pos,label, scorearray) in enumerate(zip(poss,names,scores)):
             ax.barh(pos, scorearray, bw, alpha=0.6, align='center',
                     color=RANCOL[n],label=label,
-                    tick_label=features,)
+                    tick_label=nice_features,)
         ax.set_xlabel("Variance explained (%)")
         ax.set_ylabel("Storm-object characteristic")
         ax.legend()
@@ -1205,20 +1219,23 @@ def shuffled_copy(seq):
     l = list(seq)
     return random.sample(l,len(l))
 
-def get_MATCH(mns,return_megaframe=False):
-    # Load one big df with all objects
-    fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
-    obs_fmts = ("nexrad_3km","nexrad_1km")
-    all_fmts = list(fcst_fmts) + list(obs_fmts)
-    megaframe = load_megaframe(fmts=all_fmts)
-    # pdb.set_trace()
+def get_MATCH(mns,return_megaframe=False,modes=('cellular',),custom_megaframe=None):
+    if custom_megaframe is not None:
+        megaframe = custom_megaframe
+    else:
+        # Load one big df with all objects
+        fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
+        obs_fmts = ("nexrad_3km","nexrad_1km")
+        all_fmts = list(fcst_fmts) + list(obs_fmts)
+        megaframe = load_megaframe(fmts=all_fmts)
     CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
+
+    # pdb.set_trace()
 
     MATCH = {}
     # Create pickle of matches
     # for dom_code in ('d01_3km','d02_1km'):
     # modes = ('cellular',)#'linear')
-    modes = ('linear',)
     for member in mns:
         for dom_code, mode in itertools.product(('d02_1km','d01_3km'),modes):
             if dom_code not in MATCH.keys():
@@ -1242,6 +1259,8 @@ def get_MATCH(mns,return_megaframe=False):
                 fpath3 = os.path.join(objectroot,"verif_match_sorted",
                                         mode,casestr,initstr,fname)
                 if (not os.path.exists(fpath)) or (not os.path.exists(fpath2)):
+                    pdb.set_trace()
+
                     fcst_prod_code = '_'.join((dom_code,member))
                     dictA = {"prod_code":fcst_prod_code,#"member":member,
                                     "case_code":casestr,"init_code":initstr,
@@ -1737,6 +1756,7 @@ if do_domains:
     print("Domains plot saved to",fpath)
 
 if do_percentiles:
+    bins_names = 10001
     pass
     # JRL: create cdfs of cref, qpf, az-shear in EE3, EE1, and obs.
     # Evaluate everything at "key" percentiles, e.g. 90, 95, 99% for extreme stuff
@@ -1889,6 +1909,17 @@ if do_percentiles:
             fig,ax = plt.subplots(1)
             ax.plot(bins,RVH.cdf(bins))
             ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
+            fig.savefig(fpath_fig)
+            ax.set_xlim(LIMS[_vrbl])
+            # ax.set_ylim([RVH.ppf(50)])
+            fig.savefig(fpath_fig2)
+
+            fname_fig = "pc_scatter_{}_{}.png".format(_vrbl,kmstr)
+            fpath_fig3 = os.path.join(pcroot,fname_fig)
+
+            fig,ax = plt.subplots(1)
+            ax.scatter(bins,RVH.cdf(bins))
+
             fig.savefig(fpath_fig)
             ax.set_xlim(LIMS[_vrbl])
             # ax.set_ylim([RVH.ppf(50)])
@@ -2642,12 +2673,6 @@ if object_switch:
                                         initutc=initutc,mem=mem)
         print(stars,"FCST DEBUG:",fcst_fmt,caseutc,initutc,validutc,mem)
 
-        if "3km" in fcst_fmt:
-            dx = 3.0
-        elif "1km" in fcst_fmt:
-            dx = 1.0
-        else:
-            raise Exception
         if (not os.path.exists(pk_fpath)) or overwrite_pp:
 
             fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
@@ -2655,7 +2680,20 @@ if object_switch:
 
             kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,
                         initutc=initutc,fpath=pk_fpath)
-            obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
+            pdb.set_trace()
+
+            if "3km" in fcst_fmt:
+                dx = 3.0
+                kw['threshold'] = 0
+            elif "1km" in fcst_fmt:
+                dx = 1.0
+                kw['threshold'] = 0
+            else:
+                assert True == False
+
+            kw['dx'] = dx
+            kw['footprint'] = 0
+            obj = ObjectID(fcst_data,fcst_lats,fcst_lons,**kw)
             utils.save_pickle(obj=obj,fpath=pk_fpath)
             # print("Object instance newly created.")
         elif (load is False):
@@ -2764,7 +2802,8 @@ if object_switch:
             # utils.save_pickle(obj=results_fcst,fpath=fcst_fpath)
 
             # Then, load.
-            itr_fcst_2 = loop_obj_fcst(fcst_vrbl,fcstmins,fcst_fmt,member_names,load=True)
+            itr_fcst_2 = loop_obj_fcst(fcst_vrbl,fcstmins,
+                            fcst_fmt,member_names,load=True)
             if ncpus > 1:
                 with multiprocessing.Pool(ncpus) as pool:
                     results_fcst = pool.map(compute_obj_fcst,itr_fcst_2)
@@ -2822,7 +2861,7 @@ if object_switch:
             utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
     # Do combined PCA - JRL TODO FIX!
-    do_combined = False
+    do_combined = True
     if do_combined:
         # Get data
         fname = {}
@@ -2865,7 +2904,7 @@ if do_object_pca:
     print(stars,"DOING PCA",stars)
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
-    all_fmts = list(fcst_fmts) + list(obs_fmts) #+ ['all',]
+    all_fmts = list(fcst_fmts) + list(obs_fmts) + ['all',]
     for fmt in all_fmts:
         if fmt == "all":
             fname = "pca_all_fcst_objs.pickle"
@@ -2921,13 +2960,19 @@ if do_object_performance:
     # casestr = (20160331...)
     # initstr = (2300 etc - depends on case)
 
-    # mns = half_member_names
-    mns = fifteen_member_names
-    # mns = test_member_names
-    MATCH = get_MATCH(mns)
-    # 4x5 (cases x init times) for mean performance for case
     # modes = ('cellular',)#'linear')
     modes = ("linear",)
+
+    if modes[0] == "linear":
+        pickle_fname = "linear_match.pickle"
+        pickle_fpath = os.path.join(objectroot,pickle_fname)
+        MATCH = utils.load_pickle(pickle_fpath)
+    else:
+        # mns = half_member_names
+        mns = fifteen_member_names
+        # mns = test_member_names
+        MATCH = get_MATCH(mns)
+        # 4x5 (cases x init times) for mean performance for case
 
     plot_these = [
             ("20160331","1900"),
@@ -3048,6 +3093,7 @@ if do_object_distr:
     # distance_from_wcentroid
     # updraught_area_km
     attrs = ("max_updraught",)
+    # pdb.set_trace()
 
     if True:
         # Data from objects and updraught data
@@ -3512,6 +3558,7 @@ if do_object_examples:
 
 
 if do_object_waffle:
+    # BROKEN
     print(stars,"DOING WAFFLEPLOT",stars)
     # Compute PCA for d01/d02 combined objects, but for cellular only
     # Check the leading PCs again - is PC1 the same as previous PC2?
@@ -3567,13 +3614,18 @@ if do_object_brier_uh:
     # Create waffle plot of all BS scores/components/RPS - ordered by fcst min
 
     # Brier score: UH for 4 levels for matched objects
-    # mns = fifteen_member_names
-    mns = get_member_names(18)
-    MATCH, mf = get_MATCH(mns, return_megaframe=True)
 
+
+    # modes = ('cellular',)
+    modes = ('linear','cellular')
+
+    # JRL Sept 2019
+    verif_meth = "IGN"
+    # verif_meth = "BS"
+
+
+    print("ß"*20,"READY TO WAFFLE!","ø"*20)
     fcst_doms = ('d02_1km','d01_3km')
-    # modes = ('cellular',)#'linear')
-    modes = ('linear',)
 
     obs_IDs = {}
     # Loop first to build unique observed object set
@@ -3595,23 +3647,42 @@ if do_object_brier_uh:
 
     all_bs = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
     all_lt = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
-    overwrite_BS_pickles = True
+    overwrite_BS_pickles = False
 
     # Just those cells that are rotating
     all_meso_bs =  {p:{k:[] for k in ("1km","3km")} for p in bs_props}
     all_meso_lt =  {p:{k:[] for k in ("1km","3km")} for p in bs_props}
 
-    # parallelise if too slow?
-    ### THIS IS FOR CREATING DATAFRAME OF OBSERVED OBJECTS PER RUN
-    for initutc, casestr, initstr in obj_perf_gen():
-        # This is a given initialisation (all 180 min, len(mns) members)
-        for fcst_dom_code in fcst_doms:
-            # d01 or d02
-            dom, km = fcst_dom_code.split('_')
-            for mode in modes:
+    for mode in modes:
+
+        # mns = fifteen_member_names
+        if mode == "linear":
+            mns = get_member_names(18)
+            pickle_fname = "linear_match.pickle"
+            pickle_fpath = os.path.join(objectroot,pickle_fname)
+            MATCH = utils.load_pickle(pickle_fpath)
+
+            mf_fname = "linear_mf.pickle"
+            mf_fpath = os.path.join(objectroot,mf_fname)
+            mf = utils.load_pickle(mf_fpath)
+        else:
+            mns = get_member_names(15)
+            MATCH, mf = get_MATCH(mns, return_megaframe=True)
+
+        # parallelise if too slow?
+        ### THIS IS FOR CREATING DATAFRAME OF OBSERVED OBJECTS PER RUN
+        for initutc, casestr, initstr in obj_perf_gen():
+            # This is a given initialisation (all 180 min, len(mns) members)
+            for fcst_dom_code in fcst_doms:
+                # d01 or d02
+                dom, km = fcst_dom_code.split('_')
+
+                # For mode in modes was here
+                # Indent now reduced...
+
                 # Save output at this level
-                fname = f"BS_prop_{casestr}_{initstr}_{mode}_{km}.pickle"
-                fpath = os.path.join(objectroot,"BS_pickles",fname)
+                fname = f"{verif_meth}_prop_{casestr}_{initstr}_{mode}_{km}.pickle"
+                fpath = os.path.join(objectroot,f"{verif_meth}_pickles",fname)
 
                 if os.path.exists(fpath) and (not overwrite_BS_pickles):
                     bs = utils.load_pickle(fpath=fpath)
@@ -3697,7 +3768,17 @@ if do_object_brier_uh:
                                 n_valid_mem = len(mns) - total_nans
                                 prob_frac_mns = N.nansum(fcst_bools[prop])/n_valid_mem
                                 assert 0 <= prob_frac_mns <= 1
-                                bs_val = (prob_frac_mns - obs_val)**2
+
+                                # Sept 2019 info edits
+
+                                # bs_val = (prob_frac_mns - obs_val)**2
+                                if prob_frac_mns == 1:
+                                    bs_val = 0 # perfect!
+                                elif prob_frac_mns == 0:
+                                    bs_val = 9999
+                                else:
+                                    bs_val = -N.log2(prob_frac_mns)
+
                                 # ([0,1] - {1,0}) **2
                                 # Perfect score: 100% and it is observed (0**2)
                                 # Also, 0% and it is not observed.
@@ -3738,130 +3819,164 @@ if do_object_brier_uh:
                 # [lead_time,BS]
                 # lead_times.append()
 
-    fname = f"all_leadtimes_BS_objs_{mode}.pickle"
-    fpath = os.path.join(objectroot,"BS_pickles",fname)
-    if os.path.exists(fpath) and (not overwrite_BS_pickles):
-        all_lt = utils.load_pickle(fpath)
-    else:
-        utils.save_pickle(fpath=fpath,obj=all_lt)
-
-    fname = f"all_brierscores_BS_objs_{mode}.pickle"
-    fpath = os.path.join(objectroot,"BS_pickles",fname)
-    if os.path.exists(fpath) and (not overwrite_BS_pickles):
-        all_bs = utils.load_pickle(fpath)
-    else:
-        utils.save_pickle(fpath=fpath,obj=all_bs)
-
-    fname = f"all_leadtimes_BS_mesos_{mode}.pickle"
-    fpath = os.path.join(objectroot,"BS_pickles",fname)
-    if os.path.exists(fpath) and (not overwrite_BS_pickles):
-        all_meso_lt = utils.load_pickle(fpath)
-    else:
-        utils.save_pickle(fpath=fpath,obj=all_meso_lt)
-
-    fname = f"all_brierscores_BS_mesos_{mode}.pickle"
-    fpath = os.path.join(objectroot,"BS_pickles",fname)
-    if os.path.exists(fpath) and (not overwrite_BS_pickles):
-        all_meso_bs = utils.load_pickle(fpath)
-    else:
-        utils.save_pickle(fpath=fpath,obj=all_meso_bs)
-
-    # pdb.set_trace()
-    # For domain, for init time:
-    # Load all obs' BS scores
-    # Sort by lead time
-    # Do waffle plot ordered by lead time, coloured by BS from 0-1
-
-    # Do eight props as left-to-right increasing lead time
-    # One fig for 3km, another for 1km
-
-    for meso_sw in ("meso-only",):#"all"):
-        # meso_sw = "meso-only"
-        # meso_sw = "all"
-
-        # JRL TODO: pick the largest sbs_nice_n to have most sample size for
-        # low percentile - and maybe do 10 nrows.
-        # Going to test with just a few members, and run more for larger sample
-        if meso_sw == "meso-only":
-            all_bs = all_meso_bs
-            all_lt = all_meso_lt
-            #sbs_nice_n = 125
-            #nrows = 5
-            sbs_nice_n = 200
-            nrows = 8
+        fname = f"all_leadtimes_{verif_meth}_objs_{mode}.pickle"
+        fpath = os.path.join(objectroot,f"{verif_meth}_pickles",fname)
+        if os.path.exists(fpath) and (not overwrite_BS_pickles):
+            all_lt = utils.load_pickle(fpath)
         else:
-            sbs_nice_n = 375
-            nrows = 15
+            utils.save_pickle(fpath=fpath,obj=all_lt)
 
-        # from pywaffle import Waffle
-        for km in ("1km","3km"):
-            for prop in bs_props:
-                fname = f"waffle_{prop}_{km}_{meso_sw}.png"
-                fpath = os.path.join(outroot,"waffle",fname)
-                arr = N.array([all_lt[prop][km],all_bs[prop][km]])
+        fname = f"all_brierscores_{verif_meth}_objs_{mode}.pickle"
+        fpath = os.path.join(objectroot,f"{verif_meth}_pickles",fname)
+        if os.path.exists(fpath) and (not overwrite_BS_pickles):
+            all_bs = utils.load_pickle(fpath)
+        else:
+            utils.save_pickle(fpath=fpath,obj=all_bs)
 
-                df = pandas.DataFrame(data=arr.T,columns=('lead_time','brier_score'))
+        fname = f"all_leadtimes_{verif_meth}_mesos_{mode}.pickle"
+        fpath = os.path.join(objectroot,f"{verif_meth}_pickles",fname)
+        if os.path.exists(fpath) and (not overwrite_BS_pickles):
+            all_meso_lt = utils.load_pickle(fpath)
+        else:
+            utils.save_pickle(fpath=fpath,obj=all_meso_lt)
 
-                #arr_sort = N.sort(arr,axis=0)[0,:]
-                # Each array entry (axis 1) is now BS for that object
-                #assert len(N.where(arr_sort > 1)) == 0
-                #assert len(N.where(arr_sort < 1)) == 0
+        fname = f"all_brierscores_{verif_meth}_mesos_{mode}.pickle"
+        fpath = os.path.join(objectroot,f"{verif_meth}_pickles",fname)
+        if os.path.exists(fpath) and (not overwrite_BS_pickles):
+            all_meso_bs = utils.load_pickle(fpath)
+        else:
+            utils.save_pickle(fpath=fpath,obj=all_meso_bs)
 
-                # pdb.set_trace()
+        # pdb.set_trace()
+        # For domain, for init time:
+        # Load all obs' BS scores
+        # Sort by lead time
+        # Do waffle plot ordered by lead time, coloured by BS from 0-1
 
-                # Subsample?
-                # total_raw = df_sort.shape[0]
-                # sbs_frac = 0.2
-                # sbs_n = int(sbs_frac * total_raw)
+        # Do eight props as left-to-right increasing lead time
+        # One fig for 3km, another for 1km
 
-                # nrows = 5
-                # Make right for reshaping - multiple of nrows
+        for meso_sw in ("meso-only",):#"all"):
+            # meso_sw = "meso-only"
+            # meso_sw = "all"
 
-                # sbs_nice_n = sbs_n - (sbs_n%nrows)
-                # sbs_nice_n = 125
-                df.dropna(inplace=True)
+            # JRL TODO: pick the largest sbs_nice_n to have most sample size for
+            # low percentile - and maybe do 10 nrows.
+            # Going to test with just a few members, and run more for larger sample
+            if meso_sw == "meso-only":
+                all_bs = all_meso_bs
+                all_lt = all_meso_lt
+                #sbs_nice_n = 125
+                #nrows = 5
 
-                try:
-                    df = df.sample(n=sbs_nice_n)
-                except ValueError: # not enough samples
-                    print("Skipping this figure - not enough data")
-                    continue
+                # Sept 2019 changes
+                # sbs_nice_n = 200
+                # nrows = 8
 
-                df = df.sort_values(by="brier_score")
-                # Reshape for nrows (these rows should increase in time left to right)
-                data_arr = df.brier_score.values
-                # pdb.set_trace()
+                # For nice plots
+                sbs_nice_n = 450
+                nrows = 15
 
-                ncols = data_arr.size//nrows
+                # For more
+                sbs_nice_n = 1025
+                nrows = 25
 
-                # JRL: which order?!
-                data_arr = N.reshape(data_arr,[nrows,ncols],order="F")
-                # arr_waffle = N.reshape(arr_sort,(20,-1))
+            else:
+                sbs_nice_n = 375
+                nrows = 15
 
-                cm = M.cm.Reds_r if km=="1km" else M.cm.Blues_r
-                cm.set_bad('grey',1.0)
+            # from pywaffle import Waffle
+            for km in ("1km","3km"):
+                for prop in bs_props:
+                    fname = f"waffle_{prop}_{km}_{meso_sw}_{mode}.png"
+                    fpath = os.path.join(outroot,"waffle",fname)
+                    arr = N.array([all_lt[prop][km],all_bs[prop][km]])
 
-                fig,ax = plt.subplots(figsize=(8,4))
-                # data_arr_mi = N.ma.masked_invalid(data_arr)
-                pcm = ax.pcolormesh(
-                                        # data_arr_mi,
-                                        data_arr,
-                                        edgecolors="white",
-                                        snap=True,
-                                        cmap=cm,
-                                        alpha=0.8,
-                                        vmin=0.0,vmax=1.0,
-                                        )
-                plt.colorbar(pcm,ax=ax,orientation='horizontal')
-                ax.grid(False)
-                ax.axis("off")
-                ax.set_aspect("equal")
-                utils.trycreate(fpath,isdir=False)
-                fig.tight_layout()
-                fig.savefig(fpath)
-                print("Saved to",fpath)
-                # pdb.set_trace()
-                pass
+                    df = pandas.DataFrame(data=arr.T,columns=('lead_time','brier_score'))
+
+                    #arr_sort = N.sort(arr,axis=0)[0,:]
+                    # Each array entry (axis 1) is now BS for that object
+                    #assert len(N.where(arr_sort > 1)) == 0
+                    #assert len(N.where(arr_sort < 1)) == 0
+
+                    # pdb.set_trace()
+
+                    # Subsample?
+                    # total_raw = df_sort.shape[0]
+                    # sbs_frac = 0.2
+                    # sbs_n = int(sbs_frac * total_raw)
+
+                    # nrows = 5
+                    # Make right for reshaping - multiple of nrows
+
+                    # sbs_nice_n = sbs_n - (sbs_n%nrows)
+                    # sbs_nice_n = 125
+
+                    # JRL Sept 2019: This seems very important regarding base rates?
+                    # JRL: nah - just removing observed objects with a AWS val of NaN
+
+                    # df.dropna(inplace=True)
+
+                    # JRL Sept 2019: can we sub-sample at a higher value? We are ignoring
+                    # the top pc level anyway
+                    # Explain in manuscript why this was done
+                    # pdb.set_trace()
+                    nn0 = df.shape[0]
+                    try:
+                        df = df.sample(n=sbs_nice_n)
+                    except ValueError: # not enough samples
+                        print("Skipping this figure - not enough data")
+                        continue
+
+                    df = df.sort_values(by="brier_score")
+                    nn1 = df.shape[0]
+
+                    # Reshape for nrows (these rows should increase in time left to right)
+                    data_arr = df.brier_score.values
+                    # pdb.set_trace()
+
+                    ncols = data_arr.size//nrows
+
+                    # JRL: which order?!
+                    data_arr = N.reshape(data_arr,[nrows,ncols],order="F")
+                    # arr_waffle = N.reshape(arr_sort,(20,-1))
+
+                    # Mask "misses", marked as 9999
+                    data_arr = N.ma.masked_equal(data_arr,9999)
+
+                    cm = M.cm.Reds_r if km=="1km" else M.cm.Blues_r
+                    cm.set_bad('grey')
+
+                    fig,ax = plt.subplots(figsize=(8,6))
+                    # data_arr_mi = N.ma.masked_invalid(data_arr)
+                    pcm = ax.pcolormesh(
+                                            # data_arr_mi,
+                                            data_arr,
+                                            edgecolors="white",
+                                            snap=True,
+                                            cmap=cm,
+                                            alpha=0.8,
+                                            vmin=0.0,
+                                            vmax=4.0,
+                                            )
+                    plt.colorbar(pcm,ax=ax,orientation='horizontal',)
+                    #ax.colorbar.set_xlim([0,4])
+                    ax.grid(False)
+                    # draw thick black line to show x=0.5, and thinner for 0.25 and 0.75
+                    plt.axvline(x=int(sbs_nice_n/(2*nrows)),color='k',lw=5)
+                    plt.axvline(x=int(sbs_nice_n/(4*nrows)),color='k',lw=2.5)
+                    plt.axvline(x=int((3*sbs_nice_n)/(4*nrows)),color='k',lw=2.5)
+
+                    # ax.set_title(f"n_0: {nn0}; n_s: {nn1}",fontstyle='italic')
+                    ax.axis("off")
+                    ax.set_aspect("equal")
+                    utils.trycreate(fpath,isdir=False)
+                    fig.tight_layout()
+                    fig.savefig(fpath)
+                    print("Saved to",fpath)
+                    # pdb.set_trace()
+                    pass
+# End of loop over both modes.
 
 if do_case_outline:
     CASES_narr = collections.OrderedDict()
@@ -4217,7 +4332,9 @@ if do_case_outline:
     plt.close(fig)
 
 if do_object_infogain:
-    halfhours = N.arange(30,210,30)
+    # halfhours = N.arange(30,210,30)
+    # tperiods = ['first_hour','second_hour','third_hour']
+    # fcstmins = [60,120,180]
 
     def n_p_gen(naive_probs, means, medians):
         for n_p in naive_probs:
@@ -4235,39 +4352,50 @@ if do_object_infogain:
             #sns.stripplot(x=data,y=n,color=cols[n],
             #            dodge=True,jitter=True,
             #            alpha=0.25,zorder=1,)
-            sns.kdeplot(data,shade=True,color=cols[n],alpha=0.3,
+            sns.kdeplot(data.flatten(),shade=True,color=cols[n],alpha=0.3,
             # clip=[worst_score,best_score],
-            clip = [worst_score,best_score],
+            # clip = [worst_score,best_score],
             label=dstrs[n],ax=ax,
             kernel='gau',legend=True,)
 
-        # all_min = min(EE3.min(),EE1.min())
-        # all_max = max(EE3.max(),EE1.max())
-        # logbins = N.logspace(all_min,all_max,50)
-        # logbins = N.logspace(-4,4,50)
-        logbins = N.concatenate([N.logspace(-1,0,25),N.logspace(0,1,25)])
-        # logbins = 50
-        # Need to fit a log-friendly KDE? Scatter?
-        ax.hist([EE3,EE1],bins=logbins,alpha=0.7,label=["3km","1km"],
-            color=["#1A85FF","#D41159"],
-            #range=[N.floor(all_min),N.ceil(all_max)],
-        #range=[-4,4],
-        )
-        ax.set_xscale("symlog",)#linthreshx=1)
+        if False:
+            fig.tight_layout()
+            fig.savefig(fpath)
+            print("Saved to",fpath)
+            pdb.set_trace()
 
-        ax.axvline(0,color='k',linewidth=2)
-        ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1,linestyle='--')
-        ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1,linestyle='--')
-        ax.axvline(N.nanmedian(EE3),color='#1A85FF',linewidth=1,linestyle=':')
-        ax.axvline(N.nanmedian(EE1),color='#D41159',linewidth=1,linestyle=':')
+        if False:
+            # all_min = min(EE3.min(),EE1.min())
+            # all_max = max(EE3.max(),EE1.max())
+            # logbins = N.logspace(all_min,all_max,50)
+            # logbins = N.logspace(-4,4,50)
+            logbins = N.concatenate([N.logspace(-1,0,25),N.logspace(0,1,25)])
+            # logbins = 50
+            # Need to fit a log-friendly KDE? Scatter?
+            # pdb.set_trace()
+            ax.hist([EE3,EE1],bins=logbins,alpha=0.7,label=["3km","1km"],
+            # ax.hist([EE3,EE1],alpha=0.7,label=["3km","1km"],
+                color=["#1A85FF","#D41159"],
+                #range=[N.floor(all_min),N.ceil(all_max)],
+            #range=[-4,4],
+            )
 
-        ax.axvline(worst_score,color='brown',linewidth=2)
-        ax.axvline(best_score,color='green',linewidth=2)
-        ax.set_ylabel("Density")
-        ax.set_xlabel("Object information gain (bits)")
-        # ax.legend()
-        ax.set_xlim([worst_score-0.5,best_score+0.5])
-        # ax.set_ylim([0,1.2])
+        if True:
+            # ax.set_xscale("symlog",)#linthreshx=1)
+
+            ax.axvline(0,color='k',linewidth=2)
+            # ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1,linestyle='--')
+            # ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1,linestyle='--')
+            ax.axvline(N.nanmedian(EE3),color='#1A85FF',linewidth=1,linestyle='--')
+            ax.axvline(N.nanmedian(EE1),color='#D41159',linewidth=1,linestyle='--')
+
+            ax.axvline(worst_score,color='brown',linewidth=2)
+            ax.axvline(best_score,color='green',linewidth=2)
+            ax.set_ylabel("Density")
+            ax.set_xlabel("Object information gain (bits)")
+            # ax.legend()
+            ax.set_xlim([worst_score-0.5,best_score+0.5])
+            # ax.set_ylim([0,1.2])
 
         fig.tight_layout()
         fig.savefig(fpath)
@@ -4276,7 +4404,7 @@ if do_object_infogain:
 
     def compute_OSIG(i):
         naive_prob, means, medians = i
-        mns = get_member_names(18)
+        mns = get_member_names(16)
         # naive_prob = 0.2
 
         # Approximates 1/36 - could be set to even smaller values to greater
@@ -4289,110 +4417,175 @@ if do_object_infogain:
         # Plot as EE3 v EE1 distributions of info gain/loss of all objects
         # Compute stat.sig? Could do for two distributions!
 
-        MATCH, mf = get_MATCH(mns, return_megaframe=True)
         # 4x5 (cases x init times) for mean performance for case
 
-        fcst_doms = ('d02_1km','d01_3km')
-        # modes = ('cellular',)#'linear')
-        modes = ("linear",)
-        groups = list(mf.leadtime_group.unique())
+        modes = ('cellular',)#'linear')
+        # modes = ("linear",)
+        # fcst_doms = ('d02_1km','d01_3km')
+        fcst_doms = ('d01_3km',)
 
+        if modes[0] == "linear":
+            pickle_fname = "linear_match.pickle"
+            pickle_fpath = os.path.join(objectroot,pickle_fname)
 
+            mf_fname = "linear_mf.pickle"
+            mf_fpath = os.path.join(objectroot,mf_fname)
+
+            MATCH = utils.load_pickle(pickle_fpath)
+            mf = utils.load_pickle(mf_fpath)
+        else:
+            MATCH, mf = get_MATCH(mns, return_megaframe=True)
+
+        # tperiods = list(mf.leadtime_group.unique())
+        tperiods = ["first_hour","second_hour","third_hour"]
+
+        # All information gain by dom/mode
         all_IGs = {m:{fdc:N.zeros([2,0]) for fdc in fcst_doms} for m in modes}
-        IGs_by_time = {m:{fdc:{g:[] for tp in tperiods} for fdc in fcst_doms} for m in modes}
+        # Info gain per hour, and by dom/mode
+        IGs_by_time = {m:{fdc:{tp:[] for tp in tperiods} for fdc in fcst_doms} for m in modes}
+
         for mode, fcst_dom_code in itertools.product(modes,fcst_doms):
             for initutc, casestr, initstr in obj_perf_gen():
-                # This is a given initialisation (all 180 min, len(mns) members)
-                dom, km = fcst_dom_code.split('_')
+                if (initstr != "0200"):
+                    continue
+                for hour in tperiods:
+                    if hour != "first_hour":
+                        continue
+                    # This is a given initialisation (all 180 min, len(mns) members)
+                    dom, km = fcst_dom_code.split('_')
 
-                print("Doing IG for: ",mode,fcst_dom_code,casestr,initstr)
+                    print("Doing IG for: ",mode,fcst_dom_code,casestr,initstr)
 
-                prod_code = f"nexrad_{km}_obs"
-                earliest_utc = initutc - datetime.timedelta(seconds=60*10)
-                latest_utc = initutc +  datetime.timedelta(seconds=60*190)
-                obs_objs_IDs = mf[
-                        (mf['prod_code'] == prod_code) &
-                        (mf['conv_mode'] == mode) &
-                        (mf['case_code'] == casestr) &
-                        (mf['time'] >= earliest_utc) &
-                        (mf['time'] <= latest_utc)
-                        ].megaframe_idx
+                    prod_code = f"nexrad_{km}_obs"
+                    earliest_utc = initutc - datetime.timedelta(seconds=60*10)
+                    latest_utc = initutc +  datetime.timedelta(seconds=60*190)
+                    obs_objs_IDs = mf[
+                            (mf['prod_code'] == prod_code) &
+                            (mf['conv_mode'] == mode) &
+                            (mf['case_code'] == casestr) &
+                            (mf['time'] >= earliest_utc) &
+                            (mf['time'] <= latest_utc)
+                            # (mf['leadtime_group'] == f"{hour}")
+                            ].megaframe_idx
 
-                # Check to see all unique
-                unique_IDs = obs_objs_IDs.unique()
-                assert len(unique_IDs) == len(obs_objs_IDs)
-                # IGs[mode][fcst_dom_code] = N.zeros([2,len(unique_IDs)])
-                IGs = N.zeros([2,len(unique_IDs)])
-                # pdb.set_trace()
+                    if True:
+                        ootest = mf[
+                            (mf['prod_code'] == prod_code) &
+                            (mf['conv_mode'] == mode) &
+                            (mf['case_code'] == casestr) &
+                            (mf['time'] == datetime.datetime(2017,5,3,2,30,0)) &
+                            (mf['member'] == "obs")
+                            ]
 
-                for noidx, obs_ID in enumerate(unique_IDs):
-                    match_bools = N.zeros([len(mns)],dtype=bool)
-                    for nm, member in enumerate(mns):
-                        matches = MATCH[fcst_dom_code][member][casestr][
-                        initstr][mode]['matches']
-                        # for fcst_ID, v in matches.items():
-                        for o, v in matches.items():
-                            if v is None:
-                                # No match
-                                # JRL - IMPORTANT:
-                                # Note that matching the "wrong" mode will give False
-                                # should consider redoing with above/below MDI = 0.0
-                                # which is a bit of fuzzy logic.
-                                # Will be OK will cell/line split as it was done
-                                # to both obs/fcst fields so we hope error is random
-                                # match_bools[nm] = False
-                                pass
-                            elif o == obs_ID:
-                                # This is the object we're checking for
-                                # else, there's a match!
-                                match_bools[nm] = True
-                                continue
 
-                                # If there's no match at all, maybe there are no objects?
-                                assert isinstance(match_bools[nm],N.bool_)
+                    #if hour != "first_hour":
+                    #    pdb.set_trace()
+                    # Check to see all unique
+                    unique_IDs = obs_objs_IDs.unique()
+                    assert len(unique_IDs) == len(obs_objs_IDs)
+                    # IGs[mode][fcst_dom_code] = N.zeros([2,len(unique_IDs)])
+                    IGs = N.zeros([2,len(unique_IDs)])
+                    # pdb.set_trace()
 
-                    fcst_prob = N.sum(match_bools.astype(int))/len(mns)
-                    fcst_prob = constrain(fcst_prob,minmax=constrain_minmax)
-                    # For all observed objects for a domain in a given init (/20):
-                    # What is the % of a match?
+                    for noidx, obs_ID in enumerate(unique_IDs):
+                        #if obs_ID == 1133:
+                        #    pdb.set_trace()
+                        match_bools = N.zeros([len(mns)],dtype=bool)
+                        for nm, member in enumerate(mns):
+                            matches = MATCH[fcst_dom_code][member][casestr][
+                            initstr][mode]['matches']
+                            # for fcst_ID, v in matches.items():
+                            for o, v in matches.items():
+                                if v is None:
+                                    # No match
+                                    # JRL - IMPORTANT:
+                                    # Note that matching the "wrong" mode will give False
+                                    # should consider redoing with above/below MDI = 0.0
+                                    # which is a bit of fuzzy logic.
+                                    # Will be OK will cell/line split as it was done
+                                    # to both obs/fcst fields so we hope error is random
+                                    # match_bools[nm] = False
+                                    pass
+                                elif o == obs_ID:
+                                    # This is the object we're checking for
+                                    # else, there's a match!
+                                    match_bools[nm] = True
+                                    continue
 
-                    # naive_ign = -N.log2(naive_prob)
-                    # fcst_ign = -N.log2(fcst_prob)
-                    # info_gain = fcst_ign - naive_ign
-                    info_gain = N.log2(fcst_prob/naive_prob)
-                    assert not N.isnan(info_gain)
+                                    # If there's no match at all, maybe there are no objects?
+                                    assert isinstance(match_bools[nm],N.bool_)
 
-                    # IGs[mode][fcst_dom_code][0,noidx] = obs_ID
-                    # IGs[mode][fcst_dom_code][1,noidx] = info_gain
-                    IGs[0,noidx] = int(obs_ID)
-                    IGs[1,noidx] = info_gain
+                        fcst_prob = N.sum(match_bools.astype(int))/len(mns)
+                        fcst_prob = constrain(fcst_prob,minmax=constrain_minmax)
+                        # For all observed objects for a domain in a given init (/20):
+                        # What is the % of a match?
 
-                    the_obj = mf[mf['megaframe_idx'] == obs_ID]
-                    assert len(the_obj) == 1
-                    obj_utc = the_obj.time.values[0]
+                        # naive_ign = -N.log2(naive_prob)
+                        # fcst_ign = -N.log2(fcst_prob)
+                        # info_gain = fcst_ign - naive_ign
+                        info_gain = N.log2(fcst_prob/naive_prob)
+                        if (obs_ID == 582):
+                            print(fcst_dom_code,info_gain)
+                            # pdb.set_trace()
+                        assert not N.isnan(info_gain)
 
-                    all_IGs[mode][fcst_dom_code] = N.concatenate(
-                        [all_IGs[mode][fcst_dom_code],IGs],
-                        axis=1,)
+                        # Here, IGs is every object's info gain
 
-                    # determine which time window this is in
-                    compare_utc = initutc + datetime.timedelta(
-                                    seconds=int(halfhour)*60)
-                    obj_utc = utils.dither_one_value(obj_utc)
-                    dt = (compare_utc-obj_utc).total_seconds()
-                    idx = N.searchsorted(halfhours,dt)
+                        # IGs[mode][fcst_dom_code][0,noidx] = obs_ID
+                        # IGs[mode][fcst_dom_code][1,noidx] = info_gain
+                        IGs[0,noidx] = int(obs_ID)
+                        IGs[1,noidx] = info_gain
 
-                    pdb.set_trace()
-                    # 0 is 30 min or earlier.
-                    # Then work from there.
+                        # Now to append this into the big list
+                        the_obj = mf[mf['megaframe_idx'] == obs_ID]
+                        assert len(the_obj) == 1
+
+                        #if the_obj.leadtime_group.values[0] != "first_hour":
+                        #    pdb.set_trace()
+                        # pdb.set_trace()
+
+                        all_IGs[mode][fcst_dom_code] = N.concatenate(
+                            [all_IGs[mode][fcst_dom_code],IGs],
+                            axis=1,)
+
+
+                        # Now, let's put it into the right hour
+                        #if True:
+                        #    hour = the_obj.leadtime_group.values[0]
+                        if True:
+                            obj_utc = the_obj.time.values[0]
+                            # determine which time window this is in
+                            compare_utc = initutc + datetime.timedelta(
+                                            # seconds=int(halfhour)*60)
+                                            seconds=int(tperiods.index(hour))*60)
+
+                            obj_utc = utils.dither_one_value(obj_utc)
+                            dt = (compare_utc-obj_utc).total_seconds()
+                            tt = int(abs(dt)/60)
+                            halfhours = [0,60,120]
+                            idx = N.searchsorted(halfhours,tt) - 1
+                            # pdb.set_trace()
+
+                        #if hour != "first_hour":
+                        #    pdb.set_trace()
+                        #pdb.set_trace()
+                        # IGs_by_time[mode][fcst_dom_code][hour].append(IGs[1,:])
+                        # IGs_by_time[mode][fcst_dom_code][hour] =
+                        hh = tperiods[idx]
+                        IGs_by_time[mode][fcst_dom_code][hh].append(info_gain)
+                        # pdb.set_trace()
+                        # 0 is 30 min or earlier.
+                        # Then work from there.
 
         # 1/4 done
+        assert 1==0
         worst_score = N.log2(constrain_minmax[0]/naive_prob)
         best_score = N.log2(constrain_minmax[1]/naive_prob)
         print(f"Worst IG score is {worst_score:.2f} bits")
 
         # mode = 'cellular'
-        mode = 'linear'
+        # mode = 'linear'
+        mode = modes[0]
 
         naive = int(naive_prob*100)
         figsize = (6,4)
@@ -4404,35 +4597,47 @@ if do_object_infogain:
         EE3_IGs = all_IGs[mode]["d01_3km"][1,:].flatten()
         EE1_IGs = all_IGs[mode]["d02_1km"][1,:].flatten()
 
-        # pdb.set_trace()
         # fig,ax = plt.subplots(1)
-        plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
-        fig.savefig(fpath)
+        # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+        #fig.savefig(fpath)
+        #pdb.set_trace()
 
-        for nh, tperiod in enumerate(tperiods):
+        for nh in range(3):
+            # hours = ("first_hour","second_hour","third_hour")
+            hour = tperiods[nh]
             fig,ax = plt.subplots(1,figsize=figsize)
             fname = f"obj_infogain_distrs_{mode}_{hour}_{naive}pc.png"
             fpath = os.path.join(outroot,"info_gain",fname)
 
-            EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
-            EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
+            #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
+            #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
 
-            plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+            #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
+            #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
 
+            #aa = N.array(IGs_by_time[mode]["d01_3km"][hour])
+            #pdb.set_trace()
+
+            # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+            plot(ax,N.array(IGs_by_time[mode]["d01_3km"][hour]),
+                    N.array(IGs_by_time[mode]["d02_1km"][hour]),
+                    fpath,(worst_score,best_score),
+                    )
             # Put the mean/median into array for bar chart
-            means[0,nh] = N.nanmean(EE3_IG)
-            means[1,nh] = N.nanmean(EE1_IG)
+            means[0,nh] = N.nanmean(EE3_IGs)
+            means[1,nh] = N.nanmean(EE1_IGs)
 
-            medians[0,nh] = N.nanmedian(EE3_IG)
-            medians[1,nh] = N.nanmedian(EE1_IG)
+            medians[0,nh] = N.nanmedian(EE3_IGs)
+            medians[1,nh] = N.nanmedian(EE1_IGs)
 
             # Note we use three bins for times, which isn't great, but
             # sample size probably too small for e.g. 30 min bins, also
             # not fair that 180 min of forecasts can match with 220 min of obs?
-        fig.savefig(fpath)
+            # fig.savefig(fpath)
         return
 
-    naive_probs = N.arange(0.1,1.0,0.1)
+    # naive_probs = N.arange(0.1,1.0,0.1)
+    naive_probs = (0.2,)
     # arrays for means for each [dx,tperiod,]
 
     means = utils.generate_shared_arr([2,6,len(naive_probs)],dtype=float)
@@ -4448,7 +4653,7 @@ if do_object_infogain:
     fpath_means = "./OSIG_means.npy"
     fpath_medians = './OSIG_medians.npy'
 
-    loaded = False
+    # loaded = False
     gg = n_p_gen(naive_probs,means,medians)
 
     if os.path.exists(fpath_means) and os.path.exists(fpath_medians):
@@ -4706,14 +4911,526 @@ if do_qlcs_verif:
     all_fmts = list(fcst_fmts) + list(obs_fmts)
     megaframe = load_megaframe(fmts=all_fmts)
 
-    obsframe = megaframe[(megaframe['member'] == 'obs') &
+    if False:
+        obsframe = megaframe[(megaframe['member'] == 'obs') &
+                            (megaframe['qlcsness'] > 0.5) &
+                            (megaframe['eccentricity'] > 0.85)
+                            ]
+
+        fcstframe = megaframe[(megaframe['member'] != 'obs') &
+                            (megaframe['qlcsness'] > 0.5) &
+                            (megaframe['eccentricity'] > 0.85)
+                            ]
+
+    linear_frame = megaframe[
                         (megaframe['qlcsness'] > 0.5) &
                         (megaframe['eccentricity'] > 0.85)
                         ]
 
-    fcstframe = megaframe[(megaframe['member'] != 'obs') &
-                        (megaframe['qlcsness'] > 0.5) &
-                        (megaframe['eccentricity'] > 0.85)
-                        ]
+    # pdb.set_trace()
 
-    pdb.set_trace()
+
+    # Match these groups, iterating over ensemble members?
+
+    mns = get_member_names(18)
+    MATCH, mf = get_MATCH(mns, return_megaframe=True, modes=('linear',),
+                            custom_megaframe=linear_frame)
+
+    pickle_fname = "linear_match.pickle"
+    pickle_fpath = os.path.join(objectroot,pickle_fname)
+
+    mf_fname = "linear_mf.pickle"
+    mf_fpath = os.path.join(objectroot,mf_fname)
+
+    if not os.path.exists(pickle_fpath):
+        utils.save_pickle(obj=MATCH,fpath=pickle_fpath)
+    if not os.path.exists(mf_fpath):
+        utils.save_pickle(obj=mf,fpath=mf_fpath)
+
+    modes = ("linear",)
+
+if do_spurious_example:
+    # Get fcst/obs data
+    fcst_data_3, fcst_lats_3, fcst_lons_3 = load_fcst_dll(
+            "REFL_comp","d01_3km",
+            datetime.datetime(2016,3,31,19,30,0),
+            datetime.datetime(2016,3,31,0,0,0),
+            datetime.datetime(2016,3,31,19,0,0),
+            "m01")
+
+    fcst_data_1, fcst_lats_1, fcst_lons_1 = load_fcst_dll(
+            "REFL_comp","d02_1km",
+            datetime.datetime(2016,3,31,19,30,0),
+            datetime.datetime(2016,3,31,0,0,0),
+            datetime.datetime(2016,3,31,19,0,0),
+            "m01")
+
+    obs_data, obs_lats, obs_lons = load_obs_dll(
+        datetime.datetime(2016,3,31,19,30,0),
+        datetime.datetime(2016,3,31,0,0,0),
+        fcst_vrbl = "REFL_comp",
+        fcst_fmt = "d02_1km",)
+
+    """
+    validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
+                    fcst_fmt=None,return_ll=True):
+
+    fcst_data_3, _obs_data = load_both_data("REFL_comp","3km",
+                            datetime.datetime(2016,3,31,19,30,0),
+                            datetime.datetime(2016,3,31,0,0,0),
+                            datetime.datetime(2016,3,31,19,0,0),
+                            "m01")
+
+    fcst_data_1, obs_data = load_both_data("REFL_comp","1km",
+                            datetime.datetime(2016,3,31,19,30,0),
+                            datetime.datetime(2016,3,31,0,0,0),
+                            datetime.datetime(2016,3,31,19,0,0),
+                            "m01")
+    """
+    fig,axes = plt.subplots(ncols=3,figsize=(15,8))
+
+    # OBS
+    ax = axes.flat[0]
+    m0 = create_bmap(obs_lats.max(),obs_lons.max(),
+                    obs_lats.min(),obs_lons.min(),ax=ax,
+                    proj='merc')
+    x,y = m0(obs_lons,obs_lats)
+    m0.drawstates(color='grey')
+    m0.drawcountries(color='grey')
+    S = Scales('cref')
+    # m2.contourf(x,y,EE3_data,cmap=S.cm,levels=S.clvs,alpha=0.8)
+    pcm = m0.pcolormesh(x,y,obs_data,cmap=S.cm,vmin=S.clvs[0],
+                        vmax=S.clvs[-1],alpha=0.5,
+                        antialiased=True,)
+    pcm.cmap.set_under('white')
+
+    # EE3
+    ax = axes.flat[1]
+    m1 = create_bmap(fcst_lats_3.max(),fcst_lons_3.max(),
+                    fcst_lats_3.min(),fcst_lons_3.min(),ax=ax,
+                    proj='merc')
+    x,y = m1(fcst_lons_3,fcst_lats_3)
+    m1.drawstates(color='grey')
+    m1.drawcountries(color='grey')
+    S = Scales('cref')
+    # m2.contourf(x,y,EE3_data,cmap=S.cm,levels=S.clvs,alpha=0.8)
+    pcm = m1.pcolormesh(x,y,fcst_data_3,cmap=S.cm,vmin=S.clvs[0],
+                        vmax=S.clvs[-1],alpha=0.5,
+                        antialiased=True,)
+    pcm.cmap.set_under('white')
+
+    # EE1
+    ax = axes.flat[2]
+    m2 = create_bmap(fcst_lats_1.max(),fcst_lons_1.max(),
+                    fcst_lats_1.min(),fcst_lons_1.min(),ax=ax,
+                    proj='merc')
+    x,y = m2(fcst_lons_1,fcst_lats_1)
+    m2.drawstates(color='grey')
+    m2.drawcountries(color='grey')
+    S = Scales('cref')
+    # m2.contourf(x,y,EE3_data,cmap=S.cm,levels=S.clvs,alpha=0.8)
+    pcm = m2.pcolormesh(x,y,fcst_data_1,cmap=S.cm,vmin=S.clvs[0],
+                        vmax=S.clvs[-1],alpha=0.5,
+                        antialiased=True,)
+    pcm.cmap.set_under('white')
+
+    fig.tight_layout()
+    fig.savefig("./spurious_compare.png")
+
+if do_oID_example:
+    data_folder = "/Volumes/LaCie/VSE_dx/object_instances/20160331"
+    data_fname = "objects_REFL_comp_d02_1km_20160331_1900_1930_m01.pickle"
+    # data_fname = "objects_REFL_comp_d01_3km_20160331_1900_1930_m01.pickle"
+    data_fpath = os.path.join(data_folder,data_fname)
+
+    obj = utils.load_pickle(data_fpath)
+    # pdb.set_trace()
+
+    def do_label_pca(bmap,ax,discrim_vals=(-0.5,0.5)):
+        locs = dict()
+        obj_discrim = N.zeros_like(obj.OKidxarray)
+        for o in obj.objects.itertuples():
+            lab = "{:0.2f}".format(o.qlcsness)
+            locs[lab] = (o.centroid_lat,o.centroid_lon)
+            id = int(o.label)
+            if o.qlcsness < discrim_vals[0]:
+                discrim = 1
+            elif o.qlcsness > discrim_vals[1]:
+                discrim = 3
+            else:
+                discrim = 2
+            obj_discrim = N.where(obj.idxarray == id, discrim, obj_discrim)
+            bmap.contour(x,y,obj_discrim,colors=['k',],linewidths=0.5)
+
+        marr = N.ma.masked_where(obj_discrim < 1, obj_discrim)
+        mraw = N.ma.masked_where(obj.raw_data < 1, obj_discrim)
+
+        pcm = bmap.pcolormesh(data=marr,x=x,y=y,alpha=0.5,vmin=1,vmax=3,
+                                cmap=M.cm.get_cmap("magma",3),)
+
+
+    def label_objs(bmap,ax,locs):
+        for k,v in locs.items():
+            xpt, ypt = bmap(v[1],v[0])
+            # bbox_style = {'boxstyle':'square','fc':'white','alpha':0.5}
+            # bmap.plot(xpt,ypt,'ko',)#markersize=3,zorder=100)
+            # ax.text(xpt,ypt,k,ha='left',fontsize=15)
+            ax.annotate(k,xy=(xpt,ypt),xycoords="data",zorder=1000,
+                            fontsize=7,fontweight='bold')
+            # pdb.set_trace()
+        return
+
+
+    fig,axes = plt.subplots(1,3,figsize=(9,4))
+    fcst_lats = obj.lats
+    fcst_lons = obj.lons
+
+    for n,ax in enumerate(axes.flat):
+        # if n!=0:
+        #     continue
+        print("Plotting subplot #",n+1)
+        # bmap = create_bmap(ax=ax)
+        bmap = create_bmap(fcst_lats.max(),fcst_lons.max(),
+                        fcst_lats.min(),fcst_lons.min(),ax=ax,
+                        proj='merc')
+        x,y = bmap(fcst_lons,fcst_lats)
+        S = Scales(vrbl='REFL_comp')
+
+        if n == 0:
+            pcm = bmap.pcolormesh(x,y,obj.raw_data,cmap=S.cm,vmin=S.clvs[0],
+                                vmax=S.clvs[-1],alpha=0.5,
+                                antialiased=True,)
+            pcm.cmap.set_under('white')
+            ax.set_title("Raw data")
+
+        elif n == 1:
+            locs = dict()
+            for o in obj.objects.itertuples():
+                locs[str(int(o.label))] = (o.weighted_centroid_lat,
+                    o.weighted_centroid_lon)
+            pcm = bmap.pcolormesh(x,y,obj.object_field,cmap=S.cm,vmin=S.clvs[0],
+                                vmax=S.clvs[-1],alpha=0.5,
+                                antialiased=True,)
+            bmap.contour(x,y,obj.raw_data,levels=[45,],color='k',linewidths=0.5)
+            pcm.cmap.set_under('white')
+
+            # label_objs(bmap,ax,locs)
+            ax.set_title("Intensity array")
+
+
+        elif n==2:
+            do_label_pca(bmap,ax)
+
+            mode_names = ["","Cellular","Ambiguous","Linear/Complex"]
+            def format_func(x,y):
+                return mode_names[x]
+
+            # This function formatter will replace integers with target names
+            formatter = plt.FuncFormatter(lambda val, loc: mode_names[val])
+
+            # We must be sure to specify the ticks matching our target names
+            cax = fig.add_axes([0.75, 0.1, 0.2, 0.04])
+            #cax.set_xlim(0.5, 3.5)
+            fig.colorbar(pcm,cax=cax,ticks=(1,2,3), format=formatter,
+                            orientation='horizontal')
+
+            # Set the clim so that labels are centered on each block
+
+            # label_objs(bmap,ax,locs)
+            #plt.colorbar(pcm,cax=cax)
+            ax.set_title("MDI value")
+        bmap.drawstates(color='grey')
+        bmap.drawcountries(color='grey')
+
+
+    out_fname = "obj_ex.png"
+    out_fpath = os.path.join(outroot,out_fname)
+    utils.trycreate(out_fpath)
+    fig.tight_layout()
+    fig.savefig(out_fpath)
+    print("Saved figure to",out_fpath)
+    plt.close(fig)
+
+
+if do_ign_storm:
+    # Show verif
+    # Plot 3km raw and objects by ignorance
+    # Same for 1 km objects
+
+    # Obs obj centroid location
+    # -88.24355617959804
+    # 33.48270273742653
+    # 1133
+
+    # latlon = (33.46,-88.28)
+    # latlon = (41.6,-78.72)
+    # latlon = (33.79,-84.24)
+    latlon = (36.6,-101.0)
+    # latpt, lonpt = latlon
+
+    # latmax, latmin, lonmax, lonmin = (34.5,33.0,-87.5,-89.5)
+    pad = 0.8
+    latmax = latlon[0] + pad
+    latmin = latlon[0] - pad
+    lonmax = latlon[1] + pad
+    lonmin = latlon[1] - pad
+
+
+    vrbl = "UH25"
+
+    latlon = (0,0)
+
+    # Western OK/TX cell: obs_1km: 1430, (36.384018,-101.334395)
+    # Western OK/TX cell: obs_3km: 581,
+
+    # d02_1km 1.91
+    # d01_3km 2.02
+
+
+    # Eastern OK/TX cell: obs_1km: 1431, (36.594944,-100.882999)
+    # Eastern OK/TX cell: obs_1km: 582,
+
+    # d02_1km 2.23
+    # d01_3km 1.91
+
+
+
+    mem = 'm01'
+    valid_time = datetime.datetime(2017,5,3,2,30,0)
+    valid = f"{valid_time.hour:02d}{valid_time.minute:02d}"
+
+    init_time =  datetime.datetime(2017,5,3,2,0,0)
+    init = f"{init_time.hour:02d}{init_time.minute:02d}"
+
+    case_date = datetime.datetime(2017,5,2,0,0,0)
+    case = f"{case_date.year:04d}{case_date.month:02d}{case_date.day:02d}"
+
+    def do_plot_obj(bmap,ax,obj,contour_only=False,lw=(1.0,),anno_ign=False):
+        locs = dict()
+        obj_discrim = N.zeros_like(obj.OKidxarray)
+        for o in obj.objects.itertuples():
+            lab = "{:0.2f}".format(o.qlcsness)
+            locs[lab] = (o.centroid_lat,o.centroid_lon)
+            id = int(o.label)
+            discrim = 1
+            obj_discrim = N.where(obj.idxarray == id, discrim, obj_discrim)
+            bmap.contour(x,y,obj_discrim,colors=['k',],levels=[0,1],linewidths=lw)
+
+            #if anno_ign:
+            #    pdb.set_trace()
+
+        if not contour_only:
+            marr = N.ma.masked_where(obj_discrim < 1, obj_discrim)
+            mraw = N.ma.masked_where(obj.raw_data < 1, obj_discrim)
+
+            pcm = bmap.pcolormesh(data=marr,x=x,y=y,alpha=0.5,vmin=1,vmax=3,
+                                    cmap=M.cm.get_cmap("magma",3),)
+        return
+
+
+    data_folder = f"/Volumes/LaCie/VSE_dx/object_instances/{case}"
+    data_fname_1 = f"objects_REFL_comp_d02_1km_{case}_{init}_{valid}_{mem}.pickle"
+    data_fname_3 = f"objects_REFL_comp_d01_3km_{case}_{init}_{valid}_{mem}.pickle"
+    data_fname_o = f"objects_NEXRAD_nexrad_1km_{case}_{valid}.pickle"
+
+    data_fpath_1 = os.path.join(data_folder,data_fname_1)
+    data_fpath_3 = os.path.join(data_folder,data_fname_3)
+    data_fpath_o = os.path.join(data_folder,data_fname_o)
+
+
+    obj_3 = utils.load_pickle(data_fpath_3)
+    obj_1 = utils.load_pickle(data_fpath_1)
+    obj_o = utils.load_pickle(data_fpath_o)
+
+
+    # Verif - UH
+    uhcm = M.cm.Reds
+    # uh_minmax = (0.001,0.012)
+    #uh_minmax_3 = (0.2,1.5)
+    #uh_minmax_1 = (0.5,4.2)
+    uh_minmax_3 = (0.3,3.2)
+    uh_minmax_1 = (0.8,9.9)
+
+    # aws_minmax = (0.001,0.009)
+    # aws_minmax = (0.007,0.010)
+    aws_minmax = (0.002,0.0044)
+
+
+
+
+
+    # Get fcst/obs data - REFL_comp
+    fcst_data_3, fcst_lats_3, fcst_lons_3 = load_fcst_dll(
+            "REFL_comp","d01_3km",
+            valid_time,case_date,init_time,mem)
+
+    fcst_data_1, fcst_lats_1, fcst_lons_1 = load_fcst_dll(
+            "REFL_comp","d02_1km",
+            valid_time,case_date,init_time,mem)
+
+    obs_data, obs_lats, obs_lons = load_obs_dll(
+        valid_time, case_date,
+        fcst_vrbl = "REFL_comp",
+        fcst_fmt = "d02_1km",)
+
+
+
+    # Get ignorance, maybe objects
+
+    fig, axes = plt.subplots(ncols=3,nrows=2,figsize=(10,8))
+    fname = "ML_AS_ex_cb.png"
+    fpath = os.path.join(outroot,fname)
+    S = Scales('cref')
+
+    # Verif
+    ax = axes.flat[0]
+    m = create_bmap(
+                    #obs_lats.max(),obs_lons.max(),
+                    #obs_lats.min(),obs_lons.min(),
+                    latmax,lonmax,latmin,lonmin,ax=ax,
+                    proj='merc',latlon=latlon)
+    x,y = m(obs_lons,obs_lats)
+    m.drawstates(color='grey')
+    m.drawcountries(color='grey')
+    pcm = m.pcolormesh(x,y,obs_data,cmap=S.cm,vmin=S.clvs[0],
+                        vmax=S.clvs[-1],alpha=0.5,
+                        antialiased=True,)
+    pcm.cmap.set_under('white')
+
+    # EE3km
+    ax = axes.flat[1]
+    m = create_bmap(
+                    # fcst_lats_3.max(),fcst_lons_3.max(),
+                    # fcst_lats_3.min(),fcst_lons_3.min(),ax=ax,
+                    latmax,lonmax,latmin,lonmin,ax=ax,
+                    proj='merc',latlon=latlon)
+    x,y = m(fcst_lons_3,fcst_lats_3)
+    m.drawstates(color='grey')
+    m.drawcountries(color='grey')
+    pcm = m.pcolormesh(x,y,fcst_data_3,cmap=S.cm,vmin=S.clvs[0],
+                        vmax=S.clvs[-1],alpha=0.5,
+                        antialiased=True,)
+    pcm.cmap.set_under('white')
+
+    # EE1km
+    ax = axes.flat[2]
+    m = create_bmap(
+                    # fcst_lats_1.max(),fcst_lons_1.max(),
+                    # fcst_lats_1.min(),fcst_lons_1.min(),ax=ax,
+                    latmax,lonmax,latmin,lonmin,ax=ax,
+                    proj='merc',latlon=latlon)
+    x,y = m(fcst_lons_1,fcst_lats_1)
+    m.drawstates(color='grey')
+    m.drawcountries(color='grey')
+    pcm = m.pcolormesh(x,y,fcst_data_1,cmap=S.cm,vmin=S.clvs[0],
+                        vmax=S.clvs[-1],alpha=0.5,
+                        antialiased=True,)
+    pcm.cmap.set_under('white')
+    plt.colorbar(pcm,ax=ax)
+
+
+
+    # Get fcst/obs data - UH and AWS
+    fcst_data_3, fcst_lats_3, fcst_lons_3 = load_fcst_dll(
+            "UH25","d01_3km",
+            valid_time,case_date,init_time,mem)
+
+    fcst_data_1, fcst_lats_1, fcst_lons_1 = load_fcst_dll(
+            "UH25","d02_1km",
+            valid_time,case_date,init_time,mem)
+
+    obs_data, obs_lats, obs_lons = load_obs_dll(
+        valid_time,case_date,
+        fcst_vrbl = "UH25",
+        fcst_fmt = "d02_1km",)
+
+
+
+    ax = axes.flat[3]
+    m = create_bmap(
+                    # obs_lats.max(),obs_lons.max(),
+                    # obs_lats.min(),obs_lons.min(),ax=ax,
+                    latmax,lonmax,latmin,lonmin,ax=ax,
+                    proj='merc',latlon=latlon)
+    x,y = m(obs_lons,obs_lats)
+    m.drawstates(color='grey')
+    m.drawcountries(color='grey')
+    pcm = m.pcolormesh(x,y,obs_data,cmap=uhcm,
+                        vmin=aws_minmax[0],vmax=aws_minmax[1],
+                        alpha=0.5,antialiased=True,)
+    pcm.cmap.set_under('white')
+    do_plot_obj(m,ax,obj_o,contour_only=True,anno_ign=True)
+    plt.colorbar(pcm,ax=ax)
+
+
+    # EE3km
+    ax = axes.flat[4]
+    m = create_bmap(
+                    # fcst_lats_3.max(),fcst_lons_3.max(),
+                    # fcst_lats_3.min(),fcst_lons_3.min(),ax=ax,
+                    latmax,lonmax,latmin,lonmin,ax=ax,
+                    proj='merc',latlon=latlon)
+    x,y = m(fcst_lons_3,fcst_lats_3)
+    m.drawstates(color='grey')
+    m.drawcountries(color='grey')
+    pcm = m.pcolormesh(x,y,fcst_data_3,cmap=uhcm,
+                        vmin=uh_minmax_3[0],vmax=uh_minmax_3[1],
+                        alpha=0.5,antialiased=True,)
+    pcm.cmap.set_under('white')
+    do_plot_obj(m,ax,obj_3,contour_only=True,lw=0.13,)#anno_ign=True)
+
+
+    # EE1km
+    ax = axes.flat[5]
+    m = create_bmap(
+                    # fcst_lats_1.max(),fcst_lons_1.max(),
+                    # fcst_lats_1.min(),fcst_lons_1.min(),ax=ax,
+                    latmax,lonmax,latmin,lonmin,ax=ax,
+                    proj='merc',latlon=latlon)
+    x,y = m(fcst_lons_1,fcst_lats_1)
+    m.drawstates(color='grey')
+    m.drawcountries(color='grey')
+    pcm = m.pcolormesh(x,y,fcst_data_1,cmap=uhcm,
+                        vmin=uh_minmax_1[0],vmax=uh_minmax_1[1],
+                        alpha=0.5,antialiased=True,)
+    pcm.cmap.set_under('white')
+    do_plot_obj(m,ax,obj_1,contour_only=True)
+
+    if False:
+
+        ax = axes.flat[6]
+        m = create_bmap(
+                        #obs_lats.max(),obs_lons.max(),
+                        #obs_lats.min(),obs_lons.min(),ax=ax,
+                        latmax,lonmax,latmin,lonmin,ax=ax,
+                        proj='merc',latlon=latlon)
+        x,y = m(obs_lons,obs_lats)
+        m.drawstates(color='grey')
+        m.drawcountries(color='grey')
+        do_plot_obj(m,ax,obj_o)
+
+        ax = axes.flat[7]
+        m = create_bmap(
+                        #fcst_lats_3.max(),fcst_lons_3.max(),
+                        #fcst_lats_3.min(),fcst_lons_3.min(),ax=ax,
+                        latmax,lonmax,latmin,lonmin,ax=ax,
+                        proj='merc',latlon=latlon)
+        x,y = m(fcst_lons_3,fcst_lats_3)
+        m.drawstates(color='grey')
+        m.drawcountries(color='grey')
+        do_plot_obj(m,ax,obj_3)
+
+        ax = axes.flat[8]
+        m = create_bmap(
+                        # fcst_lats_1.max(),fcst_lons_1.max(),
+                        # fcst_lats_1.min(),fcst_lons_1.min(),ax=ax,
+                        latmax,lonmax,latmin,lonmin,ax=ax,
+                        proj='merc',latlon=latlon)
+        x,y = m(fcst_lons_1,fcst_lats_1)
+        m.drawstates(color='grey')
+        m.drawcountries(color='grey')
+        do_plot_obj(m,ax,obj_1)
+
+
+    # fig.tight_layout()
+    fig.savefig(fpath)
