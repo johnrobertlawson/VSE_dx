@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 # extractroot = '/Users/john.lawson/data/AprilFool'
 extractroot = '/work/john.lawson/VSE_reso/pp/AprilFool'
 # outdir = '/Users/john.lawson/VSE_dx/pyoutput'
-outdir = '/home/john.lawson/VSE_dx/pycode'
+outdir = '/home/john.lawson/VSE_dx/pyoutput'
 
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
@@ -47,12 +47,12 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                         datetime.datetime(2017,5,5,2,0,0),
                         ]
 
-debug_cases = 'four'
+debug_cases = None
 if debug_cases == 'one':
     CASES = collections.OrderedDict()
     CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                             datetime.datetime(2016,3,31,22,0,0),]
-else:
+elif debug_cases == 'four':
     CASES = collections.OrderedDict()
     CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                             datetime.datetime(2016,3,31,21,0,0),
@@ -66,6 +66,8 @@ else:
     CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                             datetime.datetime(2017,5,5,0,0,0),
                             ]
+else:
+    pass
 
 
 def get_extraction_fpaths(vrbl,fmt,validutc,caseutc,initutc=None,mem=None):
@@ -143,8 +145,8 @@ BIG_DATAS = dict()
 domains = ("d01_3km","d02_1km","NEXRAD_nexrad_3km","NEXRAD_nexrad_1km")
 fcst_domains = ("d01_3km","d02_1km")
 obs_domains = ("NEXRAD_nexrad_3km","NEXRAD_nexrad_1km")
-nmems = 2
-member_names = ['m{:02d}'.format(n) for n in range(1,nmems)]
+nmems = 18
+member_names = ['m{:02d}'.format(n) for n in range(1,nmems+1)]
 
 for domain in domains:
     BIG_DATAS[domain] = None
@@ -200,7 +202,7 @@ fpath = os.path.join(outdir,fname)
 for domain in domains:
     label = domain
     c = COLORS[domain]
-    for pc in N.arange(87,97,0.1):
+    for pc in N.arange(90,100,0.1):
         ax.scatter(pc,N.nanpercentile(BIG_DATAS[domain],pc),
             color=c,s=10,marker='*',label=label)
         label = None
