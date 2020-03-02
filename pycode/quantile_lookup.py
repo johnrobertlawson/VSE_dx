@@ -12,10 +12,10 @@ import matplotlib.pyplot as plt
 
 ### paths etc
 # dataroot = '/Users/john.lawson/data/AprilFool'
-# extractroot = '/Users/john.lawson/data/AprilFool'
-extractroot = '/work/john.lawson/VSE_reso/pp/AprilFool'
-# outdir = '/Users/john.lawson/VSE_dx/pyoutput'
-outdir = '/home/john.lawson/VSE_dx/pyoutput'
+extractroot = '/Users/john.lawson/data/AprilFool'
+# extractroot = '/work/john.lawson/VSE_reso/pp/AprilFool'
+outdir = '/Users/john.lawson/VSE_dx/pyoutput'
+#outdir = '/home/john.lawson/VSE_dx/pyoutput'
 
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
@@ -47,7 +47,7 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                         datetime.datetime(2017,5,5,2,0,0),
                         ]
 
-debug_cases = None
+debug_cases = 'four'
 if debug_cases == 'one':
     CASES = collections.OrderedDict()
     CASES[datetime.datetime(2016,3,31,0,0,0)] = [

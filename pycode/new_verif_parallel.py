@@ -46,6 +46,7 @@ from evac.stats.detscores import DetScores
 from evac.plot.performance import Performance
 # from evac.stats.fi import FI
 from fiss import FISS
+# from FISS.fiss import FISS
 from evac.object.objectid import ObjectID
 from evac.object.catalogue import Catalogue
 from evac.plot.scales import Scales
@@ -79,13 +80,13 @@ do_domains = False
 do_percentiles = False
 _do_performance = False # Broken - to delete?
 do_performance = False
-do_efss = False # TODO - average for cref over cases, for paper
+do_efss = True # TODO - average for cref over cases, for paper
 # From scratch, do object_switch, do_object_pca, then
 # delete the object dfs (in subdirs too), and
 # and re-run object_switch to do the MDI of each cell
-object_switch = True
+object_switch = False
 do_object_pca = False
-do_object_performance = False # TODO re-do with new (18) matching and diff vectors?
+do_object_performance = False # TODO re-do with new (18) matching/diff vectors?
 do_object_distr = False # TODO re-plot after matching new (18) matches
 do_object_matching = False # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO leave till later...
@@ -96,7 +97,7 @@ do_one_objectID = False
 do_qlcs_verif = False
 do_spurious_example = False
 do_oID_example = False
-do_ign_storm = True
+do_ign_storm = False
 
 # MAYBE DELETE
 do_object_examples = False # TODO maybe delete, or do by hand
@@ -142,18 +143,28 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 ### DIRECTORIES ###
 # extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
 key_pp = 'AprilFool'
+key_output = "FebPC"
+
+# R1 - 96pc w/ 144 footprint
+# R2 - 96pc w/ 120 footprint
+# R3 - 94.5 pc w/ 120 footprint
+# FebPC - 96pc w/ 144 footprint - let's go!
+
 #extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
+lacie_root = '/Volumes/LaCie/VSE_dx'
 
-objectroot = os.path.join(extractroot,'object_instances_PC')
+# objectroot = os.path.join(extractroot,'object_instances_PC')
+objectroot = os.path.join(lacie_root,'object_instances_PC')
+
 # objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
 # outroot = "/mnt/jlawson/VSE_dx/figures/"
-outroot = "/Users/john.lawson/data/figures"
+outroot = "/Users/john.lawson/data/figures_{}".format(key_output)
 #tempdir = "/Users/john.lawson/data/intermediate_files"
-tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files"
+tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files_PC"
 narrroot = '/Users/john.lawson/data/AprilFool/NARR'
 
 
@@ -186,7 +197,7 @@ NICENAMES = {"d01_3km":"EE3km",
                     "d02_3km":"EE1km-i",}
 
 #### FOR DEBUGGING ####
-#CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,22,0,0),], }
+# CASES = { datetime.datetime(2016,3,31,0,0,0):[datetime.datetime(2016,3,31,19,0,0),], }
 
 # fcst_vrbls = ("REFL_comp",)
 # fcst_vrbls = ("Wmax",)
@@ -768,7 +779,18 @@ def get_all_initutcs():
 
 
 
-def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
+def get_kw(prodfmt,utc,threshold,mem=None,initutc=None,fpath=None,
+                footprint=144):
+    if threshold == 'auto':
+        if '3km' in prodfmt:
+            # Using 96pc
+            threshold = 44.3
+            # threshold = 41.5
+        elif '1km' in prodfmt:
+            threshold = 45.7
+            # threshold = 43.0
+        else:
+            raise Exception
     pca_fname = "pca_model_{}.pickle".format(prodfmt)
     pca_fpath = os.path.join(objectroot,pca_fname)
     # print("Determining kw arguments for Object ID...")
@@ -799,6 +821,9 @@ def get_kw(prodfmt,utc,mem=None,initutc=None,fpath=None):
     kw['time_code'] = utc
     kw['lead_time'] = fcstmin
     kw['fpath_save'] = fpath
+    kw['threshold'] = threshold
+    kw['footprint'] = footprint
+
 
     # print(fcstmin)
     return kw
@@ -940,8 +965,9 @@ def load_uh_df(lookup,CAT,layer,fmt):
         print("UH metadata DataFrame loaded from",fpath)
     return uh_df
 
-def concat_two_dfs(df_o,df_w):
-    new_df = df_o.join(df_w)
+def concat_two_dfs(df_o,df_w,lsuffix=None):
+    kw = {'lsuffix':lsuffix}
+    new_df = df_o.join(df_w,**kw)
     return new_df
 
 def load_W_df(W_lookup,CAT,fmt):
@@ -1049,12 +1075,12 @@ def create_lookup(fcst_fmts,vrbl):
     # pdb.set_trace()
     return df_lookup
 
-def add_hax_to_df(df_og,fmt):
+def add_hax_to_df(df_og,fmt,pca=None):
     def gen(df):
         for o in df.itertuples():
             yield o
 
-    def compute_df_hax(o):
+    def compute_df_hax(o,pca=True):
         DTYPES = {
                     "miniframe_idx":"object",
                     #"resolution":"object",
@@ -1077,10 +1103,41 @@ def add_hax_to_df(df_og,fmt):
         res = "EE1km" if (int(o.nlats) > 200) else "EE3km"
         df.loc[idx,"resolution"] = res
 
+        # Member, domain
+        dom, dxkm, mem = o.prod_code.split("_")
+        df.loc[idx,"member"] = mem
+        df.loc[idx,"domain"] = dom
+
+        # Compute QLCS-ness (MDI)
+        pca_fmt = f"{dom}_{dxkm}"
+        #if pca is not None:
+        pca_fname = "pca_model_{}.pickle".format(pca_fmt)
+        pca_fpath = os.path.join(objectroot,pca_fname)
+        P = utils.load_pickle(fpath=pca_fpath)
+
+        # series = df.loc[0,P['features']]
+        # qlcsness = P['pca'].transform(P['scaler'].transform(series))[0][0]
+        x = N.zeros([1,len(P['features'])])
+        #for ns,s in enumerate(P['features']):
+        #    x[ns] = o.s
+
+        # Hard coded because I don't understand Pandas
+        x[0,0] = o.area
+        x[0,1] = o.eccentricity
+        x[0,2] = o.extent
+        x[0,3] = o.max_intensity
+        x[0,4] = o.mean_intensity
+        x[0,5] = o.perimeter
+        x[0,6] = o.longaxis_km
+
+        qlcsness = P['pca'].transform(P['scaler'].transform(x))[0][0]
+        df.loc[idx,'qlcsness'] = qlcsness
+
         # Mode
-        if o.qlcsness < -0.5:
+        # pdb.set_trace()
+        if qlcsness < -0.5:
             conv_mode = "cellular"
-        elif o.qlcsness > 0.5:
+        elif qlcsness > 0.5:
             conv_mode = "linear"
         else:
             conv_mode = "ambiguous"
@@ -1099,11 +1156,6 @@ def add_hax_to_df(df_og,fmt):
         else:
             raise Exception
         df.loc[idx,"case_code"] = case_code
-
-        # Member, domain
-        dom, dxkm, mem = o.prod_code.split("_")
-        df.loc[idx,"member"] = mem
-        df.loc[idx,"domain"] = dom
 
         # Lead-time group
         lt = o.lead_time
@@ -1125,6 +1177,7 @@ def add_hax_to_df(df_og,fmt):
             ic = f"{dt.hour:02d}{dt.minute:02d}"
         df.loc[idx,"init_code"] = ic
 
+
         # pdb.set_trace()
         return df
 
@@ -1145,6 +1198,9 @@ def add_hax_to_df(df_og,fmt):
         #    count += 1
         #    print(f"Parallelising for chunk #{count}.")
         #    df_subset = df_og.iloc[start:start + chunk_size]
+
+
+
         gg = gen(df_og)
         #    gg = gen(df_subset)
             # cs = math.ceil(chunk_size/ncpus)
@@ -1186,7 +1242,11 @@ def add_hax_to_df(df_og,fmt):
 
     # Set index for df_hax
     # pdb.set_trace()
-    df_og = concat_two_dfs(df_og,df_hax)
+    # This should merge new attributes but overwrite old ones
+    df_og = concat_two_dfs(df_og,df_hax,lsuffix='_left')
+    # df_og.update(df_hax)
+    # df_og.combine_first(df_hax)
+    # pdb.set_trace()
     print("Megaframe hacked: resolution added")
     return df_og
 
@@ -1219,7 +1279,8 @@ def shuffled_copy(seq):
     l = list(seq)
     return random.sample(l,len(l))
 
-def get_MATCH(mns,return_megaframe=False,modes=('cellular',),custom_megaframe=None):
+def get_MATCH(mns,return_megaframe=False,modes=('cellular',),
+            custom_megaframe=None):
     if custom_megaframe is not None:
         megaframe = custom_megaframe
     else:
@@ -1228,6 +1289,7 @@ def get_MATCH(mns,return_megaframe=False,modes=('cellular',),custom_megaframe=No
         obs_fmts = ("nexrad_3km","nexrad_1km")
         all_fmts = list(fcst_fmts) + list(obs_fmts)
         megaframe = load_megaframe(fmts=all_fmts)
+        # pdb.set_trace()
     CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
 
     # pdb.set_trace()
@@ -1250,7 +1312,8 @@ def get_MATCH(mns,return_megaframe=False,modes=('cellular',),custom_megaframe=No
                 if casestr not in MATCH[dom_code][member].keys():
                     MATCH[dom_code][member][casestr] = {}
                 if initstr not in MATCH[dom_code][member][casestr].keys():
-                    MATCH[dom_code][member][casestr][initstr] = {m:{} for m in modes}
+                    MATCH[dom_code][member][casestr][initstr] = {
+                            m:{} for m in modes}
                 fname = f"{dom}_{member}-verif_{casestr}_{initstr}.pickle"
                 fpath = os.path.join(objectroot,"verif_match_tuples",
                                         mode,casestr,initstr,fname)
@@ -1259,7 +1322,7 @@ def get_MATCH(mns,return_megaframe=False,modes=('cellular',),custom_megaframe=No
                 fpath3 = os.path.join(objectroot,"verif_match_sorted",
                                         mode,casestr,initstr,fname)
                 if (not os.path.exists(fpath)) or (not os.path.exists(fpath2)):
-                    pdb.set_trace()
+                    # pdb.set_trace()
 
                     fcst_prod_code = '_'.join((dom_code,member))
                     dictA = {"prod_code":fcst_prod_code,#"member":member,
@@ -1311,7 +1374,8 @@ def get_MATCH(mns,return_megaframe=False,modes=('cellular',),custom_megaframe=No
 
 def get_dom_match(mns,return_megaframe=False,modes=None):
     if modes is None:
-        modes = ('linear',)#'cellular')
+        # modes = ('linear',)
+        modes = ('cellular',)
     # Load one big df with all objects
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
@@ -1350,6 +1414,7 @@ def get_dom_match(mns,return_megaframe=False,modes=None):
                                 "domain":"d02"}
                     print("About to parallelise dom-matching for:\n",
                                 stars,casestr,initstr,member,stars)
+                    # pdb.set_trace()
                     matches, _2x2, sorted_pairs = CAT.match_two_groups(
                                         dictA,dictB,do_contingency=True,td_max=21.0)
                     print("=== RESULTS FOR",member,casestr,
@@ -2043,7 +2108,8 @@ if _do_performance:
                     lstr = get_nice(fmt)
                     print("Plotting",fmt,"to",fpath1)
                     # pdb.set_trace()
-                    PD1.plot_data(pod=N.mean(POD[casestr]),far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
+                    PD1.plot_data(pod=N.mean(POD[casestr]),
+                            far=N.mean(FAR[casestr]),plotkwargs=pk,label=lstr)
 
                     #if (fcstmin in (60,120,180)) and (vrbl == "REFL_comp") and (thresh==30):
                     if (fcstmin in (30,90,150)) and (vrbl == "REFL_comp") and (thresh==30):
@@ -2361,11 +2427,12 @@ if do_efss:
         threshs_obs = PC_Thresh.get_threshs(obs_vrbl,fmt)
         fcst_data, obs_data = load_timewindow_both_data(vrbl=fcst_vrbl,
                         fmt=fcst_fmt,validutc=validutc,caseutc=caseutc,
-                        initutc=initutc,mem='first_half',window=temporal_window)
+                        initutc=initutc,mem='all',window=temporal_window)
         efss = FISS(xfs=fcst_data,xa=obs_data,thresholds_obs=threshs_obs,
                         thresholds_fcst=threshs_fcst,ncpus=ncpus,efss=True,
                         neighborhoods=spatial_windows,
-                        temporal_window=temporal_window,)
+                        temporal_window=temporal_window,
+                        skip_fiss=True)
         # print("Computed contingency scores for",caseutc,initutc,mem,fcst_fmt,validutc)
         return efss.results
 
@@ -2384,7 +2451,7 @@ if do_efss:
                         # "d02_1km":(1,3,9,15,21,27,33,39)}
                         "d02_1km":(1,3,9,15,21,27,)}
 
-    temporal_windows = (1,3,5)
+    temporal_windows = (3,)
     # temporal_windows = (5,)
 
 
@@ -2394,7 +2461,7 @@ if do_efss:
     for fcstmin, temporal_window,caseutc,vrbl in itertools.product(
                 fcstmins,temporal_windows,CASES.keys(),vrbls):
         casestr = utils.string_from_time('dir',caseutc,strlen='day')
-        fssdir = os.path.join(extractroot,"efss_fiss",vrbl)
+        fssdir = os.path.join(tempdir,"efss_fiss",vrbl)
         utils.trycreate(fssdir,isdir=True)
         obs_qts = PC_Thresh.get_quantiles(vrbl)
 
@@ -2616,7 +2683,7 @@ if do_efss:
             # pdb.set_trace()
         pass
     pass
-    pdb.set_trace()
+    # pdb.set_trace()
 
 
 
@@ -2646,20 +2713,18 @@ if object_switch:
         # QUICK LOOKS
         fcstmin = int(((validutc-initutc).seconds)/60)
         if fcstmin in range(30,210,30) and do_quicklooks and (mem == "m01"):
-            ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(fcst_fmt,initutc,fcstmin)
+            ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(
+                        fcst_fmt,initutc,fcstmin)
             outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
             ql_fpath = os.path.join(outdir,ql_fname)
             if (not os.path.exists(ql_fpath)) or overwrite_output:
                 obj.plot_quicklook(outdir=outdir,fname=ql_fname,what=plot_what)
+                print("Figure plotted to",outdir)
             else:
                 print("Figure already created")
                 pass
-
+            # pdb.set_trace()
         return
-
-
-
-
 
     def compute_obj_fcst(i):
         fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem, load = i
@@ -2679,20 +2744,20 @@ if object_switch:
                                     validutc,caseutc,initutc,mem)
 
             kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,
-                        initutc=initutc,fpath=pk_fpath)
-            pdb.set_trace()
+                        initutc=initutc,fpath=pk_fpath,threshold='auto')
+            # pdb.set_trace()
 
             if "3km" in fcst_fmt:
                 dx = 3.0
-                kw['threshold'] = 0
+                # kw['threshold'] = 0
             elif "1km" in fcst_fmt:
                 dx = 1.0
-                kw['threshold'] = 0
+                # kw['threshold'] = 0
             else:
                 assert True == False
 
             kw['dx'] = dx
-            kw['footprint'] = 0
+            # 144 is default
             obj = ObjectID(fcst_data,fcst_lats,fcst_lons,**kw)
             utils.save_pickle(obj=obj,fpath=pk_fpath)
             # print("Object instance newly created.")
@@ -2707,11 +2772,14 @@ if object_switch:
             obj = utils.load_pickle(pk_fpath)
 
             if obj == "ERROR":
+                pdb.set_trace()
                 print("Overwriting",pk_fpath)
-                fcst_data, fcst_lats, fcst_lons = load_fcst_dll(fcst_vrbl,fcst_fmt,
+                fcst_data, fcst_lats, fcst_lons = load_fcst_dll(
+                                        fcst_vrbl,fcst_fmt,
                                         validutc,caseutc,initutc,mem)
 
-                kw = get_kw(prodfmt=fcst_fmt,utc=validutc,mem=mem,initutc=initutc,
+                kw = get_kw(prodfmt=fcst_fmt,utc=validutc,threshold='auto',
+                            mem=mem,initutc=initutc,
                             fpath=pk_fpath)
                 obj = ObjectID(fcst_data,fcst_lats,fcst_lons,dx=dx,**kw)
                 utils.save_pickle(obj=obj,fpath=pk_fpath)
@@ -2720,7 +2788,8 @@ if object_switch:
         fcstmin = int(((validutc-initutc).seconds)/60)
         if fcstmin in range(30,210,30) and do_quicklooks and (mem == "m01"):
         #if ((fcstmin % 30) == 0): # and (mem == "m01"):
-            ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(fcst_fmt,initutc,fcstmin)
+            ql_fname = "obj_{}_{:%Y%m%d%H}_{}min.png".format(
+                    fcst_fmt,initutc,fcstmin)
             outdir = os.path.join(outroot,"object_quicklooks",plot_dir)
             ql_fpath = os.path.join(outdir,ql_fname)
             if (not os.path.exists(ql_fpath)) or overwrite_output:
@@ -2749,7 +2818,9 @@ if object_switch:
 
             obs_data, obs_lats, obs_lons = load_obs_dll(validutc,caseutc,
                                 obs_vrbl=obs_vrbl,obs_fmt=obs_fmt)
-            kw = get_kw(prodfmt=obs_fmt,utc=validutc,fpath=fpath)
+            kw = get_kw(prodfmt=obs_fmt,utc=validutc,
+                            threshold=40.5,fpath=fpath) # 96th pc
+                            # threshold = 38.2, fpath=fpath)
             obj = ObjectID(obs_data,obs_lats,obs_lons,dx=dx,**kw)
             utils.save_pickle(obj=obj,fpath=fpath)
             # print("Object instance newly created.")
@@ -2804,6 +2875,8 @@ if object_switch:
             # Then, load.
             itr_fcst_2 = loop_obj_fcst(fcst_vrbl,fcstmins,
                             fcst_fmt,member_names,load=True)
+                            # fcst_fmt,half_member_names,load=True)
+
             if ncpus > 1:
                 with multiprocessing.Pool(ncpus) as pool:
                     results_fcst = pool.map(compute_obj_fcst,itr_fcst_2)
@@ -2831,7 +2904,8 @@ if object_switch:
             fcst_df = pandas.concat(results_fcst,ignore_index=True)
             CAT = Catalogue(fcst_df,tempdir=objectroot,ncpus=ncpus)
             pca, PC_df, features, scaler = CAT.do_pca()
-            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
+            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,
+                            features=features),fpath=fpath)
 
             fcst_dfs.append(fcst_df)
             del fcst_df
@@ -2861,7 +2935,7 @@ if object_switch:
             utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath)
 
     # Do combined PCA - JRL TODO FIX!
-    do_combined = True
+    do_combined = False
     if do_combined:
         # Get data
         fname = {}
@@ -2898,13 +2972,14 @@ if object_switch:
             all_fcst_obj_df = pandas.concat(results,ignore_index=True)
             CAT = Catalogue(all_fcst_obj_df,tempdir=objectroot,ncpus=ncpus)
             pca, PC_df, features, scaler = CAT.do_pca(all_features)
-            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,features=features),fpath=fpath['new'])
+            utils.save_pickle(obj=dict(data=PC_df,pca=pca,scaler=scaler,
+                                features=features),fpath=fpath['new'])
 
 if do_object_pca:
     print(stars,"DOING PCA",stars)
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
-    all_fmts = list(fcst_fmts) + list(obs_fmts) + ['all',]
+    all_fmts = list(fcst_fmts) + list(obs_fmts) # + ['all',]
     for fmt in all_fmts:
         if fmt == "all":
             fname = "pca_all_fcst_objs.pickle"
@@ -2960,19 +3035,20 @@ if do_object_performance:
     # casestr = (20160331...)
     # initstr = (2300 etc - depends on case)
 
-    # modes = ('cellular',)#'linear')
-    modes = ("linear",)
+    mns = member_names
+    # modes = ("linear",)
+    modes = ('cellular','linear')
 
-    if modes[0] == "linear":
-        pickle_fname = "linear_match.pickle"
-        pickle_fpath = os.path.join(objectroot,pickle_fname)
-        MATCH = utils.load_pickle(pickle_fpath)
-    else:
-        # mns = half_member_names
-        mns = fifteen_member_names
+    # if modes[0] == "linear":
+    #    pickle_fname = "linear_match.pickle"
+    #    pickle_fpath = os.path.join(objectroot,pickle_fname)
+    #    MATCH = utils.load_pickle(pickle_fpath)
+    #else:
+        # mns = fifteen_member_names
         # mns = test_member_names
-        MATCH = get_MATCH(mns)
+        #MATCH = get_MATCH(mns)
         # 4x5 (cases x init times) for mean performance for case
+
 
     plot_these = [
             ("20160331","1900"),
@@ -2992,7 +3068,8 @@ if do_object_performance:
             ("20170504","0200"),
     ]
 
-    def plot_huge_objperf(mode):
+    def plot_huge_objperf(mode, do_anno_member=False):
+        MATCH = get_MATCH(mns,modes=(mode,))
         fname = f"obj_perfdiag_allcases_{mode}.png"
         fpath = os.path.join(outroot,fname)
 
@@ -3013,7 +3090,8 @@ if do_object_performance:
             print(f"Plotting performance for {casestr} {initstr} {mode}")
             # mns set above, so we can sub-sample members
             PD = Performance(fpath=fpath,legendkwargs=None,legend=False,fig=fig,ax=ax)
-            for dom_code, mode in itertools.product(('d02_1km','d01_3km'),modes):
+            for dom_code, mode in itertools.product(('d02_1km','d01_3km'),
+                                (mode,)):
                 pod_all = []
                 far_all = []
                 for member in mns:
@@ -3028,17 +3106,17 @@ if do_object_performance:
                     pad = 0.04
                     apad = 0.02
                     color_phys = get_color(fmt=fmt,mem=member)
-                    pk = {'marker':MARKERS[fmt],'c':color_phys,'s':0.7*SIZES[fmt],
+                    pk = {'marker':MARKERS[fmt],'c':color_phys,'s':3.5*SIZES[fmt],
                                     'alpha':0.2}
                     lstr = get_nice(fmt)
                     PD.plot_data(pod=pod,far=far,plotkwargs=pk,label=lstr)
                     if do_pub_fig:
                         PD2.plot_data(pod=pod,far=far,plotkwargs=pk,label=lstr)
-
-                    PD.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
+                    if do_anno_member:
+                        PD.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
                                     xycoords='data',fontsize='6',color='black',
                                     fontweight='medium')
-                    if do_pub_fig:
+                    if do_pub_fig and do_anno_member:
                         PD2.ax.annotate(annostr,xy=(1-far-apad,pod+apad),
                                         xycoords='data',fontsize='6',color='black',
                                         fontweight='medium')
@@ -3047,20 +3125,20 @@ if do_object_performance:
                     #pk = {'marker':MARKERS[fmt],'c':COLORS[fmt],'s':SIZES[fmt],
                     #                'alpha':ALPHAS[fmt]}
                     # PD.save()
-                pk_final = {'marker':'x','c':color_phys,'s':4*SIZES[fmt],
-                                                    'alpha':0.9,}
+                pk_final = {'marker':'X','c':color_phys,'s':15*SIZES[fmt],
+                                        'alpha':0.85,'edgecolors':('black',)}
                 pod_mean = N.nanmean(N.array(pod_all))
                 far_mean = N.nanmean(N.array(far_all))
                 PD.plot_data(pod=pod_mean,far=far_mean,plotkwargs=pk_final)
                 if do_pub_fig:
                     PD2.plot_data(pod=pod_mean,far=far_mean,plotkwargs=pk_final)
-                PD.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
-                                xycoords='data',fontsize='8',color=color_phys,
-                                    fontweight='bold')
+                #PD.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
+                #                xycoords='data',fontsize='8',color=color_phys,
+                #                    fontweight='bold')
                 if do_pub_fig:
-                    PD2.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
-                                    xycoords='data',fontsize='8',color=color_phys,
-                                        fontweight='bold')
+                    #PD2.ax.annotate("mean",xy=(1-far_mean-apad,pod_mean+apad),
+                    #                xycoords='data',fontsize='8',color=color_phys,
+                    #                    fontweight='bold')
                     PD2.ax.set_title(f"{casestr}:  {initstr} UTC\n")
 
             ax.set_title(f"{casestr}:  {initstr} UTC")
@@ -3197,8 +3275,11 @@ if do_object_distr:
 
 if do_object_matching:
     print(stars,"DOING OBJ MATCHING/DIFFS",stars)
-    mns = get_member_names(7)
-    match_dict, megaframe = get_dom_match(mns, return_megaframe=True)
+    # mode = "cellular"
+    mode = 'linear'
+    mns = get_member_names(18)
+    match_dict, megaframe = get_dom_match(mns, return_megaframe=True,
+                                modes=(mode,))
 
     ### DIFFS ###
 
@@ -3233,8 +3314,7 @@ if do_object_matching:
     # loop over all matches, and join dicts together - alert if any clashes in keys
     for member in mns:
         for initutc, casestr, initstr in get_initutcs_strs():
-            # this_dict = match_dict[member]["cellular"][casestr][initstr]['matches']
-            this_dict = match_dict[member]["linear"][casestr][initstr]['matches']
+            this_dict = match_dict[member][mode][casestr][initstr]['matches']
 
             for k,v in this_dict.items():
                 if v is not None:
@@ -3328,7 +3408,7 @@ if do_object_matching:
     #utils.trycreate(fpath)
     #RidgePlot(fpath).plot(diff_df,namelist=prop_diffs,)
 
-    fname = "hist_3x3.png"
+    fname = f"hist_3x3_{mode}.png"
     fpath = os.path.join(outroot,"match_diffs",fname)
     utils.trycreate(fpath)
     fig,axes = plt.subplots(nrows=3,ncols=3,figsize=(11,11))
@@ -3617,8 +3697,8 @@ if do_object_brier_uh:
 
 
     # modes = ('cellular',)
-    modes = ('linear','cellular')
-
+    # modes = ('linear',)
+    modes = ('cellular','linear')
     # JRL Sept 2019
     verif_meth = "IGN"
     # verif_meth = "BS"
@@ -3647,7 +3727,7 @@ if do_object_brier_uh:
 
     all_bs = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
     all_lt = {p:{k:[] for k in ("1km","3km")} for p in bs_props}
-    overwrite_BS_pickles = False
+    overwrite_BS_pickles = True
 
     # Just those cells that are rotating
     all_meso_bs =  {p:{k:[] for k in ("1km","3km")} for p in bs_props}
@@ -3656,18 +3736,21 @@ if do_object_brier_uh:
     for mode in modes:
 
         # mns = fifteen_member_names
-        if mode == "linear":
-            mns = get_member_names(18)
-            pickle_fname = "linear_match.pickle"
-            pickle_fpath = os.path.join(objectroot,pickle_fname)
-            MATCH = utils.load_pickle(pickle_fpath)
+        # if mode == "linear":
+        #    mns = get_member_names(18)
+        #    pickle_fname = "linear_match.pickle"
+        #    pickle_fpath = os.path.join(objectroot,pickle_fname)
+        #    MATCH = utils.load_pickle(pickle_fpath)
 
-            mf_fname = "linear_mf.pickle"
-            mf_fpath = os.path.join(objectroot,mf_fname)
-            mf = utils.load_pickle(mf_fpath)
-        else:
-            mns = get_member_names(15)
-            MATCH, mf = get_MATCH(mns, return_megaframe=True)
+        #    mf_fname = "linear_mf.pickle"
+        #    mf_fpath = os.path.join(objectroot,mf_fname)
+        #    mf = utils.load_pickle(mf_fpath)
+        #else:
+        #    mns = get_member_names(18)
+        #    MATCH, mf = get_MATCH(mns, return_megaframe=True)
+
+        mns = get_member_names(36)
+        MATCH, mf = get_MATCH(mns, return_megaframe=True,modes=(mode,))
 
         # parallelise if too slow?
         ### THIS IS FOR CREATING DATAFRAME OF OBSERVED OBJECTS PER RUN
@@ -3687,6 +3770,7 @@ if do_object_brier_uh:
                 if os.path.exists(fpath) and (not overwrite_BS_pickles):
                     bs = utils.load_pickle(fpath=fpath)
                 else:
+                # if True:
                     # Linear or cell
                     obs_objs = []
                     obs_IDs = set()
@@ -3699,13 +3783,14 @@ if do_object_brier_uh:
                         # for fcst_ID, v in matches.items():
                         for obs_ID, v in matches.items():
                             # obs_ID is the "real" observed object - build pdf for each
-                            if obs_ID in obs_IDs:
-                                # Obs object already in set
-                                continue
-                            the_row = mf[mf['megaframe_idx']==obs_ID]
-                            assert the_row.shape[0] == 1
-                            obs_objs.append(the_row)
-                            obs_IDs.add(obs_ID)
+                            if obs_ID not in obs_IDs:
+                                the_row = mf[mf['megaframe_idx']==obs_ID]
+                                assert the_row.shape[0] == 1
+                                # pdb.set_trace()
+                                # assert the_row.member == 'obs'
+                                if the_row.member.values[0] == 'obs':
+                                    obs_objs.append(the_row)
+                                    obs_IDs.add(obs_ID)
 
                     # DataFrame with all observed objects that have been matched
                     if len(obs_objs)>0:
@@ -3717,10 +3802,12 @@ if do_object_brier_uh:
                     bs = {o:{} for o in obs_IDs}
                     # For a given observed object within this run....
                     for idx,oo in enumerate(obs_obj_df.itertuples()):
-                        if oo is None:
+                        if (oo is None):# or (oo.member == "obs"):
                             continue
                         obj_ID = oo.megaframe_idx
+                        print(obj_ID)
                         fcst_bools = {p:[] for p in bs_props}
+                        fcst_bool = {}
 
                         # Probs generated in this loop block
                         for member in mns:
@@ -3730,21 +3817,26 @@ if do_object_brier_uh:
 
                             for obs_ID, v in matches.items():
                                 if obs_ID == obj_ID:
+                                    # fcst_bool =
                                     if v is None:
                                         # No object matched
                                         for prop in bs_props:
-                                            fcst_bools[prop].append(0)
-                                        continue
-                                    fcst_ID, _TI = v
-                                    of = mf[mf['megaframe_idx']==fcst_ID]
-                                    assert of.shape[0] == 1
-                                    for prop in bs_props:
-                                        fcst_bool = of.get(prop).values[0]
-                                        if not N.isnan(fcst_bool):
-                                            fcst_bool = int(fcst_bool)
-                                        fcst_bools[prop].append(fcst_bool)
-                                        # pdb.set_trace()
+                                            fcst_bool[prop] = 0
+                                    else:
+                                        fcst_ID, _TI = v
+                                        of = mf[mf['megaframe_idx']==fcst_ID]
+                                        assert of.shape[0] == 1
+                                        for prop in bs_props:
+                                            #fcst_bool = of.get(prop).values[0]
+                                            fcst_bool[prop] = int(
+                                                    of.get(prop).values[0])
 
+                                            #if not N.isnan(fcst_bool):
+                                            #    fcst_bool = int(fcst_bool)
+                                            # pdb.set_trace()
+                                    for prop in bs_props:
+                                        fcst_bools[prop].append(fcst_bool[prop])
+                                        # print(len(fcst_bools[prop]))
                         # Assume all members have been checked, and missing = fail
                         obs_bools = {p:[] for p in bs_props}
                         oo_df = mf[mf['megaframe_idx']==obs_ID]
@@ -3762,11 +3854,18 @@ if do_object_brier_uh:
                             if not N.isnan(obs_val):
                                 obs_val = int(obs_val)
 
-                                # number of non-nan members
                                 isnan = N.isnan(fcst_bools[prop])
+                                # number of non-nan members
                                 total_nans = N.sum(isnan)
                                 n_valid_mem = len(mns) - total_nans
                                 prob_frac_mns = N.nansum(fcst_bools[prop])/n_valid_mem
+                                # prob_frac_mns = len(mns)
+                                debugg = False
+                                if prop == "midrot_exceed_ID_0" and debugg:
+                                    print(obj_ID,fcst_bools[prop],
+                                            n_valid_mem,prob_frac_mns,
+                                            obs_val)
+                                    pdb.set_trace()
                                 assert 0 <= prob_frac_mns <= 1
 
                                 # Sept 2019 info edits
@@ -3807,8 +3906,8 @@ if do_object_brier_uh:
                         # that object in this run. Get average fcst time?
                         # pdb.set_trace()
                         pass
-                    # pdb.set_trace()
                     pass
+                    # pdb.set_trace()
 
                     # BS values need dumping in table with valid time
 
@@ -3878,8 +3977,8 @@ if do_object_brier_uh:
                 nrows = 15
 
                 # For more
-                sbs_nice_n = 1025
-                nrows = 25
+                # sbs_nice_n = 1025
+                # nrows = 25
 
             else:
                 sbs_nice_n = 375
@@ -3892,7 +3991,12 @@ if do_object_brier_uh:
                     fpath = os.path.join(outroot,"waffle",fname)
                     arr = N.array([all_lt[prop][km],all_bs[prop][km]])
 
-                    df = pandas.DataFrame(data=arr.T,columns=('lead_time','brier_score'))
+                    df = pandas.DataFrame(data=arr.T,
+                                columns=('lead_time','brier_score'))
+
+                    # Do histograms for the total per member #
+
+
 
                     #arr_sort = N.sort(arr,axis=0)[0,:]
                     # Each array entry (axis 1) is now BS for that object
@@ -4335,6 +4439,7 @@ if do_object_infogain:
     # halfhours = N.arange(30,210,30)
     # tperiods = ['first_hour','second_hour','third_hour']
     # fcstmins = [60,120,180]
+    modes = ('cellular','linear')
 
     def n_p_gen(naive_probs, means, medians):
         for n_p in naive_probs:
@@ -4352,42 +4457,56 @@ if do_object_infogain:
             #sns.stripplot(x=data,y=n,color=cols[n],
             #            dodge=True,jitter=True,
             #            alpha=0.25,zorder=1,)
-            sns.kdeplot(data.flatten(),shade=True,color=cols[n],alpha=0.3,
-            # clip=[worst_score,best_score],
-            # clip = [worst_score,best_score],
-            label=dstrs[n],ax=ax,
-            kernel='gau',legend=True,)
+            # pdb.set_trace()
 
-        if False:
-            fig.tight_layout()
-            fig.savefig(fpath)
-            print("Saved to",fpath)
-            pdb.set_trace()
+            sns_plot = True; line_plot = False
 
-        if False:
+            if sns_plot:
+                sns.kdeplot(data.flatten(),shade=True,
+                color=cols[n],alpha=0.3,
+                label=dstrs[n],ax=ax,
+                kernel='gau',legend=True,
+                bw='scott',)
+
+            elif line_plot:
+        #if True:
+            # Also do histogram
+                bbins = [N.log2((n/36)/0.2) for n in range(0,37)]
+                bbins[0] = N.log2(0.01/0.2)
+                bbins[-1] = N.log2(0.99/0.2)
+
+
             # all_min = min(EE3.min(),EE1.min())
             # all_max = max(EE3.max(),EE1.max())
             # logbins = N.logspace(all_min,all_max,50)
             # logbins = N.logspace(-4,4,50)
-            logbins = N.concatenate([N.logspace(-1,0,25),N.logspace(0,1,25)])
+            # logbins = N.concatenate([N.logspace(-1,0,25),N.logspace(0,1,25)])
             # logbins = 50
             # Need to fit a log-friendly KDE? Scatter?
             # pdb.set_trace()
-            ax.hist([EE3,EE1],bins=logbins,alpha=0.7,label=["3km","1km"],
+            if False:
+                ax.hist(data,bins=bbins,alpha=0.7,label=["3km","1km"],
             # ax.hist([EE3,EE1],alpha=0.7,label=["3km","1km"],
-                color=["#1A85FF","#D41159"],
+                    color=["#1A85FF","#D41159"],
+                    histtype='stepfilled',
                 #range=[N.floor(all_min),N.ceil(all_max)],
             #range=[-4,4],
-            )
+                )
+            if False:
+                xlocs, counts = N.unique(data,return_counts=1)
+                # vals,edges = N.histogram(data,bins=bbins)
 
-        if True:
+                # ax.plot(edges,vals,label=dstrs[n],color=cols[n])
+                ax.plot(xlocs,counts,label=dstrs[n],color=cols[n])
+
+        #if True:
             # ax.set_xscale("symlog",)#linthreshx=1)
 
-            ax.axvline(0,color='k',linewidth=2)
-            # ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1,linestyle='--')
-            # ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1,linestyle='--')
-            ax.axvline(N.nanmedian(EE3),color='#1A85FF',linewidth=1,linestyle='--')
-            ax.axvline(N.nanmedian(EE1),color='#D41159',linewidth=1,linestyle='--')
+            ax.axvline(0,color='k',linewidth=1.5)
+            ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1,linestyle='--')
+            ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1,linestyle='--')
+            # ax.axvline(N.nanmedian(EE3),color='#1A85FF',linewidth=1,linestyle='--')
+            # ax.axvline(N.nanmedian(EE1),color='#D41159',linewidth=1,linestyle='--')
 
             ax.axvline(worst_score,color='brown',linewidth=2)
             ax.axvline(best_score,color='green',linewidth=2)
@@ -4404,9 +4523,9 @@ if do_object_infogain:
 
     def compute_OSIG(i):
         naive_prob, means, medians = i
-        mns = get_member_names(16)
+        # mns = get_member_names(18)
         # naive_prob = 0.2
-
+        mns = member_names
         # Approximates 1/36 - could be set to even smaller values to greater
         # punish certainty - but that doesn't make sense with a model with
         # known underdispersion.
@@ -4419,229 +4538,240 @@ if do_object_infogain:
 
         # 4x5 (cases x init times) for mean performance for case
 
-        modes = ('cellular',)#'linear')
+        # modes = ('cellular',)#'linear')
         # modes = ("linear",)
-        # fcst_doms = ('d02_1km','d01_3km')
-        fcst_doms = ('d01_3km',)
+        # fcst_doms = ('d01_3km',)
 
-        if modes[0] == "linear":
-            pickle_fname = "linear_match.pickle"
-            pickle_fpath = os.path.join(objectroot,pickle_fname)
+        #if modes[0] == "linear":
+        #    pickle_fname = "linear_match.pickle"
+        #    pickle_fpath = os.path.join(objectroot,pickle_fname)
 
-            mf_fname = "linear_mf.pickle"
-            mf_fpath = os.path.join(objectroot,mf_fname)
+        #    mf_fname = "linear_mf.pickle"
+        #    mf_fpath = os.path.join(objectroot,mf_fname)
 
-            MATCH = utils.load_pickle(pickle_fpath)
-            mf = utils.load_pickle(mf_fpath)
-        else:
-            MATCH, mf = get_MATCH(mns, return_megaframe=True)
+        #    MATCH = utils.load_pickle(pickle_fpath)
+        #    mf = utils.load_pickle(mf_fpath)
+        #else:
+        #    MATCH, mf = get_MATCH(mns, return_megaframe=True)
 
         # tperiods = list(mf.leadtime_group.unique())
+        fcst_doms = ('d02_1km','d01_3km')
         tperiods = ["first_hour","second_hour","third_hour"]
-
+        modes = ('cellular','linear')
         # All information gain by dom/mode
         all_IGs = {m:{fdc:N.zeros([2,0]) for fdc in fcst_doms} for m in modes}
         # Info gain per hour, and by dom/mode
-        IGs_by_time = {m:{fdc:{tp:[] for tp in tperiods} for fdc in fcst_doms} for m in modes}
+        IGs_fname = "IGs_by_time.pickle"
+        IGs_fpath = os.path.join(objectroot,IGs_fname)
 
-        for mode, fcst_dom_code in itertools.product(modes,fcst_doms):
-            for initutc, casestr, initstr in obj_perf_gen():
-                if (initstr != "0200"):
-                    continue
-                for hour in tperiods:
-                    if hour != "first_hour":
-                        continue
-                    # This is a given initialisation (all 180 min, len(mns) members)
-                    dom, km = fcst_dom_code.split('_')
+        if os.path.exists(IGs_fpath):
+            IGs_by_time = utils.load_pickle(IGs_fpath)
+        else:
 
-                    print("Doing IG for: ",mode,fcst_dom_code,casestr,initstr)
+            IGs_by_time = {m:{fdc:{tp:[] for tp in tperiods} for fdc in fcst_doms} for m in modes}
 
-                    prod_code = f"nexrad_{km}_obs"
-                    earliest_utc = initutc - datetime.timedelta(seconds=60*10)
-                    latest_utc = initutc +  datetime.timedelta(seconds=60*190)
-                    obs_objs_IDs = mf[
-                            (mf['prod_code'] == prod_code) &
-                            (mf['conv_mode'] == mode) &
-                            (mf['case_code'] == casestr) &
-                            (mf['time'] >= earliest_utc) &
-                            (mf['time'] <= latest_utc)
-                            # (mf['leadtime_group'] == f"{hour}")
-                            ].megaframe_idx
+            for mode, fcst_dom_code in itertools.product(modes,fcst_doms):
+                MATCH, mf = get_MATCH(mns, return_megaframe=True,modes=(mode,))
+                for initutc, casestr, initstr in obj_perf_gen():
+                    #if (initstr != "0200"):
+                    #    continue
+                    for hour in tperiods:
+                        #if hour != "first_hour":
+                        #    continue
+                        # This is a given initialisation (all 180 min, len(mns) members)
+                        dom, km = fcst_dom_code.split('_')
 
-                    if True:
-                        ootest = mf[
-                            (mf['prod_code'] == prod_code) &
-                            (mf['conv_mode'] == mode) &
-                            (mf['case_code'] == casestr) &
-                            (mf['time'] == datetime.datetime(2017,5,3,2,30,0)) &
-                            (mf['member'] == "obs")
-                            ]
+                        print("Doing IG for: ",mode,fcst_dom_code,casestr,initstr)
 
+                        prod_code = f"nexrad_{km}_obs"
+                        earliest_utc = initutc - datetime.timedelta(seconds=60*10)
+                        latest_utc = initutc +  datetime.timedelta(seconds=60*190)
+                        obs_objs_IDs = mf[
+                                (mf['prod_code'] == prod_code) &
+                                (mf['conv_mode'] == mode) &
+                                (mf['case_code'] == casestr) &
+                                (mf['time'] >= earliest_utc) &
+                                (mf['time'] <= latest_utc)
+                                # (mf['leadtime_group'] == f"{hour}")
+                                ].megaframe_idx
 
-                    #if hour != "first_hour":
-                    #    pdb.set_trace()
-                    # Check to see all unique
-                    unique_IDs = obs_objs_IDs.unique()
-                    assert len(unique_IDs) == len(obs_objs_IDs)
-                    # IGs[mode][fcst_dom_code] = N.zeros([2,len(unique_IDs)])
-                    IGs = N.zeros([2,len(unique_IDs)])
-                    # pdb.set_trace()
+                        if False:
+                            ootest = mf[
+                                (mf['prod_code'] == prod_code) &
+                                (mf['conv_mode'] == mode) &
+                                (mf['case_code'] == casestr) &
+                                (mf['time'] == datetime.datetime(2017,5,3,2,30,0)) &
+                                (mf['member'] == "obs")
+                                ]
 
-                    for noidx, obs_ID in enumerate(unique_IDs):
-                        #if obs_ID == 1133:
-                        #    pdb.set_trace()
-                        match_bools = N.zeros([len(mns)],dtype=bool)
-                        for nm, member in enumerate(mns):
-                            matches = MATCH[fcst_dom_code][member][casestr][
-                            initstr][mode]['matches']
-                            # for fcst_ID, v in matches.items():
-                            for o, v in matches.items():
-                                if v is None:
-                                    # No match
-                                    # JRL - IMPORTANT:
-                                    # Note that matching the "wrong" mode will give False
-                                    # should consider redoing with above/below MDI = 0.0
-                                    # which is a bit of fuzzy logic.
-                                    # Will be OK will cell/line split as it was done
-                                    # to both obs/fcst fields so we hope error is random
-                                    # match_bools[nm] = False
-                                    pass
-                                elif o == obs_ID:
-                                    # This is the object we're checking for
-                                    # else, there's a match!
-                                    match_bools[nm] = True
-                                    continue
-
-                                    # If there's no match at all, maybe there are no objects?
-                                    assert isinstance(match_bools[nm],N.bool_)
-
-                        fcst_prob = N.sum(match_bools.astype(int))/len(mns)
-                        fcst_prob = constrain(fcst_prob,minmax=constrain_minmax)
-                        # For all observed objects for a domain in a given init (/20):
-                        # What is the % of a match?
-
-                        # naive_ign = -N.log2(naive_prob)
-                        # fcst_ign = -N.log2(fcst_prob)
-                        # info_gain = fcst_ign - naive_ign
-                        info_gain = N.log2(fcst_prob/naive_prob)
-                        if (obs_ID == 582):
-                            print(fcst_dom_code,info_gain)
-                            # pdb.set_trace()
-                        assert not N.isnan(info_gain)
-
-                        # Here, IGs is every object's info gain
-
-                        # IGs[mode][fcst_dom_code][0,noidx] = obs_ID
-                        # IGs[mode][fcst_dom_code][1,noidx] = info_gain
-                        IGs[0,noidx] = int(obs_ID)
-                        IGs[1,noidx] = info_gain
-
-                        # Now to append this into the big list
-                        the_obj = mf[mf['megaframe_idx'] == obs_ID]
-                        assert len(the_obj) == 1
-
-                        #if the_obj.leadtime_group.values[0] != "first_hour":
-                        #    pdb.set_trace()
-                        # pdb.set_trace()
-
-                        all_IGs[mode][fcst_dom_code] = N.concatenate(
-                            [all_IGs[mode][fcst_dom_code],IGs],
-                            axis=1,)
-
-
-                        # Now, let's put it into the right hour
-                        #if True:
-                        #    hour = the_obj.leadtime_group.values[0]
-                        if True:
-                            obj_utc = the_obj.time.values[0]
-                            # determine which time window this is in
-                            compare_utc = initutc + datetime.timedelta(
-                                            # seconds=int(halfhour)*60)
-                                            seconds=int(tperiods.index(hour))*60)
-
-                            obj_utc = utils.dither_one_value(obj_utc)
-                            dt = (compare_utc-obj_utc).total_seconds()
-                            tt = int(abs(dt)/60)
-                            halfhours = [0,60,120]
-                            idx = N.searchsorted(halfhours,tt) - 1
-                            # pdb.set_trace()
 
                         #if hour != "first_hour":
                         #    pdb.set_trace()
-                        #pdb.set_trace()
-                        # IGs_by_time[mode][fcst_dom_code][hour].append(IGs[1,:])
-                        # IGs_by_time[mode][fcst_dom_code][hour] =
-                        hh = tperiods[idx]
-                        IGs_by_time[mode][fcst_dom_code][hh].append(info_gain)
+                        # Check to see all unique
+                        unique_IDs = obs_objs_IDs.unique()
+                        assert len(unique_IDs) == len(obs_objs_IDs)
+                        # IGs[mode][fcst_dom_code] = N.zeros([2,len(unique_IDs)])
+                        IGs = N.zeros([2,len(unique_IDs)])
                         # pdb.set_trace()
-                        # 0 is 30 min or earlier.
-                        # Then work from there.
+
+                        for noidx, obs_ID in enumerate(unique_IDs):
+                            #if obs_ID == 1133:
+                            #    pdb.set_trace()
+                            match_bools = N.zeros([len(mns)],dtype=bool)
+                            for nm, member in enumerate(mns):
+                                matches = MATCH[fcst_dom_code][member][casestr][
+                                initstr][mode]['matches']
+                                # for fcst_ID, v in matches.items():
+                                for o, v in matches.items():
+                                    if v is None:
+                                        # No match
+                                        # JRL - IMPORTANT:
+                                        # Note that matching the "wrong" mode will give False
+                                        # should consider redoing with above/below MDI = 0.0
+                                        # which is a bit of fuzzy logic.
+                                        # Will be OK will cell/line split as it was done
+                                        # to both obs/fcst fields so we hope error is random
+                                        # match_bools[nm] = False
+                                        pass
+                                    elif o == obs_ID:
+                                        # This is the object we're checking for
+                                        # else, there's a match!
+                                        match_bools[nm] = True
+                                        continue
+
+                                        # If there's no match at all, maybe there are no objects?
+                                        assert isinstance(match_bools[nm],N.bool_)
+
+                            fcst_prob = N.sum(match_bools.astype(int))/len(mns)
+                            fcst_prob = constrain(fcst_prob,minmax=constrain_minmax)
+                            # For all observed objects for a domain in a given init (/20):
+                            # What is the % of a match?
+
+                            # naive_ign = -N.log2(naive_prob)
+                            # fcst_ign = -N.log2(fcst_prob)
+                            # info_gain = fcst_ign - naive_ign
+                            info_gain = N.log2(fcst_prob/naive_prob)
+                            #if (obs_ID == 582):
+                            #    print(fcst_dom_code,info_gain)
+                                # pdb.set_trace()
+                            assert not N.isnan(info_gain)
+
+                            # Here, IGs is every object's info gain
+
+                            # IGs[mode][fcst_dom_code][0,noidx] = obs_ID
+                            # IGs[mode][fcst_dom_code][1,noidx] = info_gain
+                            IGs[0,noidx] = int(obs_ID)
+                            IGs[1,noidx] = info_gain
+
+                            # Now to append this into the big list
+                            the_obj = mf[mf['megaframe_idx'] == obs_ID]
+                            assert len(the_obj) == 1
+
+                            #if the_obj.leadtime_group.values[0] != "first_hour":
+                            #    pdb.set_trace()
+                            # pdb.set_trace()
+
+                            all_IGs[mode][fcst_dom_code] = N.concatenate(
+                                [all_IGs[mode][fcst_dom_code],IGs],
+                                axis=1,)
+
+
+                            # Now, let's put it into the right hour
+                            #if True:
+                            #    hour = the_obj.leadtime_group.values[0]
+                            if True:
+                                obj_utc = the_obj.time.values[0]
+                                # determine which time window this is in
+                                compare_utc = initutc + datetime.timedelta(
+                                                # seconds=int(halfhour)*60)
+                                                seconds=int(tperiods.index(hour))*60)
+
+                                obj_utc = utils.dither_one_value(obj_utc)
+                                dt = (compare_utc-obj_utc).total_seconds()
+                                tt = int(abs(dt)/60)
+                                halfhours = [0,60,120]
+                                idx = N.searchsorted(halfhours,tt) - 1
+                                # pdb.set_trace()
+
+                            #if hour != "first_hour":
+                            #    pdb.set_trace()
+                            #pdb.set_trace()
+                            # IGs_by_time[mode][fcst_dom_code][hour].append(IGs[1,:])
+                            # IGs_by_time[mode][fcst_dom_code][hour] =
+                            hh = tperiods[idx]
+                            IGs_by_time[mode][fcst_dom_code][hh].append(info_gain)
+                            # pdb.set_trace()
+                            # 0 is 30 min or earlier.
+                            # Then work from there.
+
+            # Save to disk
+            utils.save_pickle(obj=IGs_by_time, fpath=IGs_fpath)
 
         # 1/4 done
-        assert 1==0
+        # assert 1==0
         worst_score = N.log2(constrain_minmax[0]/naive_prob)
         best_score = N.log2(constrain_minmax[1]/naive_prob)
         print(f"Worst IG score is {worst_score:.2f} bits")
 
         # mode = 'cellular'
         # mode = 'linear'
-        mode = modes[0]
+        for mode in modes:
 
-        naive = int(naive_prob*100)
-        figsize = (6,4)
-        fig,ax = plt.subplots(1,figsize=figsize)
-        fname = f"obj_infogain_distrs_{mode}_allhours_{naive}pc.png"
-        fpath = os.path.join(outroot,"info_gain",fname)
-        utils.trycreate(fpath)
-
-        EE3_IGs = all_IGs[mode]["d01_3km"][1,:].flatten()
-        EE1_IGs = all_IGs[mode]["d02_1km"][1,:].flatten()
-
-        # fig,ax = plt.subplots(1)
-        # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
-        #fig.savefig(fpath)
-        #pdb.set_trace()
-
-        for nh in range(3):
-            # hours = ("first_hour","second_hour","third_hour")
-            hour = tperiods[nh]
+            naive = int(naive_prob*100)
+            figsize = (6,4)
             fig,ax = plt.subplots(1,figsize=figsize)
-            fname = f"obj_infogain_distrs_{mode}_{hour}_{naive}pc.png"
+            fname = f"obj_infogain_distrs_{mode}_allhours_{naive}pc.png"
             fpath = os.path.join(outroot,"info_gain",fname)
+            utils.trycreate(fpath)
 
-            #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
-            #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
+            EE3_IGs = all_IGs[mode]["d01_3km"][1,:].flatten()
+            EE1_IGs = all_IGs[mode]["d02_1km"][1,:].flatten()
 
-            #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
-            #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
-
-            #aa = N.array(IGs_by_time[mode]["d01_3km"][hour])
+            # fig,ax = plt.subplots(1)
+            # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+            #fig.savefig(fpath)
             #pdb.set_trace()
 
-            # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
-            plot(ax,N.array(IGs_by_time[mode]["d01_3km"][hour]),
-                    N.array(IGs_by_time[mode]["d02_1km"][hour]),
-                    fpath,(worst_score,best_score),
-                    )
-            # Put the mean/median into array for bar chart
-            means[0,nh] = N.nanmean(EE3_IGs)
-            means[1,nh] = N.nanmean(EE1_IGs)
+            for nh in range(3):
+                # hours = ("first_hour","second_hour","third_hour")
+                hour = tperiods[nh]
+                fig,ax = plt.subplots(1,figsize=figsize)
+                fname = f"obj_infogain_distrs_{mode}_{hour}_{naive}pc.png"
+                fpath = os.path.join(outroot,"info_gain",fname)
 
-            medians[0,nh] = N.nanmedian(EE3_IGs)
-            medians[1,nh] = N.nanmedian(EE1_IGs)
+                #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
+                #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
 
-            # Note we use three bins for times, which isn't great, but
-            # sample size probably too small for e.g. 30 min bins, also
-            # not fair that 180 min of forecasts can match with 220 min of obs?
-            # fig.savefig(fpath)
+                #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
+                #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
+
+                #aa = N.array(IGs_by_time[mode]["d01_3km"][hour])
+                #pdb.set_trace()
+
+                # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
+                plot(ax,N.array(IGs_by_time[mode]["d01_3km"][hour]),
+                        N.array(IGs_by_time[mode]["d02_1km"][hour]),
+                        fpath,(worst_score,best_score),
+                        )
+                # Put the mean/median into array for bar chart
+                means[0,nh] = N.nanmean(EE3_IGs)
+                means[1,nh] = N.nanmean(EE1_IGs)
+
+                medians[0,nh] = N.nanmedian(EE3_IGs)
+                medians[1,nh] = N.nanmedian(EE1_IGs)
+
+                # Note we use three bins for times, which isn't great, but
+                # sample size probably too small for e.g. 30 min bins, also
+                # not fair that 180 min of forecasts can match with 220 min of obs?
+                # fig.savefig(fpath)
         return
 
     # naive_probs = N.arange(0.1,1.0,0.1)
     naive_probs = (0.2,)
     # arrays for means for each [dx,tperiod,]
 
-    means = utils.generate_shared_arr([2,6,len(naive_probs)],dtype=float)
-    medians = utils.generate_shared_arr([2,6,len(naive_probs)],dtype=float)
+    means = utils.generate_shared_arr([2,3,len(naive_probs)],dtype=float)
+    medians = utils.generate_shared_arr([2,3,len(naive_probs)],dtype=float)
 
     # means = N.zeros([2,3,len(naive_probs)])]
 
@@ -4674,9 +4804,11 @@ if do_object_infogain:
 
     # CR-IG between the two?
 
+    # MAYBE need to plot histogram w/o smoothing.
+
     # Bar chart of (x-axis) hour 1/2/3 and (y) median/mean OSIG
     fig,ax = plt.subplots(1)
-    pdb.set_trace()
+    # pdb.set_trace()
 
     # fit a curve once we have the bars  - log? find ref from chaos lit
 
@@ -5038,7 +5170,7 @@ if do_spurious_example:
     fig.savefig("./spurious_compare.png")
 
 if do_oID_example:
-    data_folder = "/Volumes/LaCie/VSE_dx/object_instances/20160331"
+    data_folder = os.path.join(objectroot,"20160331")
     data_fname = "objects_REFL_comp_d02_1km_20160331_1900_1930_m01.pickle"
     # data_fname = "objects_REFL_comp_d01_3km_20160331_1900_1930_m01.pickle"
     data_fpath = os.path.join(data_folder,data_fname)
@@ -5047,6 +5179,8 @@ if do_oID_example:
     # pdb.set_trace()
 
     def do_label_pca(bmap,ax,discrim_vals=(-0.5,0.5)):
+        # JRL: change to lookup in megaframe.
+
         locs = dict()
         obj_discrim = N.zeros_like(obj.OKidxarray)
         for o in obj.objects.itertuples():
@@ -5228,7 +5362,7 @@ if do_ign_storm:
         return
 
 
-    data_folder = f"/Volumes/LaCie/VSE_dx/object_instances/{case}"
+    data_folder = os.path.join(objectroot,case)
     data_fname_1 = f"objects_REFL_comp_d02_1km_{case}_{init}_{valid}_{mem}.pickle"
     data_fname_3 = f"objects_REFL_comp_d01_3km_{case}_{init}_{valid}_{mem}.pickle"
     data_fname_o = f"objects_NEXRAD_nexrad_1km_{case}_{valid}.pickle"
