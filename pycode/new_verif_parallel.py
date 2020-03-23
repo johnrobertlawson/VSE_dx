@@ -80,7 +80,7 @@ do_domains = False
 do_percentiles = False
 _do_performance = False # Broken - to delete?
 do_performance = False
-do_efss = True # TODO - average for cref over cases, for paper
+do_efss = False # TODO - average for cref over cases, for paper
 # From scratch, do object_switch, do_object_pca, then
 # delete the object dfs (in subdirs too), and
 # and re-run object_switch to do the MDI of each cell
@@ -91,13 +91,15 @@ do_object_distr = False # TODO re-plot after matching new (18) matches
 do_object_matching = False # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO leave till later...
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
-do_object_infogain = False # TODO broken due to indents etc
+do_object_infogain = True # TODO broken due to indents etc
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
 do_qlcs_verif = False
 do_spurious_example = False
 do_oID_example = False
 do_ign_storm = False
+
+do_uh_infogain = False
 
 # MAYBE DELETE
 do_object_examples = False # TODO maybe delete, or do by hand
@@ -154,8 +156,8 @@ key_output = "FebPC"
 extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 lacie_root = '/Volumes/LaCie/VSE_dx'
 
-# objectroot = os.path.join(extractroot,'object_instances_PC')
-objectroot = os.path.join(lacie_root,'object_instances_PC')
+objectroot = os.path.join(extractroot,'object_instances_PC')
+# objectroot = os.path.join(lacie_root,'object_instances_PC')
 
 # objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
@@ -3277,7 +3279,7 @@ if do_object_matching:
     print(stars,"DOING OBJ MATCHING/DIFFS",stars)
     # mode = "cellular"
     mode = 'linear'
-    mns = get_member_names(18)
+    mns = get_member_names(36)
     match_dict, megaframe = get_dom_match(mns, return_megaframe=True,
                                 modes=(mode,))
 
@@ -3805,7 +3807,7 @@ if do_object_brier_uh:
                         if (oo is None):# or (oo.member == "obs"):
                             continue
                         obj_ID = oo.megaframe_idx
-                        print(obj_ID)
+                        # print(obj_ID)
                         fcst_bools = {p:[] for p in bs_props}
                         fcst_bool = {}
 
@@ -3872,12 +3874,21 @@ if do_object_brier_uh:
 
                                 # bs_val = (prob_frac_mns - obs_val)**2
                                 if prob_frac_mns == 1:
-                                    bs_val = 0 # perfect!
+                                    prob_frac_mns = 0.99
                                 elif prob_frac_mns == 0:
-                                    bs_val = 9999
+                                    prob_frac_mns = 0.01
+                                # bs_val = -N.log2(prob_frac_mns)
+                                c1 = (obs_val*N.log2(obs_val/prob_frac_mns))
+                                c2 = ((1-obs_val)*N.log2(
+                                        (1-obs_val)/(1-prob_frac_mns)))
+                                if N.isnan(c1):
+                                    bs_val = -1*(c2)
+                                elif N.isnan(c2):
+                                    bs_val = -1*(c1)
                                 else:
-                                    bs_val = -N.log2(prob_frac_mns)
-
+                                    bs_val = -1*(c1+c2)
+                                # pdb.set_trace()
+                                assert not N.isnan(bs_val)
                                 # ([0,1] - {1,0}) **2
                                 # Perfect score: 100% and it is observed (0**2)
                                 # Also, 0% and it is not observed.
@@ -3963,32 +3974,24 @@ if do_object_brier_uh:
             # low percentile - and maybe do 10 nrows.
             # Going to test with just a few members, and run more for larger sample
             if meso_sw == "meso-only":
-                all_bs = all_meso_bs
-                all_lt = all_meso_lt
-                #sbs_nice_n = 125
-                #nrows = 5
+                # all_bs = all_meso_bs
+                # all_lt = all_meso_lt
 
-                # Sept 2019 changes
-                # sbs_nice_n = 200
-                # nrows = 8
+                if mode == "linear":
+                    sbs_nice_n = 1500
+                    nrows = 25
 
-                # For nice plots
-                sbs_nice_n = 450
-                nrows = 15
-
-                # For more
-                # sbs_nice_n = 1025
-                # nrows = 25
-
-            else:
-                sbs_nice_n = 375
-                nrows = 15
+                else:
+                    # sbs_nice_n = 450
+                    # sbs_nice_n = 2000
+                    sbs_nice_n = 1500
+                    nrows = 25
 
             # from pywaffle import Waffle
             for km in ("1km","3km"):
                 for prop in bs_props:
                     fname = f"waffle_{prop}_{km}_{meso_sw}_{mode}.png"
-                    fpath = os.path.join(outroot,"waffle",fname)
+                    fpath = os.path.join(outroot,"waffle",mode,fname)
                     arr = N.array([all_lt[prop][km],all_bs[prop][km]])
 
                     df = pandas.DataFrame(data=arr.T,
@@ -4026,6 +4029,8 @@ if do_object_brier_uh:
                     # Explain in manuscript why this was done
                     # pdb.set_trace()
                     nn0 = df.shape[0]
+                    print(fname,"is",nn0)
+                    #pdb.set_trace()
                     try:
                         df = df.sample(n=sbs_nice_n)
                     except ValueError: # not enough samples
@@ -4441,11 +4446,17 @@ if do_object_infogain:
     # fcstmins = [60,120,180]
     modes = ('cellular','linear')
 
+    uh_props = ["midrot_exceed_ID_0","midrot_exceed_ID_1",
+        "midrot_exceed_ID_2","midrot_exceed_ID_3",
+        "lowrot_exceed_ID_0","lowrot_exceed_ID_1",
+        "lowrot_exceed_ID_2","lowrot_exceed_ID_3",]
+
     def n_p_gen(naive_probs, means, medians):
         for n_p in naive_probs:
             yield n_p, means, medians
 
-    def plot(ax,EE3,EE1,fpath,bounds):
+    def plot(ax,EE3,EE1,fpath,bounds,vrbl='cref',H_all=None,H_noclearsky=None,
+                Ho_all=None,Ho_ncs=None):
         worst_score, best_score = bounds
         # sns.despine(bottom=True,left=True)
         cols = ["#1A85FF","#D41159",]
@@ -4461,12 +4472,20 @@ if do_object_infogain:
 
             sns_plot = True; line_plot = False
 
+            #if vrbl == "UH":
+            #    dataset = data.flatten()[::1]
+            #else:
+            dataset = data.flatten()
             if sns_plot:
-                sns.kdeplot(data.flatten(),shade=True,
+                # if vrbl == "UH": pdb.set_trace()
+                sns.kdeplot(dataset,shade=True,
                 color=cols[n],alpha=0.3,
                 label=dstrs[n],ax=ax,
-                kernel='gau',legend=True,
-                bw='scott',)
+                # kernel='gau',bw='scott',
+                # kernel='gau',bw='silverman',
+                # kernel='gau', bw=0.2,
+                kernel = 'cos', bw='scott',
+                legend=True)
 
             elif line_plot:
         #if True:
@@ -4502,24 +4521,81 @@ if do_object_infogain:
         #if True:
             # ax.set_xscale("symlog",)#linthreshx=1)
 
-            ax.axvline(0,color='k',linewidth=1.5)
-            ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1,linestyle='--')
-            ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1,linestyle='--')
-            # ax.axvline(N.nanmedian(EE3),color='#1A85FF',linewidth=1,linestyle='--')
-            # ax.axvline(N.nanmedian(EE1),color='#D41159',linewidth=1,linestyle='--')
-
+        ax.axvline(0,color='k',linewidth=1.5)
+        ax.axvline(N.nanmean(EE3),color='#1A85FF',linewidth=1.3,linestyle='--')
+        ax.axvline(N.nanmean(EE1),color='#D41159',linewidth=1.3,linestyle='--')
+        #ax.axvline(N.median(EE3),color='#1A85FF',
+        #                    linewidth=1.3,linestyle='--')
+        #ax.axvline(N.median(EE1),color='#D41159',
+        #                    linewidth=1.3,linestyle='--')
+        # pdb.set_trace()
+        print(f"Medians are {N.nanmedian(EE3)} and {N.nanmedian(EE1)}.")
+        print(f"Means are {N.nanmean(EE3)} and {N.nanmean(EE1)}.")
+        if vrbl != "UH":
             ax.axvline(worst_score,color='brown',linewidth=2)
-            ax.axvline(best_score,color='green',linewidth=2)
-            ax.set_ylabel("Density")
-            ax.set_xlabel("Object information gain (bits)")
-            # ax.legend()
-            ax.set_xlim([worst_score-0.5,best_score+0.5])
-            # ax.set_ylim([0,1.2])
+        ax.axvline(best_score,color='green',linewidth=2)
+        ax.set_ylabel("Density")
+        # ax.legend()
+        if vrbl == "UH":
+            ax.set_xlim([min(N.nanmin(EE1),N.nanmin(EE3)),0.5])
+            ax.set_xlabel("Remaining UH entropy per object (bits)")
 
+            if H_all is not None:
+                # Annotate text with H for all and no-clear-sky
+
+                s1 = f"Removing <0.2 probs, 1km gains {H_noclearsky:.1f} bits"
+                s2 = f" (for all probs, 1km gains {H_all:.1f} bits)"
+                ss = s1+s2
+                anno = True
+            elif Ho_all is not None:
+
+                s3 = f"No <20% forecasts of obs=no: 1km gains {Ho_ncs:.3f} bits per object"
+                s4 = f" (for all probs, 1km gained {Ho_all:.3f} bits)"
+                ss = s3+s4
+                anno = True
+            else:
+                anno = False
+            if anno is True:
+                fontkw = {
+                        #'family':'serif',
+                        'color':'darkred',
+                        #'weight':'normal',
+                        #'size':16,
+                        }
+                # ax.text(-6, -0.15, ss, fontdict=fontkw)
+                ax.text(0.5, -0.13, ss, horizontalalignment='center',
+                    verticalalignment='center', transform=ax.transAxes,
+                    fontdict=fontkw)
+            # Do table with sample size also?
+
+        else:
+            ax.set_xlim([worst_score-0.5,best_score+0.5])
+            ax.set_xlabel("Object information gain (bits)")
+        # ax.set_ylim([0,1.2])
+        # pdb.set_trace()
         fig.tight_layout()
         fig.savefig(fpath)
         print("Saved to",fpath)
         return
+
+    def get_H(arr3km,arr1km):
+        arr3km = arr3km[~N.isnan(arr3km)]
+        arr1km = arr1km[~N.isnan(arr1km)]
+        uq_3 = N.unique(arr3km,return_counts=True)
+        uq_1 = N.unique(arr1km,return_counts=True)
+        H_3km = uq_3[0] * uq_3[1]
+        H_1km = uq_1[0] * uq_1[1]
+        H3_total = N.sum(H_3km)
+        H1_total = N.sum(H_1km)
+        # return H3_total - H1_total
+        H_gain = (H1_total - H3_total)
+
+        num_obj_3 = N.sum(uq_3[1])
+        num_obj_1 = N.sum(uq_1[1])
+        Ho_gain = (H1_total/num_obj_1) - (H3_total/num_obj_3)
+
+        # pdb.set_trace()
+        return H_gain, Ho_gain
 
     def compute_OSIG(i):
         naive_prob, means, medians = i
@@ -4558,17 +4634,30 @@ if do_object_infogain:
         fcst_doms = ('d02_1km','d01_3km')
         tperiods = ["first_hour","second_hour","third_hour"]
         modes = ('cellular','linear')
+        # modes = ("cellular",)
         # All information gain by dom/mode
         all_IGs = {m:{fdc:N.zeros([2,0]) for fdc in fcst_doms} for m in modes}
         # Info gain per hour, and by dom/mode
         IGs_fname = "IGs_by_time.pickle"
+        UHs_fname = "UHs_by_time.pickle"
+        mUHs_fname = "mUHs_by_time.pickle"
         IGs_fpath = os.path.join(objectroot,IGs_fname)
+        UHs_fpath = os.path.join(objectroot,UHs_fname)
+        mUHs_fpath = os.path.join(objectroot,mUHs_fname)
 
-        if os.path.exists(IGs_fpath):
+        IG_debug = False
+        if os.path.exists(IGs_fpath) and (IG_debug is False):
             IGs_by_time = utils.load_pickle(IGs_fpath)
+            UHs_by_time = utils.load_pickle(UHs_fpath)
+            # This one ignores DKL ~ 0 for not-obs, not-fcst
+            mUHs_by_time = utils.load_pickle(mUHs_fpath)
         else:
 
             IGs_by_time = {m:{fdc:{tp:[] for tp in tperiods} for fdc in fcst_doms} for m in modes}
+            UHs_by_time = {m:{fdc:{tp:{p:[] for p in uh_props}
+                for tp in tperiods} for fdc in fcst_doms} for m in modes}
+            mUHs_by_time = {m:{fdc:{tp:{p:[] for p in uh_props}
+                for tp in tperiods} for fdc in fcst_doms} for m in modes}
 
             for mode, fcst_dom_code in itertools.product(modes,fcst_doms):
                 MATCH, mf = get_MATCH(mns, return_megaframe=True,modes=(mode,))
@@ -4581,7 +4670,8 @@ if do_object_infogain:
                         # This is a given initialisation (all 180 min, len(mns) members)
                         dom, km = fcst_dom_code.split('_')
 
-                        print("Doing IG for: ",mode,fcst_dom_code,casestr,initstr)
+                        print("Doing IG for: ",
+                            mode,fcst_dom_code,casestr,initstr)
 
                         prod_code = f"nexrad_{km}_obs"
                         earliest_utc = initutc - datetime.timedelta(seconds=60*10)
@@ -4612,16 +4702,17 @@ if do_object_infogain:
                         assert len(unique_IDs) == len(obs_objs_IDs)
                         # IGs[mode][fcst_dom_code] = N.zeros([2,len(unique_IDs)])
                         IGs = N.zeros([2,len(unique_IDs)])
-                        # pdb.set_trace()
 
                         for noidx, obs_ID in enumerate(unique_IDs):
                             #if obs_ID == 1133:
                             #    pdb.set_trace()
+                            eligible_uh = []
                             match_bools = N.zeros([len(mns)],dtype=bool)
                             for nm, member in enumerate(mns):
                                 matches = MATCH[fcst_dom_code][member][casestr][
                                 initstr][mode]['matches']
                                 # for fcst_ID, v in matches.items():
+                                # pdb.set_trace()
                                 for o, v in matches.items():
                                     if v is None:
                                         # No match
@@ -4637,6 +4728,7 @@ if do_object_infogain:
                                         # This is the object we're checking for
                                         # else, there's a match!
                                         match_bools[nm] = True
+                                        eligible_uh.append(v)
                                         continue
 
                                         # If there's no match at all, maybe there are no objects?
@@ -4667,6 +4759,76 @@ if do_object_infogain:
                             the_obj = mf[mf['megaframe_idx'] == obs_ID]
                             assert len(the_obj) == 1
 
+
+                            # Compute UH exceedence here
+                            # Loop over props (list of lists -> array later)
+                            obj_utc = the_obj.time.values[0]
+                            # determine which time window this is in
+                            compare_utc = initutc + datetime.timedelta(
+                                            # seconds=int(halfhour)*60)
+                                            seconds=int(tperiods.index(hour))*60)
+
+                            obj_utc = utils.dither_one_value(obj_utc)
+                            dt = (compare_utc-obj_utc).total_seconds()
+                            tt = int(abs(dt)/60)
+                            halfhours = [0,60,120]
+                            idx = N.searchsorted(halfhours,tt) - 1
+                            hh = tperiods[idx]
+                            for prop in uh_props:
+                                obs_yesno = the_obj[prop].values[0]
+
+                                # Find the fcst objects that matched
+                                fcst_yesnos_raw = []
+                                if len(eligible_uh) == 0:
+                                    fprob = 0.01
+                                else:
+                                    for oidx in eligible_uh:
+                                        fcst_obj = mf[mf['megaframe_idx'] == oidx[0]]
+                                        fcst_yesnos_raw.append(fcst_obj[prop].values[0])
+                                    # Loop, and count those that exceed this pc
+                                    fcst_yesnos_arr = N.array(fcst_yesnos_raw)
+                                    fprob = N.sum(fcst_yesnos_arr)/36
+                                    fprob = min(0.99,fprob)
+                                    fprob = max(0.01,fprob)
+                                # compute DKL
+                                c1 = ((1-obs_yesno)*N.log2((1-obs_yesno)/(1-fprob)))
+                                c2 = (obs_yesno * N.log2(obs_yesno/fprob))
+                                #c1 = ((1-fprob)*N.log2((1-fprob)/(1-obs_yesno)))
+                                #c2 = (fprob*N.log2(fprob/obs_yesno))
+                                # pdb.set_trace()
+
+
+                                if N.isinf(c1):
+                                    c1 = 0
+                                elif N.isinf(c2):
+                                    c2 = 0
+
+                                if N.isnan(c1) and not N.isnan(c2):
+                                    DKL = -1*c2
+                                elif N.isnan(c2) and not N.isnan(c1):
+                                    DKL = -1*c1
+                                elif N.isnan(c1) and N.isnan(c2):
+                                    DKL = N.nan
+                                else:
+                                    DKL = -(c1+c2)
+                                # assert not N.isnan(DKL)
+                                UHs_by_time[mode][fcst_dom_code][hh][prop].append(
+                                    DKL)
+
+                                if N.isnan(fprob) or N.isnan(obs_yesno):
+                                    clearsky = True
+
+                                elif (float(fprob) < 0.2) & (
+                                            int(obs_yesno) == 0):
+                                    clearsky = True
+                                else:
+                                    clearsky = False
+
+                                if not clearsky:
+                                    mUHs_by_time[mode][fcst_dom_code][
+                                                    hh][prop].append(DKL)
+
+
                             #if the_obj.leadtime_group.values[0] != "first_hour":
                             #    pdb.set_trace()
                             # pdb.set_trace()
@@ -4679,18 +4841,7 @@ if do_object_infogain:
                             # Now, let's put it into the right hour
                             #if True:
                             #    hour = the_obj.leadtime_group.values[0]
-                            if True:
-                                obj_utc = the_obj.time.values[0]
-                                # determine which time window this is in
-                                compare_utc = initutc + datetime.timedelta(
-                                                # seconds=int(halfhour)*60)
-                                                seconds=int(tperiods.index(hour))*60)
 
-                                obj_utc = utils.dither_one_value(obj_utc)
-                                dt = (compare_utc-obj_utc).total_seconds()
-                                tt = int(abs(dt)/60)
-                                halfhours = [0,60,120]
-                                idx = N.searchsorted(halfhours,tt) - 1
                                 # pdb.set_trace()
 
                             #if hour != "first_hour":
@@ -4698,7 +4849,6 @@ if do_object_infogain:
                             #pdb.set_trace()
                             # IGs_by_time[mode][fcst_dom_code][hour].append(IGs[1,:])
                             # IGs_by_time[mode][fcst_dom_code][hour] =
-                            hh = tperiods[idx]
                             IGs_by_time[mode][fcst_dom_code][hh].append(info_gain)
                             # pdb.set_trace()
                             # 0 is 30 min or earlier.
@@ -4706,7 +4856,10 @@ if do_object_infogain:
 
             # Save to disk
             utils.save_pickle(obj=IGs_by_time, fpath=IGs_fpath)
+            utils.save_pickle(obj=UHs_by_time, fpath=UHs_fpath)
+            utils.save_pickle(obj=mUHs_by_time,fpath=mUHs_fpath)
 
+        # pdb.set_trace()
         # 1/4 done
         # assert 1==0
         worst_score = N.log2(constrain_minmax[0]/naive_prob)
@@ -4736,14 +4889,15 @@ if do_object_infogain:
                 # hours = ("first_hour","second_hour","third_hour")
                 hour = tperiods[nh]
                 fig,ax = plt.subplots(1,figsize=figsize)
-                fname = f"obj_infogain_distrs_{mode}_{hour}_{naive}pc.png"
-                fpath = os.path.join(outroot,"info_gain",fname)
+                ig_fname = f"obj_infogain_distrs_{mode}_{hour}_{naive}pc.png"
+                ig_fpath = os.path.join(outroot,"info_gain",ig_fname)
 
                 #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
                 #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
 
                 #EE3_IGs = N.array(IGs_by_time[mode]["d01_3km"][hour]).flatten()
                 #EE1_IGs = N.array(IGs_by_time[mode]["d02_1km"][hour]).flatten()
+
 
                 #aa = N.array(IGs_by_time[mode]["d01_3km"][hour])
                 #pdb.set_trace()
@@ -4751,9 +4905,50 @@ if do_object_infogain:
                 # plot(ax,EE3_IGs,EE1_IGs,fpath,(worst_score,best_score))
                 plot(ax,N.array(IGs_by_time[mode]["d01_3km"][hour]),
                         N.array(IGs_by_time[mode]["d02_1km"][hour]),
-                        fpath,(worst_score,best_score),
+                        ig_fpath,(worst_score,best_score),
                         )
-                # Put the mean/median into array for bar chart
+
+                # Now UH
+                for prop in uh_props:
+                    fig,ax = plt.subplots(1,figsize=figsize)
+                    uh_fname = f"uh_infogain_distrs_{mode}_{hour}_{prop}.png"
+                    uh_fpath = os.path.join(outroot,"info_gain",uh_fname)
+
+                    arr3km_a = N.array(UHs_by_time[mode]["d01_3km"][hour][prop])
+                    arr1km_a = N.array(UHs_by_time[mode]["d02_1km"][hour][prop])
+                    plot(ax,arr3km_a,arr1km_a,uh_fpath,(worst_score,best_score),
+                        vrbl="UH",)
+
+                    H_total, Ho_total = get_H(arr3km_a,arr1km_a)
+                    H_total_all = H_total
+
+
+                # for prop in uh_props:
+                    fig,ax = plt.subplots(1,figsize=figsize)
+                    uh_fname = f"muh_infogain_distrs_{mode}_{hour}_{prop}.png"
+                    uh_fpath = os.path.join(outroot,"info_gain",uh_fname)
+
+                    arr3km_b = N.array(
+                            mUHs_by_time[mode]["d01_3km"][hour][prop])
+                    arr1km_b = N.array(
+                            mUHs_by_time[mode]["d02_1km"][hour][prop])
+
+                    H_total_noclearsky, Ho_ncs = get_H(arr3km_b,arr1km_b)
+                    plot(ax,arr3km_b,arr1km_b,uh_fpath,(worst_score,best_score),
+                        vrbl="UH",
+                        # H_all=H_total_all,H_noclearsky=H_total_noclearsky)
+                        Ho_all=Ho_total,Ho_ncs=Ho_ncs)
+
+                    #print("Info gain by 1km is", H_total_noclearsky,
+                    #    "bits for",prop,"and removing clear sky")
+
+                    # Annotate both the "all" and "clear sky" bits gain
+                    # H_total_clearsky and H_total_all
+                    # ax.text()
+
+
+
+                # Putthe mean/median into array for bar chart
                 means[0,nh] = N.nanmean(EE3_IGs)
                 means[1,nh] = N.nanmean(EE1_IGs)
 
@@ -4796,6 +4991,7 @@ if do_object_infogain:
         else:
             for g in gg:
                 compute_OSIG(g)
+
 
 
 
@@ -5568,3 +5764,194 @@ if do_ign_storm:
 
     # fig.tight_layout()
     fig.savefig(fpath)
+
+if do_uh_infogain:
+
+    def compute_UH_DKL(i):
+        """ .
+        """
+        dom, mode, oo, MATCH = i
+
+        fcst_obj_mf = mf[
+                    (mf['member']!='obs') &
+                    (mf['conv_mode']==mode) &
+                    (mf['resolution']==dom)
+                    # mf['leadtime_group'==hr]
+                    ]
+        if dom == "EE3km":
+            dc = "d01_3km"
+        elif dom == "EE1km":
+            dc = "d02_1km"
+        else:
+            assert 1==0
+
+
+        for propno, prop in enumerate(uh_props):
+            # Did it exceed the threshold?
+            # Need to access this - don't loop over tuples but Series?
+            obs_yesno = oo[prop]
+            obs_ID = oo['megaframe_idx']
+            casestr = oo['case_code']
+            caseutc = datetime.datetime.strptime(casestr,"%Y%m%d")
+            obs_utc = oo['time']
+
+            # Get cases from CASES
+            # For each init time, would it capture the object?
+            iss = []
+            for initutc in CASES[caseutc]:
+                # compare datetimes
+
+                # Allow for windowing of objects
+                startutc = initutc + datetime.timedelta(seconds=(20*60))
+                endutc = initutc + datetime.timedelta(
+                                            seconds=((3*60*60)-(20*60)))
+                if (obs_utc > startutc) and (obs_utc < endutc):
+                #dt = obs_utc - initutc
+                    iss.append(initutc)
+            # Now load each ensemble member match
+
+            # No match is a 0.01
+            # All match is a 0.99
+
+            # Get window of object timing and form list of
+            # all eligible forecasts (so we avoid punishing
+            # erroneous 0% forecasts)
+
+            # Need to loop over all forecast inits and try to match
+            DKL_list = []
+            for initutc in iss:
+                initstr = datetime.datetime.strftime(initutc,"%H%M")
+                # Check to see if this object can even be matched in
+                # the time of the object
+
+                # Get hour period for this forecast object
+                # Return array of [DKL,fcsthr]
+                dt = obs_utc - initutc
+                hr_dec = dt.seconds/3600
+
+                if hr_dec < 1:
+                    leadtime_group = 0
+                elif hr_dec < 2:
+                    leadtime_group = 1
+                elif hr_dec < 3:
+                    leadtime_group = 2
+                else:
+                    assert 1==0
+
+                mem_exceeds = []
+                for mem in member_names:
+                    matches = MATCH[dc][mem][casestr][initstr][
+                                mode]['sorted']
+                    if len(matches) == 0:
+                        mem_yesno = False
+                    else:
+                        mem_match_yn = obs_ID in N.array(matches)[:,0]
+                        if mem_match_yn:
+                            mem_yesno = False
+                        else:
+                            for match in matches:
+                                if match[0] == obs_ID:
+                                    idx = match[1]
+                                    mem_yesno = fcst_obj_mf[
+                                        fcst_obj_mf['megaframe_idx']==idx].prop
+                    mem_exceeds.append(mem_yesno)
+
+                print(mem_exceeds)
+                fprob_raw = N.mean(mem_exceeds)
+                fprob = constrain(fprob_raw,minmax=(0.01,0.99))
+
+                DKL = -((obs_yesno * N.log2(obs_yesno/fprob))+
+                            ((1-obs_yesno)*N.log2((1-obs_yesno)/(1-fprob))))
+                # Compute
+                pdb.set_trace()
+                # Get matches
+
+                # Lookup in fcst mf
+
+                # compute probs
+
+                # compute DKL
+
+                # Return DKL (can collate over leadtime,)
+                # Do as list for all props
+                # Then returns from pool can be converted to array?
+                # This serves as a histogram for this collection
+                # (per leadtime,resolution,mode)
+
+                # Compute hour from diff in obs time and initutc
+                # Maybe return the hour of this object as 0/1/2
+                DKL_list.append([DKL,leadtime_group,propno])
+            pass
+            # This is end of looping over forecasts
+        # Now combine for all props/fcsts
+        DKL_arr = N.array(DKL_list)
+        # pdb.set_trace()
+        return DKL_arr
+
+    def __gen_UH_loop(obs_obj_mf,dom,mode,MATCH):
+        for initutc, casestr, initstr in get_initutcs_strs():
+            # Get objects for this time
+            for oo in obs_obj_mf.iterrows():
+                yield initutc, casestr, initstr, dom, mode, oo[1], MATCH
+
+    def gen_UH_loop(obs_obj_mf,dom,mode,MATCH):
+        for oo in obs_obj_mf.iterrows():
+            pdb.set_trace()
+            yield dom, mode, oo[1], MATCH
+
+    uh_props = ["midrot_exceed_ID_0","midrot_exceed_ID_1",
+        "midrot_exceed_ID_2","midrot_exceed_ID_3",
+        "lowrot_exceed_ID_0","lowrot_exceed_ID_1",
+        "lowrot_exceed_ID_2","lowrot_exceed_ID_3",]
+
+    modes = ('cellular','linear')
+    doms = ("EE3km","EE1km")
+    # hours = ("first_hour","second_hour","third_hour")
+    # for dom, mode, hr in itertools.product(doms,modes,hours):
+    for dom, mode in itertools.product(doms,modes):
+        MATCH, mf = get_MATCH(member_names,return_megaframe=True,modes=(mode,))
+        pdb.set_trace()
+        obs_obj_mf = mf[
+                    (mf['member']=='obs') &
+                    # (mf['conv_mode']==mode) &
+                    (mf['resolution']==dom)
+                    # mf['leadtime_group']==hr,
+                    ]
+        # Paralellise over dom, init, validutc, leadtime
+        # Loop over objects and match ensemble objects
+        # After, collate histogram count per info gain/loss?
+        itr = gen_UH_loop(obs_obj_mf,dom,mode,MATCH)
+
+        # Can we parallelise over objects? The function can load
+        # the forecast matches from the main mf?
+
+        # Need new iterator over these cases but also dom/hour/mode
+
+        if ncpus > 1:
+            with multiprocessing.Pool(ncpus) as pool:
+                returns = pool.map(compute_UH_DKL,itr)
+        else:
+            returns = []
+            for i in itr:
+                returns.append(compute_UH_DKL(i))
+
+        # Collate results
+
+        # Save to pickle (numpy?)
+
+    # PLOT!!
+
+    ##############################
+
+    # Get all objects
+
+    # Get all matches
+
+    # For each object, for each threshold, compute the prob of exceedence
+    # This is DKL (divergence), as we capture false alarms too (unlike
+    # the REFL/object info gain)
+
+    # Separate by hour
+
+
+    # Plot as obj info gain
