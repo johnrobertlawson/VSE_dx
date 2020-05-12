@@ -51,7 +51,7 @@ from evac.object.objectid import ObjectID
 from evac.object.catalogue import Catalogue
 from evac.plot.scales import Scales
 from evac.datafiles.narrfile import NARRFile
-from windrose import WindroseAxes
+# from windrose import WindroseAxes
 
 
 ### ARG PARSE ####
@@ -89,15 +89,15 @@ do_object_pca = False
 do_object_performance = False # TODO re-do with new (18) matching/diff vectors?
 do_object_distr = False # TODO re-plot after matching new (18) matches
 do_object_matching = False # TODO finish 18 members; do info-gain diffs?
-do_object_windrose = False # # TODO leave till later...
+do_object_windrose = False # # TODO NOT WORKING - WINDROSE PACKAGE HAS ISSUES
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
-do_object_infogain = True # TODO broken due to indents etc
+do_object_infogain = False # TODO broken due to indents etc
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
 do_qlcs_verif = False
 do_spurious_example = False
 do_oID_example = False
-do_ign_storm = False
+do_ign_storm = True
 
 do_uh_infogain = False
 
@@ -153,22 +153,30 @@ key_output = "FebPC"
 # FebPC - 96pc w/ 144 footprint - let's go!
 
 #extractroot = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
-extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
+# extractroot = '/Users/john.lawson/data/{}'.format(key_pp)
 lacie_root = '/Volumes/LaCie/VSE_dx'
 
-objectroot = os.path.join(extractroot,'object_instances_PC')
-# objectroot = os.path.join(lacie_root,'object_instances_PC')
+extractroot = os.path.join(lacie_root,key_pp)
+
+objectroot = os.path.join(lacie_root,'object_instances_PC')
+# objectroot = os.path.join(lacie_root,'object_instances_FIXED')
 
 # objectroot = "/Volumes/LaCie/VSE_dx/object_instances"
 # outroot = "/home/john.lawson/VSE_dx/pyoutput"
 # outroot = "/scratch/john.lawson/VSE_dx/figures"
 #outroot = "/work/john.lawson/VSE_dx/figures"
 # outroot = "/mnt/jlawson/VSE_dx/figures/"
-outroot = "/Users/john.lawson/data/figures_{}".format(key_output)
+
+# When on NSSL laptop
+# outroot = "/Users/john.lawson/data/figures_{}".format(key_output)
+
+# When on personal laptop
+outroot = "/Users/johnlawson/paper_figures/VSE_dx/{}".format(key_output)
+
 #tempdir = "/Users/john.lawson/data/intermediate_files"
 tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files_PC"
-narrroot = '/Users/john.lawson/data/AprilFool/NARR'
-
+# narrroot = '/Users/john.lawson/data/AprilFool/NARR'
+narrroot = None
 
 ##### OTHER STUFF #####
 stars = "*"*10
@@ -5363,16 +5371,20 @@ if do_spurious_example:
     pcm.cmap.set_under('white')
 
     fig.tight_layout()
-    fig.savefig("./spurious_compare.png")
+    spurious_fpath = os.path.join(outroot,"spurious_compare.png")
+    fig.savefig(spurious_fpath)
 
 if do_oID_example:
     data_folder = os.path.join(objectroot,"20160331")
     data_fname = "objects_REFL_comp_d02_1km_20160331_1900_1930_m01.pickle"
     # data_fname = "objects_REFL_comp_d01_3km_20160331_1900_1930_m01.pickle"
     data_fpath = os.path.join(data_folder,data_fname)
+    print(data_fpath)
 
     obj = utils.load_pickle(data_fpath)
     # pdb.set_trace()
+
+    mf = load_megaframe(fmts=None)
 
     def do_label_pca(bmap,ax,discrim_vals=(-0.5,0.5)):
         # JRL: change to lookup in megaframe.
@@ -5383,9 +5395,25 @@ if do_oID_example:
             lab = "{:0.2f}".format(o.qlcsness)
             locs[lab] = (o.centroid_lat,o.centroid_lon)
             id = int(o.label)
-            if o.qlcsness < discrim_vals[0]:
+
+
+            # TODO: look up object ID in megaframe and determine MDI
+            # what is obj_idx?
+            # Find object in DataFrame
+            obj_df = mf[
+                    (mf['centroid_row'] == o.centroid_row) &
+                    (mf['centroid_col'] == o.centroid_col) &
+                    (mf['fpath_save'] == data_fpath)
+                    ].megaframe_idx
+
+            # pdb.set_trace()
+            oidx = obj_df.iloc[0]
+
+            qlcsness = mf.iloc[oidx].qlcsness
+
+            if qlcsness < discrim_vals[0]:
                 discrim = 1
-            elif o.qlcsness > discrim_vals[1]:
+            elif qlcsness > discrim_vals[1]:
                 discrim = 3
             else:
                 discrim = 2
@@ -5441,7 +5469,8 @@ if do_oID_example:
             pcm = bmap.pcolormesh(x,y,obj.object_field,cmap=S.cm,vmin=S.clvs[0],
                                 vmax=S.clvs[-1],alpha=0.5,
                                 antialiased=True,)
-            bmap.contour(x,y,obj.raw_data,levels=[45,],color='k',linewidths=0.5)
+            # 45.7 is the 96th percentile
+            bmap.contour(x,y,obj.raw_data,levels=[45.7],color='k',linewidths=0.6)
             pcm.cmap.set_under('white')
 
             # label_objs(bmap,ax,locs)
@@ -5495,15 +5524,28 @@ if do_ign_storm:
     # latlon = (33.46,-88.28)
     # latlon = (41.6,-78.72)
     # latlon = (33.79,-84.24)
-    latlon = (36.6,-101.0)
+    # latlon = (36.6,-101.0)
+
+    # latlon = (32.9,-88.6)
+
+
+    latlon = (32.65,-89.2)
+
     # latpt, lonpt = latlon
 
     # latmax, latmin, lonmax, lonmin = (34.5,33.0,-87.5,-89.5)
-    pad = 0.8
-    latmax = latlon[0] + pad
-    latmin = latlon[0] - pad
-    lonmax = latlon[1] + pad
-    lonmin = latlon[1] - pad
+    # pad = 0.8
+
+    #lon_pad = 1.0
+    #lat_pad = 0.8
+
+    lon_pad = 0.6
+    lat_pad = 0.55
+
+    latmax = latlon[0] + lat_pad
+    latmin = latlon[0] - lat_pad
+    lonmax = latlon[1] + lon_pad
+    lonmin = latlon[1] - lon_pad
 
 
     vrbl = "UH25"
@@ -5522,17 +5564,17 @@ if do_ign_storm:
 
     # d02_1km 2.23
     # d01_3km 1.91
+    mem = 'm02'
 
 
 
-    mem = 'm01'
-    valid_time = datetime.datetime(2017,5,3,2,30,0)
+    valid_time = datetime.datetime(2016,3,31,21,30,0)
     valid = f"{valid_time.hour:02d}{valid_time.minute:02d}"
 
-    init_time =  datetime.datetime(2017,5,3,2,0,0)
+    init_time =  datetime.datetime(2016,3,31,20,0,0)
     init = f"{init_time.hour:02d}{init_time.minute:02d}"
 
-    case_date = datetime.datetime(2017,5,2,0,0,0)
+    case_date = datetime.datetime(2016,3,31,0,0,0)
     case = f"{case_date.year:04d}{case_date.month:02d}{case_date.day:02d}"
 
     def do_plot_obj(bmap,ax,obj,contour_only=False,lw=(1.0,),anno_ign=False):
@@ -5607,7 +5649,7 @@ if do_ign_storm:
 
     # Get ignorance, maybe objects
 
-    fig, axes = plt.subplots(ncols=3,nrows=2,figsize=(10,8))
+    fig, axes = plt.subplots(ncols=3,nrows=2,figsize=(10,7))
     fname = "ML_AS_ex_cb.png"
     fpath = os.path.join(outroot,fname)
     S = Scales('cref')
@@ -5656,7 +5698,7 @@ if do_ign_storm:
                         vmax=S.clvs[-1],alpha=0.5,
                         antialiased=True,)
     pcm.cmap.set_under('white')
-    plt.colorbar(pcm,ax=ax)
+    # plt.colorbar(pcm,ax=ax)
 
 
 
@@ -5689,8 +5731,8 @@ if do_ign_storm:
                         vmin=aws_minmax[0],vmax=aws_minmax[1],
                         alpha=0.5,antialiased=True,)
     pcm.cmap.set_under('white')
-    do_plot_obj(m,ax,obj_o,contour_only=True,anno_ign=True)
-    plt.colorbar(pcm,ax=ax)
+    do_plot_obj(m,ax,obj_o,contour_only=True,anno_ign=True,lw=(1.0,))
+    # plt.colorbar(pcm,ax=ax)
 
 
     # EE3km
@@ -5707,7 +5749,7 @@ if do_ign_storm:
                         vmin=uh_minmax_3[0],vmax=uh_minmax_3[1],
                         alpha=0.5,antialiased=True,)
     pcm.cmap.set_under('white')
-    do_plot_obj(m,ax,obj_3,contour_only=True,lw=0.13,)#anno_ign=True)
+    do_plot_obj(m,ax,obj_3,contour_only=True,lw=(1.0,),)#anno_ign=True)
 
 
     # EE1km
@@ -5724,7 +5766,7 @@ if do_ign_storm:
                         vmin=uh_minmax_1[0],vmax=uh_minmax_1[1],
                         alpha=0.5,antialiased=True,)
     pcm.cmap.set_under('white')
-    do_plot_obj(m,ax,obj_1,contour_only=True)
+    do_plot_obj(m,ax,obj_1,contour_only=True,lw=(1.0,))
 
     if False:
 
@@ -5762,7 +5804,7 @@ if do_ign_storm:
         do_plot_obj(m,ax,obj_1)
 
 
-    # fig.tight_layout()
+    fig.tight_layout()
     fig.savefig(fpath)
 
 if do_uh_infogain:
