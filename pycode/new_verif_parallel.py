@@ -88,7 +88,7 @@ object_switch = False
 do_object_pca = False
 do_object_performance = False # TODO re-do with new (18) matching/diff vectors?
 do_object_distr = False # TODO re-plot after matching new (18) matches
-do_object_matching = False # TODO finish 18 members; do info-gain diffs?
+do_object_matching = True # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO NOT WORKING - WINDROSE PACKAGE HAS ISSUES
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
 do_object_infogain = False # TODO broken due to indents etc
@@ -97,7 +97,7 @@ do_one_objectID = False
 do_qlcs_verif = False
 do_spurious_example = False
 do_oID_example = False
-do_ign_storm = True
+do_ign_storm = False
 
 do_uh_infogain = False
 
@@ -3285,8 +3285,8 @@ if do_object_distr:
 
 if do_object_matching:
     print(stars,"DOING OBJ MATCHING/DIFFS",stars)
-    # mode = "cellular"
-    mode = 'linear'
+    mode = "cellular"
+    # mode = 'linear'
     mns = get_member_names(36)
     match_dict, megaframe = get_dom_match(mns, return_megaframe=True,
                                 modes=(mode,))
@@ -3401,7 +3401,7 @@ if do_object_matching:
     }
 
     NICESTR = {
-        "area_diff":"Object area (km2/pixels?)",
+        "area_diff":"Object area ($km^2$)",
         "extent_diff":"Extent (fraction)",
         "longaxis_km_diff":"Longest axis length ($km$)",
         # "qlcsness_diff":[-3,3],
@@ -5566,7 +5566,7 @@ if do_ign_storm:
     # d01_3km 1.91
     mem = 'm02'
 
-
+    mf = load_megaframe(fmts=None)
 
     valid_time = datetime.datetime(2016,3,31,21,30,0)
     valid = f"{valid_time.hour:02d}{valid_time.minute:02d}"
@@ -5588,8 +5588,36 @@ if do_ign_storm:
             obj_discrim = N.where(obj.idxarray == id, discrim, obj_discrim)
             bmap.contour(x,y,obj_discrim,colors=['k',],levels=[0,1],linewidths=lw)
 
-            #if anno_ign:
-            #    pdb.set_trace()
+            # OBS megaframe idx:
+            # TOP LEFT = 2518
+            # BOTTOM LEFT = 2516
+            # BOTTOM RIGHT = 2515
+            if anno_ign:
+
+                # obs_objs = mf[
+                #             (mf['prod_code'] == )
+                # ]
+                obj_df = mf[
+                        (mf['centroid_row'] == o.centroid_row) &
+                        (mf['centroid_col'] == o.centroid_col) &
+                        # (mf['fpath_save'] == data_fpath)
+                        (mf['time'] == valid_time)
+                        ].megaframe_idx
+                mega_idx = obj_df.values[0]
+                mini_idx = mf[mf['megaframe_idx'] == mega_idx
+                                ].miniframe_idx.values[0]
+                # pdb.set_trace()
+                anno_str = f"{mega_idx}\n{mini_idx}"
+
+                x_pt, y_pt = bmap(o.centroid_lon,o.centroid_lat)
+
+                if (lonmin < o.centroid_lon < lonmax) & (
+                        latmin < o.centroid_lat < latmax):
+                    ax.annotate(anno_str,xy=(x_pt,y_pt),xycoords="data",
+                        annotation_clip=False,zorder=1000,
+                        fontsize=11,# fontstyle="italic",
+                        fontweight='bold',color="blue",)
+                    pdb.set_trace()
 
         if not contour_only:
             marr = N.ma.masked_where(obj_discrim < 1, obj_discrim)
@@ -5749,7 +5777,7 @@ if do_ign_storm:
                         vmin=uh_minmax_3[0],vmax=uh_minmax_3[1],
                         alpha=0.5,antialiased=True,)
     pcm.cmap.set_under('white')
-    do_plot_obj(m,ax,obj_3,contour_only=True,lw=(1.0,),)#anno_ign=True)
+    do_plot_obj(m,ax,obj_3,contour_only=True,lw=(1.0,),anno_ign=True)
 
 
     # EE1km
@@ -5766,7 +5794,7 @@ if do_ign_storm:
                         vmin=uh_minmax_1[0],vmax=uh_minmax_1[1],
                         alpha=0.5,antialiased=True,)
     pcm.cmap.set_under('white')
-    do_plot_obj(m,ax,obj_1,contour_only=True,lw=(1.0,))
+    do_plot_obj(m,ax,obj_1,contour_only=True,lw=(1.0,),anno_ign=True)
 
     if False:
 
@@ -5803,6 +5831,62 @@ if do_ign_storm:
         m.drawcountries(color='grey')
         do_plot_obj(m,ax,obj_1)
 
+    # Print matches for each obs object
+
+    # OBS megaframe idx:
+    # TOP LEFT = 2518
+    # BOTTOM LEFT = 2516
+    # BOTTOM RIGHT = 2515
+
+    print("2518 (top left):")
+    MATCH = get_MATCH(member_names,modes=('cellular',))
+    # MATCH[dom_code][member][casestr][initstr][mode]['2x2']
+
+    # for mem in member_names:
+    for mem in ('m02',):
+        print(mem)
+
+
+        prod_code = f"nexrad_3km_obs"
+        obs_objs_IDs = mf[
+                (mf['prod_code'] == prod_code) &
+                (mf['conv_mode'] == 'cellular') &
+                (mf['case_code'] == case) # &
+                # (mf['time'] >= earliest_utc) &
+                # (mf['time'] <= latest_utc)
+                # (mf['leadtime_group'] == f"{hour}")
+                ].megaframe_idx
+
+        matches = MATCH['d01_3km'][mem][case][init]['cellular']['matches']
+        matches_sort = MATCH['d01_3km'][mem][case][init]['cellular']['sorted']
+
+        print(matches_sort)
+        print(sorted(matches))
+
+        print('=+'*20)
+
+        prod_code = f"nexrad_1km_obs"
+        obs_objs_IDs = mf[
+                (mf['prod_code'] == prod_code) &
+                (mf['conv_mode'] == 'cellular') &
+                (mf['case_code'] == case) # &
+                # (mf['time'] >= earliest_utc) &
+                # (mf['time'] <= latest_utc)
+                # (mf['leadtime_group'] == f"{hour}")
+                ].megaframe_idx
+
+        matches = MATCH['d02_1km'][mem][case][init]['cellular']['matches']
+        matches_sort = MATCH['d02_1km'][mem][case][init]['cellular']['sorted']
+
+        print(matches_sort)
+        print(sorted(matches))
+
+
+
+
+        # pdb.set_trace()
+
+    # pdb.set_trace()
 
     fig.tight_layout()
     fig.savefig(fpath)
