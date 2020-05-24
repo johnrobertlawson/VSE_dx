@@ -88,10 +88,10 @@ object_switch = False
 do_object_pca = False
 do_object_performance = False # TODO re-do with new (18) matching/diff vectors?
 do_object_distr = False # TODO re-plot after matching new (18) matches
-do_object_matching = True # TODO finish 18 members; do info-gain diffs?
+do_object_matching = False # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO NOT WORKING - WINDROSE PACKAGE HAS ISSUES
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
-do_object_infogain = False # TODO broken due to indents etc
+do_object_infogain = True # TODO broken due to indents etc
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
 do_qlcs_verif = False
@@ -3173,7 +3173,7 @@ if do_object_distr:
     obs_fmts = ("nexrad_3km","nexrad_1km")
     all_fmts = list(fcst_fmts) + list(obs_fmts)
     megaframe = load_megaframe(fmts=all_fmts)
-    # pdb.set_trace()
+    pdb.set_trace()
     # max_updraught
     # mean_updraught
     # distance_from_centroid
@@ -4970,7 +4970,7 @@ if do_object_infogain:
         return
 
     # naive_probs = N.arange(0.1,1.0,0.1)
-    naive_probs = (0.2,)
+    naive_probs = (0.1,)
     # arrays for means for each [dx,tperiod,]
 
     means = utils.generate_shared_arr([2,3,len(naive_probs)],dtype=float)
