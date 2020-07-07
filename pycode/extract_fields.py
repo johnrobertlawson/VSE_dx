@@ -43,16 +43,18 @@ key_wrf = 'ForReal_nco'
 ensroot = '/oldscratch/john.lawson/WRF/VSE_reso/{}'.format(key_wrf)
 
 # Folder key for post-processed fields (objects, lat/lon, etc)
-key_pp = 'AprilFool'
+key_pp = 'UHFool'
 pp_root = '/work/john.lawson/VSE_reso/pp/{}'.format(key_pp)
 tempdir_root = '/work/john.lawson/VSE_reso/pp_temp/{}'.format(key_pp)
 
 # Folder key for scores (FSS, etc)
-key_scores = 'AprilFool'
+#key_scores = 'AprilFool'
+key_scores = "UHFool"
 scoreroot = '/work/john.lawson/VSE_reso/scores/{}'.format(key_scores)
 
 # Folder key for plots
-key_plot = 'AprilFool'
+# key_plot = 'AprilFool'
+key_plot = 'UHFool'
 plotroot = '/home/john.lawson/VSE_reso/pyoutput/{}'.format(key_plot)
 
 st4dir = '/work/john.lawson/STAGEIV_data'
@@ -63,31 +65,31 @@ radardir = '/work/john.lawson/NEXRAD_data'
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
                         datetime.datetime(2016,3,31,19,0,0),
-                        # datetime.datetime(2016,3,31,20,0,0),
-                        # datetime.datetime(2016,3,31,21,0,0),
-                        # datetime.datetime(2016,3,31,22,0,0),
-                        # datetime.datetime(2016,3,31,23,0,0),
+                        datetime.datetime(2016,3,31,20,0,0),
+                        datetime.datetime(2016,3,31,21,0,0),
+                        datetime.datetime(2016,3,31,22,0,0),
+                        datetime.datetime(2016,3,31,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,1,0,0,0)] = [
                         datetime.datetime(2017,5,1,19,0,0),
-                        # datetime.datetime(2017,5,1,20,0,0),
-                        # datetime.datetime(2017,5,1,21,0,0),
-                        # datetime.datetime(2017,5,1,22,0,0),
-                        # datetime.datetime(2017,5,1,23,0,0),
+                        datetime.datetime(2017,5,1,20,0,0),
+                        datetime.datetime(2017,5,1,21,0,0),
+                        datetime.datetime(2017,5,1,22,0,0),
+                        datetime.datetime(2017,5,1,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,2,0,0,0)] = [
                         datetime.datetime(2017,5,2,23,0,0),
-                        # datetime.datetime(2017,5,3,0,0,0),
-                        # datetime.datetime(2017,5,3,1,0,0),
-                        # datetime.datetime(2017,5,3,2,0,0),
-                        # datetime.datetime(2017,5,3,3,0,0),
+                        datetime.datetime(2017,5,3,0,0,0),
+                        datetime.datetime(2017,5,3,1,0,0),
+                        datetime.datetime(2017,5,3,2,0,0),
+                        datetime.datetime(2017,5,3,3,0,0),
                         ]
 CASES[datetime.datetime(2017,5,4,0,0,0)] = [
                         datetime.datetime(2017,5,4,22,0,0),
-                        # datetime.datetime(2017,5,4,23,0,0),
-                        # datetime.datetime(2017,5,5,0,0,0),
-                        # datetime.datetime(2017,5,5,1,0,0),
-                        # datetime.datetime(2017,5,5,2,0,0),
+                        datetime.datetime(2017,5,4,23,0,0),
+                        datetime.datetime(2017,5,5,0,0,0),
+                        datetime.datetime(2017,5,5,1,0,0),
+                        datetime.datetime(2017,5,5,2,0,0),
                         ]
 
 ##### OTHER STUFF #####
@@ -98,8 +100,8 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 
 stars = "*"*10
 dom_names = ("d01","d02")
-# member_names = ['m{:02d}'.format(n) for n in range(1,37)]
-member_names = ['m{:02d}'.format(n) for n in range(1,19)]
+member_names = ['m{:02d}'.format(n) for n in range(1,37)]
+# member_names = ['m{:02d}'.format(n) for n in range(1,19)]
 # member_names = ['m{:02d}'.format(n) for n in range(1,2)]
 # doms = (1,2)
 
@@ -111,11 +113,11 @@ OBS_VRBLS = ("AWS02","AWS25","DZ","ST4","NEXRAD")
 
 # "NEXRAD"
 # These are the requests variables
-fcst_vrbls = ("u_shear06","v_shear06")
+fcst_vrbls = ("UH02","UH25")
 # fcst_vrbls = ("SRH03","u_shear01","v_shear01")
 # fcst_vrbls = ("REFL_comp","UH25","UH02","Wmax","RAINNC")
 # fcst_vrbls = ("Wmax","RAINNC")
-obs_vrbls = ("DZ",)
+obs_vrbls = ("NEXRAD",)
 # obs_vrbls = ("AWS25","AWS02","ST4","DZ","NEXRAD")
 
 # Don't allow computation without both fcst and obs data requested
@@ -123,7 +125,7 @@ obs_vrbls = ("DZ",)
 # Maybe not needed once lats.npy and lons.npy are created
 assert fcst_vrbls and obs_vrbls
 
-debug_mode = True
+debug_mode = False
 # fcstmins = N.arange(0,185,5)
 # maxsec = 60*60*3
 
