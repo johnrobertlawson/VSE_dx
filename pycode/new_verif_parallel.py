@@ -77,7 +77,7 @@ do_quicklooks = not PA.no_quick
 ### SWITCHES ###
 do_plot_quicklooks = False
 do_domains = False
-do_percentiles = False
+do_percentiles = True
 _do_performance = False # Broken - to delete?
 do_performance = False
 do_efss = False # TODO - average for cref over cases, for paper
@@ -91,7 +91,7 @@ do_object_distr = False # TODO re-plot after matching new (18) matches
 do_object_matching = False # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO NOT WORKING - WINDROSE PACKAGE HAS ISSUES
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
-do_object_infogain = True # TODO broken due to indents etc
+do_object_infogain = False #
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
 do_qlcs_verif = False
@@ -112,33 +112,35 @@ do_object_cluster = False # TODO prob delete
 
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
-                        datetime.datetime(2016,3,31,19,0,0),
-                        datetime.datetime(2016,3,31,20,0,0),
+#                        datetime.datetime(2016,3,31,19,0,0),
+#                        datetime.datetime(2016,3,31,20,0,0),
                         datetime.datetime(2016,3,31,21,0,0),
-                        datetime.datetime(2016,3,31,22,0,0),
-                        datetime.datetime(2016,3,31,23,0,0),
+#                        datetime.datetime(2016,3,31,22,0,0),
+#                        datetime.datetime(2016,3,31,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,1,0,0,0)] = [
-                        datetime.datetime(2017,5,1,19,0,0),
-                        datetime.datetime(2017,5,1,20,0,0),
+#                        datetime.datetime(2017,5,1,19,0,0),
+#                        datetime.datetime(2017,5,1,20,0,0),
                         datetime.datetime(2017,5,1,21,0,0),
-                        datetime.datetime(2017,5,1,22,0,0),
-                        datetime.datetime(2017,5,1,23,0,0),
+#                        datetime.datetime(2017,5,1,22,0,0),
+#                        datetime.datetime(2017,5,1,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,2,0,0,0)] = [
-                        datetime.datetime(2017,5,2,23,0,0),
-                        datetime.datetime(2017,5,3,0,0,0),
+#                        datetime.datetime(2017,5,2,23,0,0),
+#                        datetime.datetime(2017,5,3,0,0,0),
                         datetime.datetime(2017,5,3,1,0,0),
-                        datetime.datetime(2017,5,3,2,0,0),
-                        datetime.datetime(2017,5,3,3,0,0),
+#                        datetime.datetime(2017,5,3,2,0,0),
+#                        datetime.datetime(2017,5,3,3,0,0),
                         ]
 CASES[datetime.datetime(2017,5,4,0,0,0)] = [
-                        datetime.datetime(2017,5,4,22,0,0),
-                        datetime.datetime(2017,5,4,23,0,0),
+#                        datetime.datetime(2017,5,4,22,0,0),
+#                        datetime.datetime(2017,5,4,23,0,0),
                         datetime.datetime(2017,5,5,0,0,0),
-                        datetime.datetime(2017,5,5,1,0,0),
-                        datetime.datetime(2017,5,5,2,0,0),
+#                        datetime.datetime(2017,5,5,1,0,0),
+#                        datetime.datetime(2017,5,5,2,0,0),
                         ]
+
+
 # To do - 20180429 (texas panhandle)
 # CASES[datetime.datetime(2018,4,29,0,0,0)] = []
 
@@ -175,6 +177,7 @@ outroot = "/Users/johnlawson/paper_figures/VSE_dx/{}".format(key_output)
 
 #tempdir = "/Users/john.lawson/data/intermediate_files"
 tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files_PC"
+# tempdir = "/Volumes/LaCie/VSE_dx/intermediate_files_FIXED"
 # narrroot = '/Users/john.lawson/data/AprilFool/NARR'
 narrroot = None
 
@@ -601,7 +604,19 @@ def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem,return_ll=True
 
     ######### JRL: ALL FCST DATA EDITING GOES ON HERE ##########
     if fcst_vrbl in ("UH02","UH25"):
-        fcst_data[fcst_data<0.0] = N.nan
+        fcst_data = N.negative(fcst_data)
+
+        # small_no = 0.000001
+
+        # fcst_data[N.isnan(fcst_data)] = 0.0
+        # fcst_data[N.isnan(fcst_data)] = small_no
+
+        # fcst_data[fcst_data<0.0] = small_no
+
+        fcst_data[fcst_data<0.0] = 0.0
+        # fcst_data[fcst_data<0.0] = N.nan
+        pass
+
     ############################################################
 
     if return_ll:
@@ -626,7 +641,9 @@ def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
 
     ######### JRL: ALL OBS DATA EDITING GOES ON HERE ##########
     if obs_vrbl in ("AWS02","AWS25"):
-        obs_data[obs_data<0.0] = N.nan
+        # obs_data[obs_data<0.0] = N.nan
+        # obs_data[obs_data<0.0] = 0.0
+        pass
     ############################################################
 
     if return_ll:
@@ -1616,7 +1633,8 @@ MINMAX = {
         "NEXRAD_cut":(0.0,90.0),
         "REFL_comp_cut":(0.0,90.0),
         "UH25":(0.0,400.0),
-        "UH02":(0.0,100.0),
+        # "UH02":(0.0,100.0),
+        "UH02":(0.0,70.0),
         "AWS25":(0.0,0.02),
         "AWS02":(0.0,0.02),
         }
@@ -1831,8 +1849,9 @@ if do_domains:
     print("Domains plot saved to",fpath)
 
 if do_percentiles:
-    bins_names = 10001
-    pass
+
+    nbinn = 1000
+
     # JRL: create cdfs of cref, qpf, az-shear in EE3, EE1, and obs.
     # Evaluate everything at "key" percentiles, e.g. 90, 95, 99% for extreme stuff
 
@@ -1894,20 +1913,22 @@ if do_percentiles:
         else:
             raise Exception
 
-        data[data<0.0] = 0.0
-        nbins = 10001
-        hist = N.histogram(data,bins=nbins,range=MINMAX[v],)
-        # pdb.set_trace()
+        # Test UH problems
+        # In "load_fcst_dll", data is multiplied by -1; NaNs removed; negatives removed
+
+        # hist = N.histogram(data,bins=nbinn,range=MINMAX[v],)
+        # data[data < 0.0] = N.nan
+        data = data[~N.isnan(data)]
+        hist = N.histogram(data,bins=nbinn,range=MINMAX[v],)[0]
+        #if N.percentile(data,99.9) < 1:
+        #    pdb.set_trace()
         return hist
 
     def plot_quantiles(RVH,ax,quantiles,mul_units,pad=0.08,vrbl=None):
         multiplier, units = mul_units
-        ymax = dir(RVH)
-
-        red_pc = PC_Thresh(vrbl)
 
         for q in quantiles:
-            col = "red" if q in red_pc else "black"
+            col = "red" # if q in red_pc else "black"
             xval = RVH.ppf(q)
             ax.axvline(xval,color=col)
             if col == "red":
@@ -1923,84 +1944,106 @@ if do_percentiles:
     # JRL: generate RAIN-H (hourly RAINNC) to compare with ST4
     # Don't do percentiles, because it's likely over-fitting (only 60 verif times)
     #_vrbls = ("NEXRAD","REFL_comp","AWS02","AWS25","UH02","UH25")
-    #_vrbls = ("UH02","UH25","AWS02","AWS25")
+    # _vrbls = ("UH02","UH25","AWS02","AWS25")
+    _vrbls = ("AWS25","UH25",)
     #_vrbls = ["NEXRAD","REFL_comp"]
-    _vrbls = ["NEXRAD_cut","REFL_comp_cut"]
+    # _vrbls = ["NEXRAD_cut","REFL_comp_cut"]
 
     for _vrbl in _vrbls:
-        for kmstr in ('3km','1km'):
+        for kmstr in ('3km',):#'1km'):
             pcroot = os.path.join(outroot,"pc_distr",_vrbl,kmstr)
 
             fname_npy = "pc_distr_{}_{}.npy".format(_vrbl,kmstr)
             fpath_npy = os.path.join(outroot,tempdir,"pc_distr",fname_npy)
+            # pdb.set_trace()
             if not os.path.exists(fpath_npy) or overwrite_pp:
                 if ncpus > 1:
                     with multiprocessing.Pool(ncpus) as pool:
                         results = pool.map(pc_func,gen_pc_loop(_vrbl,kmstr))
                 else:
+                    results = []
                     for i in gen_pc_loop(_vrbl,kmstr):
-                        pc_func(i)
+                        results.append(pc_func(i))
                 # Do merged histogram
                 results = N.array(results)
                 utils.trycreate(fpath_npy,isdir=False)
                 N.save(file=fpath_npy,arr=results)
             else:
-                results = N.load(fpath_npy)
+                results = N.load(fpath_npy,allow_pickle=True)
 
-            hist = N.sum(results[:,0],axis=0)
-
-            # JRL: not sure why there is a 10001/10002 mismatch in pc bins
-            old_bins = results[0,1]
-            RVH = rv_histogram((hist,old_bins))
+            # hist = N.sum(results[:,0],axis=0)
+            hist = N.sum(results,axis=0)
+            lin_bins = N.linspace(*MINMAX[_vrbl],nbinn+1)
+            # RVH = rv_histogram((hist,old_bins))
+            RVH = rv_histogram((hist,lin_bins))
 
             print(_vrbl,kmstr,N.sum(hist),"points counted/sorted.")
 
-            bins = N.linspace(old_bins.min(),old_bins.max(),num=hist.shape[0])
+            # bins = N.linspace(old_bins.min(),old_bins.max(),num=hist.shape[0])
+            bins = lin_bins
+
+
+
+
             #q1 = N.arange(0.1,1.0,0.1)
             #q2 = N.array([0.95,0.99,0.995,0.999,0.9999])
             #quantiles = N.concatenate([q1,q2])
-            quantiles = (0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95,
-                                0.99,0.995,0.999,0.9999)
+            quantiles = (
+                            # 0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,
+                            0.9,0.95,0.99,0.995,0.999,0.9995,0.9999)
             # RVH.cdf(x=quantiles)
 
-            dw = (bins[1] - bins[0])*0.8
-            # JRL: shouldn't fit anything - just read off different percentiles
-            fname_fig = "pc_histbar_{}_{}.png".format(_vrbl,kmstr)
-            fpath_fig = os.path.join(pcroot,fname_fig)
-            fig,ax = plt.subplots(1)
-            ax.bar(x=bins,height=hist,width=dw,color='green',alpha=0.8)
-            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
-            #ax.set_xticks(bins[::1000])
-            #ax.set_xticklabels(["{:.3f}".format(x) for x in bins[::1000]])
-            #ax.set_xlim([bins.min(),bins.max()])
-            utils.trycreate(fpath_fig,isdir=False)
-            fig.savefig(fpath_fig)
-            plt.close(fig)
 
-            fname_fig = "pc_cdf_{}_{}.png".format(_vrbl,kmstr)
-            fpath_fig = os.path.join(pcroot,fname_fig)
-            fpath_fig2 = fpath_fig.replace("_cdf_","_cdfzoom_")
+            b_hist = N.cumsum(hist)/N.sum(hist) # * 100
+            bin_vals = []
+            for q in quantiles:
+                bin_no = len(b_hist[b_hist <= q])
+                bin_vals.append(bins[bin_no])
 
-            fig,ax = plt.subplots(1)
-            ax.plot(bins,RVH.cdf(bins))
-            ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
-            fig.savefig(fpath_fig)
-            ax.set_xlim(LIMS[_vrbl])
-            # ax.set_ylim([RVH.ppf(50)])
-            fig.savefig(fpath_fig2)
+                print(f"{q:.4f}: {bins[bin_no]:.4f}")
+            # pdb.set_trace()
 
-            fname_fig = "pc_scatter_{}_{}.png".format(_vrbl,kmstr)
-            fpath_fig3 = os.path.join(pcroot,fname_fig)
 
-            fig,ax = plt.subplots(1)
-            ax.scatter(bins,RVH.cdf(bins))
+            if False:
+                dw = (bins[1] - bins[0])*0.8
+                # JRL: shouldn't fit anything - just read off different percentiles
+                fname_fig = "pc_histbar_{}_{}.png".format(_vrbl,kmstr)
+                fpath_fig = os.path.join(pcroot,fname_fig)
+                fig,ax = plt.subplots(1)
+                ax.bar(x=bins,height=hist,width=dw,color='green',alpha=0.8)
+                ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
+                #ax.set_xticks(bins[::1000])
+                #ax.set_xticklabels(["{:.3f}".format(x) for x in bins[::1000]])
+                #ax.set_xlim([bins.min(),bins.max()])
+                utils.trycreate(fpath_fig,isdir=False)
+                fig.savefig(fpath_fig)
+                plt.close(fig)
 
-            fig.savefig(fpath_fig)
-            ax.set_xlim(LIMS[_vrbl])
-            # ax.set_ylim([RVH.ppf(50)])
-            fig.savefig(fpath_fig2)
-            pass
+            if True:
+                fname_fig = "pc_cdf_{}_{}.png".format(_vrbl,kmstr)
+                fpath_fig = os.path.join(pcroot,fname_fig)
+                fpath_fig2 = fpath_fig.replace("_cdf_","_cdfzoom_")
 
+                fig,ax = plt.subplots(1)
+                ax.plot(bins,RVH.cdf(bins))
+                ax = plot_quantiles(RVH,ax,quantiles,UNITS[_vrbl],vrbl=_vrbl)
+                fig.savefig(fpath_fig)
+                ax.set_xlim(LIMS[_vrbl])
+                # ax.set_ylim([RVH.ppf(50)])
+                fig.savefig(fpath_fig2)
+
+            if False:
+                fname_fig = "pc_scatter_{}_{}.png".format(_vrbl,kmstr)
+                fpath_fig3 = os.path.join(pcroot,fname_fig)
+
+                fig,ax = plt.subplots(1)
+                ax.scatter(bins,RVH.cdf(bins))
+
+                fig.savefig(fpath_fig)
+                ax.set_xlim(LIMS[_vrbl])
+                # ax.set_ylim([RVH.ppf(50)])
+                fig.savefig(fpath_fig2)
+                # pdb.set_trace()
 
 if _do_performance:
     fcst_fmts = ("d01_3km","d02_1km")
