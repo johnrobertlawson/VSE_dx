@@ -112,32 +112,32 @@ do_object_cluster = False # TODO prob delete
 
 CASES = collections.OrderedDict()
 CASES[datetime.datetime(2016,3,31,0,0,0)] = [
-#                        datetime.datetime(2016,3,31,19,0,0),
-#                        datetime.datetime(2016,3,31,20,0,0),
+                        datetime.datetime(2016,3,31,19,0,0),
+                        datetime.datetime(2016,3,31,20,0,0),
                         datetime.datetime(2016,3,31,21,0,0),
-#                        datetime.datetime(2016,3,31,22,0,0),
-#                        datetime.datetime(2016,3,31,23,0,0),
+                        datetime.datetime(2016,3,31,22,0,0),
+                        datetime.datetime(2016,3,31,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,1,0,0,0)] = [
-#                        datetime.datetime(2017,5,1,19,0,0),
-#                        datetime.datetime(2017,5,1,20,0,0),
+                        datetime.datetime(2017,5,1,19,0,0),
+                        datetime.datetime(2017,5,1,20,0,0),
                         datetime.datetime(2017,5,1,21,0,0),
-#                        datetime.datetime(2017,5,1,22,0,0),
-#                        datetime.datetime(2017,5,1,23,0,0),
+                        datetime.datetime(2017,5,1,22,0,0),
+                        datetime.datetime(2017,5,1,23,0,0),
                         ]
 CASES[datetime.datetime(2017,5,2,0,0,0)] = [
-#                        datetime.datetime(2017,5,2,23,0,0),
-#                        datetime.datetime(2017,5,3,0,0,0),
+                        datetime.datetime(2017,5,2,23,0,0),
+                        datetime.datetime(2017,5,3,0,0,0),
                         datetime.datetime(2017,5,3,1,0,0),
-#                        datetime.datetime(2017,5,3,2,0,0),
-#                        datetime.datetime(2017,5,3,3,0,0),
+                        datetime.datetime(2017,5,3,2,0,0),
+                        datetime.datetime(2017,5,3,3,0,0),
                         ]
 CASES[datetime.datetime(2017,5,4,0,0,0)] = [
-#                        datetime.datetime(2017,5,4,22,0,0),
-#                        datetime.datetime(2017,5,4,23,0,0),
+                        datetime.datetime(2017,5,4,22,0,0),
+                        datetime.datetime(2017,5,4,23,0,0),
                         datetime.datetime(2017,5,5,0,0,0),
-#                        datetime.datetime(2017,5,5,1,0,0),
-#                        datetime.datetime(2017,5,5,2,0,0),
+                        datetime.datetime(2017,5,5,1,0,0),
+                        datetime.datetime(2017,5,5,2,0,0),
                         ]
 
 
@@ -642,7 +642,7 @@ def load_obs_dll(validutc,caseutc,obs_vrbl=None,fcst_vrbl=None,obs_fmt=None,
     ######### JRL: ALL OBS DATA EDITING GOES ON HERE ##########
     if obs_vrbl in ("AWS02","AWS25"):
         # obs_data[obs_data<0.0] = N.nan
-        # obs_data[obs_data<0.0] = 0.0
+        obs_data[obs_data<0.0] = 0.0
         pass
     ############################################################
 
@@ -1944,13 +1944,13 @@ if do_percentiles:
     # JRL: generate RAIN-H (hourly RAINNC) to compare with ST4
     # Don't do percentiles, because it's likely over-fitting (only 60 verif times)
     #_vrbls = ("NEXRAD","REFL_comp","AWS02","AWS25","UH02","UH25")
-    # _vrbls = ("UH02","UH25","AWS02","AWS25")
-    _vrbls = ("AWS25","UH25",)
+    _vrbls = ("UH02","UH25","AWS02","AWS25")
+    # _vrbls = ("AWS25","UH25",)
     #_vrbls = ["NEXRAD","REFL_comp"]
     # _vrbls = ["NEXRAD_cut","REFL_comp_cut"]
 
     for _vrbl in _vrbls:
-        for kmstr in ('3km',):#'1km'):
+        for kmstr in ('3km','1km'):
             pcroot = os.path.join(outroot,"pc_distr",_vrbl,kmstr)
 
             fname_npy = "pc_distr_{}_{}.npy".format(_vrbl,kmstr)
