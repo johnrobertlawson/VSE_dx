@@ -77,7 +77,7 @@ do_quicklooks = not PA.no_quick
 ### SWITCHES ###
 do_plot_quicklooks = False
 do_domains = False
-do_percentiles = True
+do_percentiles = False
 _do_performance = False # Broken - to delete?
 do_performance = False
 do_efss = False # TODO - average for cref over cases, for paper
@@ -99,7 +99,7 @@ do_spurious_example = False
 do_oID_example = False
 do_ign_storm = False
 
-do_uh_infogain = False
+do_uh_infogain = True
 
 # MAYBE DELETE
 do_object_examples = False # TODO maybe delete, or do by hand
@@ -269,20 +269,20 @@ class Threshs:
                         "1km": (14.5,23.4,32.8,38.6,49.1,57.5),
                         },
                     "UH02":{
-                        "3km": (0.2,1.5,8.1,21.1),
-                        "1km": (0.5,4.2,21.7,59.0),
+                        "3km": (0.7,8.26,37.31,47.53),
+                        "1km": (1.61,19.46,55.83,62.09),
                         },
                     "AWS02":{
-                        "1km": (1.7E-3,4.1E-3,7.8E-3,13.8E-3),
-                        "3km": (1.7E-3,4.0E-3,7.7E-3,13.2E-3),
+                        "1km": (1.4e-3,3.6e-3,7.1e-3,8.6e-3),
+                        "3km": (1.4e-3,3.6e-3,6.9e-3,8.3e-3),
                         },
                     "UH25":{
-                        "1km": (0.8,9.9,52.7,143.3),
-                        "3km": (0.3,3.2,15.4,37.7),
+                        "1km": (1.6,41.2,230.4,292.0),
+                        "3km": (0.8,20.4,152.0,207.2),
                         },
                     "AWS25":{
-                        "1km": (1.9E-3,4.4E-3,8.1E-3,13.5E-3),
-                        "3km": (1.9E-3,4.3E-3,7.9E-3,13.2E-3),
+                        "1km": (1.7e-3,4.1e-3,7.6e-3,9.1e-3),
+                        "3km": (1.7e-3,4.1e-3,7.5e-3,8.9e-3),
                         },
                 }
         return lookup
@@ -327,7 +327,7 @@ class Threshs:
     def get_quantiles(self,vrbl):
         # Percentiles used for paper and scoring
         if vrbl in ("AWS02","AWS25","UH02","UH25"):
-            return (0.9, 0.99, 0.999,0.9999)
+            return (0.9, 0.99, 0.999,0.9995)
         elif (vrbl in ("REFL_comp","NEXRAD")) or (vrbl.endswith("cut")):
             return (0.7,0.8,0.9,0.95,0.99,0.999)
         else:
@@ -604,7 +604,7 @@ def load_fcst_dll(fcst_vrbl,fcst_fmt,validutc,caseutc,initutc,mem,return_ll=True
 
     ######### JRL: ALL FCST DATA EDITING GOES ON HERE ##########
     if fcst_vrbl in ("UH02","UH25"):
-        fcst_data = N.negative(fcst_data)
+        # fcst_data = N.negative(fcst_data)
 
         # small_no = 0.000001
 
@@ -1644,58 +1644,58 @@ MINMAX = {
 PC_LKUP = {
             "AWS02":{
                 "1km":{
-                    0.9:1.7e-3,
-                    0.99:4.1e-3,
-                    0.999:7.8e-3,
-                    0.9999:13.8e-3,
+                    0.9:1.4e-3,
+                    0.99:3.6e-3,
+                    0.999:7.1e-3,
+                    0.9995:8.6e-3,
                 },
                 "3km":{
-                    0.9:1.7e-3,
-                    0.99:4.0e-3,
-                    0.999:7.7e-3,
-                    0.9999:13.2e-3,
+                    0.9:1.4e-3,
+                    0.99:3.6e-3,
+                    0.999:6.9e-3,
+                    0.9995:8.3e-3,
                 }
             },
             "AWS25":{
                 "1km":{
-                    0.9:1.9e-3,
-                    0.99:4.4e-3,
-                    0.999:8.1e-3,
-                    0.9999:13.5e-3,
+                    0.9:1.7e-3,
+                    0.99:4.1e-3,
+                    0.999:7.6e-3,
+                    0.9995:9.1e-3,
                 },
                 "3km":{
-                    0.9:1.9e-3,
-                    0.99:4.3e-3,
-                    0.999:7.9e-3,
-                    0.9999:13.2e-3,
+                    0.9:1.7e-3,
+                    0.99:4.1e-3,
+                    0.999:7.5e-3,
+                    0.9995:8.9e-3,
                 }
             },
             "UH02":{
                 "1km":{
-                    0.9:0.5,
-                    0.99:4.2,
-                    0.999:21.7,
-                    0.9999:59.0,
+                    0.9:1.61,
+                    0.99:19.46,
+                    0.999:55.86,
+                    0.9995:62.09,
                 },
                 "3km":{
-                    0.9:0.2,
-                    0.99:1.5,
-                    0.999:8.1,
-                    0.9999:21.1,
+                    0.9:0.7,
+                    0.99:8.26,
+                    0.999:37.31,
+                    0.9995:47.53,
                 }
             },
             "UH25":{
                 "1km":{
-                    0.9:0.8,
-                    0.99:9.9,
-                    0.999:52.7,
-                    0.9999:143.3,
+                    0.9:1.6,
+                    0.99:41.2,
+                    0.999:230.4,
+                    0.9995:292,
                 },
                 "3km":{
-                    0.9:0.3,
-                    0.99:3.2,
-                    0.999:15.4,
-                    0.9999:37.7,
+                    0.9:0.8,
+                    0.99:20.4,
+                    0.999:152,
+                    0.9995:207.2,
                 }
             }
         } # END!
@@ -6032,7 +6032,7 @@ if do_uh_infogain:
                 DKL = -((obs_yesno * N.log2(obs_yesno/fprob))+
                             ((1-obs_yesno)*N.log2((1-obs_yesno)/(1-fprob))))
                 # Compute
-                pdb.set_trace()
+                # pdb.set_trace()
                 # Get matches
 
                 # Lookup in fcst mf
