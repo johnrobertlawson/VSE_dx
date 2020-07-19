@@ -91,7 +91,7 @@ do_object_distr = False # TODO re-plot after matching new (18) matches
 do_object_matching = False # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO NOT WORKING - WINDROSE PACKAGE HAS ISSUES
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
-do_object_infogain = False #
+do_object_infogain = True #
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
 do_qlcs_verif = False
@@ -99,7 +99,7 @@ do_spurious_example = False
 do_oID_example = False
 do_ign_storm = False
 
-do_uh_infogain = True
+do_uh_infogain = False
 
 # MAYBE DELETE
 do_object_examples = False # TODO maybe delete, or do by hand
@@ -147,7 +147,7 @@ CASES[datetime.datetime(2017,5,4,0,0,0)] = [
 ### DIRECTORIES ###
 # extractroot = "/home/nothijngrad/Xmas_Shutdown/Xmas"
 key_pp = 'AprilFool'
-key_output = "FebPC"
+key_output = "JulyPC"
 
 # R1 - 96pc w/ 144 footprint
 # R2 - 96pc w/ 120 footprint
@@ -268,21 +268,22 @@ class Threshs:
                         "3km": (14.9,23.5,32.9,38.7,49.0,57.3),
                         "1km": (14.5,23.4,32.8,38.6,49.1,57.5),
                         },
+                    # 99, 99.5, 99.9, 99.95
                     "UH02":{
-                        "3km": (0.7,8.26,37.31,47.53),
-                        "1km": (1.61,19.46,55.83,62.09),
+                        "3km": (5.67,9.52,25.97,35.63),
+                        "1km": (15.33,24.01,48.65,57.05),
                         },
                     "AWS02":{
-                        "1km": (1.4e-3,3.6e-3,7.1e-3,8.6e-3),
-                        "3km": (1.4e-3,3.6e-3,6.9e-3,8.3e-3),
+                        "3km": (3.6e-3,4.4e-3,6.7e-3,8.2e-3),
+                        "1km": (3.7e-3,4.5e-3,6.9e-3,8.3e-3),
                         },
                     "UH25":{
-                        "1km": (1.6,41.2,230.4,292.0),
-                        "3km": (0.8,20.4,152.0,207.2),
+                        "3km": (9.6,17.2,52.4,75.2),
+                        "1km": (26.8,50.4,153.2,212.4),
                         },
                     "AWS25":{
-                        "1km": (1.7e-3,4.1e-3,7.6e-3,9.1e-3),
-                        "3km": (1.7e-3,4.1e-3,7.5e-3,8.9e-3),
+                        "3km": (4.2e-3,5.1e-3,7.6e-3,9.0e-3),
+                        "1km": (4.2e-3,5.2e-3,7.8e-3,9.2e-3),
                         },
                 }
         return lookup
@@ -1639,66 +1640,6 @@ MINMAX = {
         "AWS02":(0.0,0.02),
         }
 
-
-
-PC_LKUP = {
-            "AWS02":{
-                "1km":{
-                    0.9:1.4e-3,
-                    0.99:3.6e-3,
-                    0.999:7.1e-3,
-                    0.9995:8.6e-3,
-                },
-                "3km":{
-                    0.9:1.4e-3,
-                    0.99:3.6e-3,
-                    0.999:6.9e-3,
-                    0.9995:8.3e-3,
-                }
-            },
-            "AWS25":{
-                "1km":{
-                    0.9:1.7e-3,
-                    0.99:4.1e-3,
-                    0.999:7.6e-3,
-                    0.9995:9.1e-3,
-                },
-                "3km":{
-                    0.9:1.7e-3,
-                    0.99:4.1e-3,
-                    0.999:7.5e-3,
-                    0.9995:8.9e-3,
-                }
-            },
-            "UH02":{
-                "1km":{
-                    0.9:1.61,
-                    0.99:19.46,
-                    0.999:55.86,
-                    0.9995:62.09,
-                },
-                "3km":{
-                    0.9:0.7,
-                    0.99:8.26,
-                    0.999:37.31,
-                    0.9995:47.53,
-                }
-            },
-            "UH25":{
-                "1km":{
-                    0.9:1.6,
-                    0.99:41.2,
-                    0.999:230.4,
-                    0.9995:292,
-                },
-                "3km":{
-                    0.9:0.8,
-                    0.99:20.4,
-                    0.999:152,
-                    0.9995:207.2,
-                }
-            }
-        } # END!
 
 """PERCENTILES:
     * Representative AWS02 values:
@@ -4534,9 +4475,10 @@ if do_object_infogain:
                 label=dstrs[n],ax=ax,
                 # kernel='gau',bw='scott',
                 # kernel='gau',bw='silverman',
-                # kernel='gau', bw=0.2,
-                kernel = 'cos', bw='scott',
+                kernel='cos', bw=0.15,
+                # kernel = 'cos', bw='scott',
                 legend=True)
+                # pdb.set_trace()
 
             elif line_plot:
         #if True:
@@ -4588,7 +4530,9 @@ if do_object_infogain:
         ax.set_ylabel("Density")
         # ax.legend()
         if vrbl == "UH":
-            ax.set_xlim([min(N.nanmin(EE1),N.nanmin(EE3)),0.5])
+            ax.set_xlim([min(N.nanmin(EE1),N.nanmin(EE3)),0.1])
+            # ax.set_xlim([min(N.nanmin(EE1),N.nanmin(EE3)),0.5])
+
             ax.set_xlabel("Remaining UH entropy per object (bits)")
 
             if H_all is not None:
@@ -4597,13 +4541,13 @@ if do_object_infogain:
                 s1 = f"Removing <0.2 probs, 1km gains {H_noclearsky:.1f} bits"
                 s2 = f" (for all probs, 1km gains {H_all:.1f} bits)"
                 ss = s1+s2
-                anno = True
+                anno = False
             elif Ho_all is not None:
 
                 s3 = f"No <20% forecasts of obs=no: 1km gains {Ho_ncs:.3f} bits per object"
                 s4 = f" (for all probs, 1km gained {Ho_all:.3f} bits)"
                 ss = s3+s4
-                anno = True
+                anno = False
             else:
                 anno = False
             if anno is True:
@@ -4697,7 +4641,7 @@ if do_object_infogain:
         mUHs_fpath = os.path.join(objectroot,mUHs_fname)
 
         IG_debug = False
-        if os.path.exists(IGs_fpath) and (IG_debug is False):
+        if os.path.exists(IGs_fpath) and os.path.exists(mUHs_fpath) and (IG_debug is False):
             IGs_by_time = utils.load_pickle(IGs_fpath)
             UHs_by_time = utils.load_pickle(UHs_fpath)
             # This one ignores DKL ~ 0 for not-obs, not-fcst
@@ -6065,7 +6009,7 @@ if do_uh_infogain:
 
     def gen_UH_loop(obs_obj_mf,dom,mode,MATCH):
         for oo in obs_obj_mf.iterrows():
-            pdb.set_trace()
+            # pdb.set_trace()
             yield dom, mode, oo[1], MATCH
 
     uh_props = ["midrot_exceed_ID_0","midrot_exceed_ID_1",
@@ -6079,7 +6023,7 @@ if do_uh_infogain:
     # for dom, mode, hr in itertools.product(doms,modes,hours):
     for dom, mode in itertools.product(doms,modes):
         MATCH, mf = get_MATCH(member_names,return_megaframe=True,modes=(mode,))
-        pdb.set_trace()
+        # pdb.set_trace()
         obs_obj_mf = mf[
                     (mf['member']=='obs') &
                     # (mf['conv_mode']==mode) &
