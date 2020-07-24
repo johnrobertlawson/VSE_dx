@@ -16,7 +16,9 @@ import warnings
 import math
 
 # John hack
+import multiprocess
 from multiprocess import Pool as mpPool
+#multiprocess.set_start_method('spawn',force=True)
 
 # JRL: hack to stop the bloody annoying scikit warnings
 # Others might be surpressed too... not always a good idea.
@@ -88,10 +90,10 @@ object_switch = False
 do_object_pca = False
 do_object_performance = False # TODO re-do with new (18) matching/diff vectors?
 do_object_distr = False # TODO re-plot after matching new (18) matches
-do_object_matching = False # TODO finish 18 members; do info-gain diffs?
+do_object_matching = True # TODO finish 18 members; do info-gain diffs?
 do_object_windrose = False # # TODO NOT WORKING - WINDROSE PACKAGE HAS ISSUES
 do_object_brier_uh = False # TODO finish - split into first_hour, second_hour etc
-do_object_infogain = True #
+do_object_infogain = False #
 do_case_outline = False # TODO colorbars, smoothing for SRH+shear, sparse wind barbs
 do_one_objectID = False
 do_qlcs_verif = False
@@ -858,7 +860,8 @@ def get_kw(prodfmt,utc,threshold,mem=None,initutc=None,fpath=None,
 
 def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
                     add_resolution=True,add_mode=True,
-                    debug_before_uh=False,add_init=True):
+                    debug_before_uh=False,add_init=True,
+                    use_old=False):
     # Overwrite fmts...
     del fmts
     # fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
@@ -867,11 +870,14 @@ def load_megaframe(fmts,add_ens=True,add_W=True,add_uh_aws=True,
     #all_fmts = list(fcst_fmts) + list(obs_fmts)
     all_fmts = list(obs_fmts) + list(fcst_fmts)
 
-    mega_fname = "MEGAFRAME.megaframe"
+    if use_old:
+        mega_fname = "MEGAFRAME.old"
+    else:
+        mega_fname = "MEGAFRAME.megaframe"
     mega_fpath = os.path.join(objectroot,mega_fname)
     # ens will create a similar df to megaframe, but separating
     # member and domain from "prod".
-
+    # pdb.set_trace()
     # w adds on updraught information
 
     if os.path.exists(mega_fpath):
@@ -1400,7 +1406,8 @@ def get_MATCH(mns,return_megaframe=False,modes=('cellular',),
         return MATCH, megaframe
     return MATCH
 
-def get_dom_match(mns,return_megaframe=False,modes=None):
+def get_dom_match(mns,return_megaframe=False,modes=None,use_old=False,
+                        do_contingency=True):
     if modes is None:
         # modes = ('linear',)
         modes = ('cellular',)
@@ -1408,7 +1415,7 @@ def get_dom_match(mns,return_megaframe=False,modes=None):
     fcst_fmts = ("d01_3km","d02_1km",)#"d02_3km")
     obs_fmts = ("nexrad_3km","nexrad_1km")
     all_fmts = list(fcst_fmts) + list(obs_fmts)
-    megaframe = load_megaframe(fmts=all_fmts)
+    megaframe = load_megaframe(fmts=all_fmts,use_old=use_old)
     # pdb.set_trace()
     CAT = Catalogue(megaframe,tempdir=objectroot,ncpus=ncpus)
 
@@ -1428,11 +1435,16 @@ def get_dom_match(mns,return_megaframe=False,modes=None):
                 fname_match = f"{mode}_{member}-dom-match_{casestr}_{initstr}.pickle"
                 fname_2x2 = fname_match.replace("match","2x2")
                 fname_sorted = fname_match.replace("match","sortedpairs")
+
+
                 mdir = os.path.join(objectroot,"dom_match_pickles",
                                         mode,casestr,initstr)
+
+
                 fpath_match = os.path.join(mdir,fname_match)
                 fpath_2x2 = os.path.join(mdir,fname_2x2)
                 fpath_sorted = os.path.join(mdir,fname_sorted)
+                # pdb.set_trace()
                 if (not os.path.exists(fpath_match)):
                     dictA = {"member":member,"conv_mode":mode,
                                 "case_code":casestr,"init_code":initstr,
@@ -1442,39 +1454,50 @@ def get_dom_match(mns,return_megaframe=False,modes=None):
                                 "domain":"d02"}
                     print("About to parallelise dom-matching for:\n",
                                 stars,casestr,initstr,member,stars)
-                    # pdb.set_trace()
-                    matches, _2x2, sorted_pairs = CAT.match_two_groups(
-                                        dictA,dictB,do_contingency=True,td_max=21.0)
-                    print("=== RESULTS FOR",member,casestr,
-                        initstr,"===")
+                    _mat = CAT.match_two_groups(
+                                        dictA,dictB,do_contingency=do_contingency,
+                                        optimise=True,td_max=21.0)
 
-                    if _2x2 is None:
-                        print("No objects - skipping.")
+                    # pdb.set_trace()
+                    if do_contingency is True:
+                        matches, _2x2, sorted_pairs = _mat
                     else:
-                        qquad = '    '
-                        bias = _2x2.get("BIAS")
-                        pod = _2x2.get("POD")
-                        far = _2x2.get("FAR")
-                        csi = _2x2.get("CSI")
-                        print(f"BIAS: {bias:.2f}",qquad,f"POD: {pod:.2f}",qquad,
-                                f"FAR: {far:.2f}",qquad,f"CSI: {csi:.2f}")
-                        print(f"a = {_2x2.a}",qquad,f"b = {_2x2.b}",qquad,
-                                f"c = {_2x2.c}")
+                        matches = _mat
+
                     utils.save_pickle(obj=matches, fpath=fpath_match)
-                    utils.save_pickle(obj=_2x2, fpath=fpath_2x2)
-                    utils.save_pickle(obj=sorted_pairs, fpath=fpath_sorted)
+
+                    if do_contingency:
+                        print("=== RESULTS FOR",member,casestr,
+                            initstr,"===")
+
+                        if _2x2 is None:
+                            print("No objects - skipping.")
+                        else:
+                            qquad = '    '
+                            bias = _2x2.get("BIAS")
+                            pod = _2x2.get("POD")
+                            far = _2x2.get("FAR")
+                            csi = _2x2.get("CSI")
+                            print(f"BIAS: {bias:.2f}",qquad,f"POD: {pod:.2f}",qquad,
+                                    f"FAR: {far:.2f}",qquad,f"CSI: {csi:.2f}")
+                            print(f"a = {_2x2.a}",qquad,f"b = {_2x2.b}",qquad,
+                                    f"c = {_2x2.c}")
+                            utils.save_pickle(obj=sorted_pairs, fpath=fpath_sorted)
+                            utils.save_pickle(obj=_2x2, fpath=fpath_2x2)
                     print("Data saved.")
                 else:
                     matches = utils.load_pickle(fpath=fpath_match)
-                    _2x2 = utils.load_pickle(fpath=fpath_2x2)
-                    sorted_pairs = utils.load_pickle(fpath=fpath_sorted)
+                    if do_contingency:
+                        sorted_pairs = utils.load_pickle(fpath=fpath_sorted)
+                        _2x2 = utils.load_pickle(fpath=fpath_2x2)
                     # pdb.set_trace()
                     print("Data loaded.")
 
                 # Keep in memory
-                MATCH[member][mode][casestr][initstr]['2x2'] = _2x2
                 MATCH[member][mode][casestr][initstr]['matches'] = matches
-                MATCH[member][mode][casestr][initstr]['sorted'] = sorted_pairs
+                if do_contingency:
+                    MATCH[member][mode][casestr][initstr]['2x2'] = _2x2
+                    MATCH[member][mode][casestr][initstr]['sorted'] = sorted_pairs
             pass
         pass
 
@@ -2450,7 +2473,8 @@ if do_efss:
 
 
     fcstmins = (30,90,150)
-    vrbls = ("UH25","UH02","REFL_comp")
+    # vrbls = ("UH25","UH02")
+    vrbls = ("REFL_comp",)
 
     for fcstmin, temporal_window,caseutc,vrbl in itertools.product(
                 fcstmins,temporal_windows,CASES.keys(),vrbls):
@@ -2655,13 +2679,13 @@ if do_efss:
             ax.set_xlabel("Neighborhood diameter (km)")
 
             if vrbl == "REFL_comp":
-                qt_labs = ("0.7","0.8","0.9","0.95","0.99","0.999")
+                qt_labs = ("70","80","90","95","99","99.9")
             elif vrbl in ("UH02","UH25"):
-                qt_labs = ("0.9","0.99","0.999","0.9999")
+                qt_labs = ("99","99.5","99.9","99.99")
             else:
                 raise Exception
             ax.set_yticklabels(qt_labs)
-            ax.set_ylabel("Quantile to exceed")
+            ax.set_ylabel("Percentile to exceed")
 
             plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
                     rotation_mode="anchor")
@@ -3267,13 +3291,16 @@ if do_object_distr:
         print("Figure saved to",fpath)
         plt.close(f)
 
-if do_object_matching:
+if do_object_matching and (__name__ == '__main__'):
+
     print(stars,"DOING OBJ MATCHING/DIFFS",stars)
     mode = "cellular"
     # mode = 'linear'
     mns = get_member_names(36)
+    # mns = get_member_names(6)
     match_dict, megaframe = get_dom_match(mns, return_megaframe=True,
-                                modes=(mode,))
+                                modes=(mode,),use_old=False,do_contingency=False)
+    # pdb.set_trace()
 
     ### DIFFS ###
 
@@ -3287,6 +3314,7 @@ if do_object_matching:
     def find_row(df,megaidx):
         row = df[(df['megaframe_idx'] == megaidx)]
         assert len(row) == 1
+        # pdb.set_trace()
         return row
 
     def do_write_diff(df,n,oldkey,newkey,d02,d01):
@@ -3308,12 +3336,16 @@ if do_object_matching:
     # loop over all matches, and join dicts together - alert if any clashes in keys
     for member in mns:
         for initutc, casestr, initstr in get_initutcs_strs():
+            # this_dict = match_dict[member][mode][casestr][initstr]['sorted']
             this_dict = match_dict[member][mode][casestr][initstr]['matches']
+            if isinstance(this_dict,tuple):
+                pass
+            else:
+                for k,v in this_dict.items():
+                    if v is not None:
+                        megalist.append((k,v[0]))
 
-            for k,v in this_dict.items():
-                if v is not None:
-                    megalist.append((k,v[0]))
-
+            #pdb.set_trace()
     # JRL TODO: something with BIAS, CSI etc information?
     # could also do that RDI with a PCA between the two domain cellular objects
 
@@ -3413,7 +3445,8 @@ if do_object_matching:
     axit = axes.flat
     for n,p_d in enumerate(prop_diffs):
         ax = next(axit)
-        ax.hist(diff_df[p_d],bins=BINS[p_d],color='grey')
+        # ax.hist(diff_df[p_d],bins=BINS[p_d],color='grey')
+        ax.hist(diff_df[p_d],color='grey')
         # ax.hist(diff_df[p_d],color=next(palette))
         ax.set_title(NICESTR[p_d])
         ax.set_facecolor('lightgray')
@@ -3434,13 +3467,13 @@ if do_object_matching:
                 # c = 'magenta'
             ax.axvline(x_loc,color=c,linestyle='--',linewidth=2)
         ax.axvline(0,color='black',linewidth=3)
-        ax.set_xlim(LIMS[p_d])
+        # ax.set_xlim(LIMS[p_d])
         utils.make_subplot_label(ax,f"({next(lll)})",loc_frac=loc_frac)
 
     ax = next(axit)
     ax.set_facecolor('lightgray')
     ax.hist(diff_df["centroid_gap_km"],bins=50,color='green')
-    ax.set_xlim([0,50])
+    # ax.set_xlim([0,50])
     ax.set_title("Gap in centroids (km)")
     utils.make_subplot_label(ax,f"({next(lll)})",loc_frac=(0.9,0.9))
 
